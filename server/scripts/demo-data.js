@@ -2,8 +2,9 @@
 // Usage: PGLITE_DIR=./data TEST_MODE=1 node scripts/demo-data.js
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb } from '../src/db.js';
-import * as m from '../src/market.js';
+process.env.MCP_TRADING ||= 'open'; // demo traders list MCP NFTs long before the sell-out
+const { openDb } = await import('../src/db.js');
+const m = await import('../src/market.js');
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const db = await openDb();
