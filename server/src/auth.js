@@ -15,6 +15,10 @@ const rand = (n = 32) => crypto.randomBytes(n).toString('base64url');
 const hash = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
 const ACCESS_TTL = 7 * 24 * 3600;
 const REFRESH_TTL = 180 * 24 * 3600;
+const SITE_TTL = 30 * 24 * 3600;
+const SITE_COOKIE = 'mcp_site';
+// where a sign-in on the site may go back to: a page of this site, nothing else
+const SITE_RETURN = /^\/(#\/[A-Za-z0-9_\-/?=&%.:]{0,120})?$/;
 const LOGIN_TTL_MIN = 15;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const REQ_ID = /^[A-Za-z0-9_-]{16,64}$/;
@@ -52,6 +56,7 @@ export function createAuth(db, { publicUrl, xClientId, xClientSecret, devLogin }
     await db.query('delete from oauth_tokens where expires_at < now()');
     await db.query('delete from oauth_codes where expires_at < now()');
     await db.query("delete from oauth_pending where created_at < now() - interval '1 day'");
+    await db.query('delete from site_sessions where expires_at < now()');
   }
 
   const provider = {
@@ -100,11 +105,18 @@ export function createAuth(db, { publicUrl, xClientId, xClientSecret, devLogin }
     `<p>For your safety, sign-in only works in the browser where it started. Go to Claude or ChatGPT, press <b>Connect</b>
      on the MCP connector, and finish signing in there.</p><p class="dim">If someone sent you this link, close it.</p>`));
 
-  // step 2: the user signed in; send the AI app back an authorization code
+  // step 2: the user signed in; send the AI app back an authorization code (or, on the site, start a session)
   async function finish(req, res, pendingId, user) {
     const [p] = await db.query(`delete from oauth_pending where id = $1 and created_at > now() - make_interval(mins => $2) returning client_id, params`,
       [pendingId, LOGIN_TTL_MIN]);
     if (!p) return expired(res);
+    if (p.params.site) {
+      const token = rand();
+      await db.query('insert into site_sessions (token, user_id, expires_at) values ($1, $2, now() + make_interval(secs => $3))', [hash(token), user.id, SITE_TTL]);
+      res.clearCookie(cookieName(pendingId), { path: '/login' });
+      res.cookie(SITE_COOKIE, token, { httpOnly: true, secure: secureCookie, sameSite: 'lax', path: '/', maxAge: SITE_TTL * 1000 });
+      return res.redirect(SITE_RETURN.test(p.params.return_to || '') ? p.params.return_to : '/');
+    }
     const code = rand();
     await db.query("insert into oauth_codes (code, client_id, user_id, challenge, redirect_uri, expires_at) values ($1, $2, $3, $4, $5, now() + interval '5 minutes')",
       [hash(code), p.client_id, user.id, p.params.codeChallenge, p.params.redirectUri]);
@@ -121,6 +133,23 @@ export function createAuth(db, { publicUrl, xClientId, xClientSecret, devLogin }
     next();
   });
 
+  // the site's own sign-in (the launchpad): the same X sign-in, then a session cookie instead of a code for an app
+  router.get('/login/site', async (req, res) => {
+    const back = String(req.query.return || '/');
+    if (!SITE_RETURN.test(back)) return res.status(400).send(page('Sign in', '<p>Bad return address.</p>'));
+    const id = rand(16);
+    await db.query("insert into oauth_pending (id, client_id, params) values ($1, '__site__', $2)", [id, { site: true, return_to: back, client_name: 'The MCP website' }]);
+    res.cookie(cookieName(id), '1', { httpOnly: true, secure: secureCookie, sameSite: 'lax', path: '/login', maxAge: LOGIN_TTL_MIN * 60 * 1000 });
+    res.redirect(xClientId && !devLogin ? `/login/x?req=${id}` : `/login?req=${id}`);
+  });
+  router.post('/logout/site', async (req, res) => {
+    if (req.get('x-mcp-site') !== '1') return res.status(403).json({ error: 'forbidden' });
+    const token = cookieOf(req, SITE_COOKIE);
+    if (token) await db.query('delete from site_sessions where token = $1', [hash(token)]);
+    res.clearCookie(SITE_COOKIE, { path: '/' });
+    res.json({ ok: true });
+  });
+
   router.get('/login', async (req, res) => {
     const id = String(req.query.req || '');
     if (!REQ_ID.test(id)) return expired(res);
@@ -129,15 +158,17 @@ export function createAuth(db, { publicUrl, xClientId, xClientSecret, devLogin }
     if (!startedHere(req, id)) return foreign(res);
     let host = '?';
     try { host = new URL(p.params.redirectUri).hostname; } catch {}
-    const known = KNOWN_APP_HOSTS.includes(host);
+    const known = p.params.site || KNOWN_APP_HOSTS.includes(host);
+    if (p.params.site) host = 'this website';
     const warn = known ? '' : `<p class="warn">⚠ Access goes to <b>${esc(host)}</b>, which is not Claude or ChatGPT. Only continue if you set this up yourself.</p>`;
     const x = xClientId ? `<a class="btn" href="/login/x?req=${id}">Sign in with X</a>` : '';
     const dev = devLogin ? `<form method="post" action="/login/dev"><input type="hidden" name="req" value="${id}">
       <input name="handle" placeholder="test handle, e.g. artem" required pattern="[A-Za-z0-9_]{1,15}" maxlength="15" autocomplete="off">
       <button class="btn ghost">Test sign-in</button></form>
       <p class="dim">Test server: any handle works, balances are test money and anyone can sign in as any handle.</p>` : '';
-    res.send(page('Connect MCP', `<p><b>${esc(p.params.client_name)}</b> <span class="dim">(${esc(host)})</span> wants to use your MCP account:
-      see your balance and NFTs, mint, buy and sell. Withdrawals only ever go to the address you bind yourself.</p>${warn}
+    const what = p.params.site ? 'Sign in to launch and manage your collections. This does not connect any AI app.'
+      : 'wants to use your MCP account: see your balance and NFTs, mint, buy and sell. Withdrawals only ever go to the address you bind yourself.';
+    res.send(page(p.params.site ? 'Sign in to MCP' : 'Connect MCP', `<p><b>${esc(p.params.client_name)}</b> <span class="dim">(${esc(host)})</span> ${what}</p>${warn}
       <p class="dim">One X account = one MCP account. We only read your handle, name and avatar.</p>${x}${dev}`));
   });
 
@@ -194,7 +225,23 @@ export function createAuth(db, { publicUrl, xClientId, xClientSecret, devLogin }
     });
   }
 
-  return { provider, router };
+  // the user signed in on the site, if any
+  async function siteUser(req) {
+    const token = cookieOf(req, SITE_COOKIE);
+    if (!token || token.length > 100) return null;
+    const [u] = await db.query(`select u.* from site_sessions s join users u on u.id = s.user_id where s.token = $1 and s.expires_at > now()`, [hash(token)]);
+    return u || null;
+  }
+
+  return { provider, router, siteUser };
+}
+
+function cookieOf(req, name) {
+  for (const part of String(req.get('cookie') || '').split(/;\s*/)) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i) === name) return decodeURIComponent(part.slice(i + 1));
+  }
+  return null;
 }
 
 function page(title, body) {

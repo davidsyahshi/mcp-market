@@ -1,6 +1,7 @@
 // Serverless entry (Netlify Functions, AWS Lambda): the same Express app behind serverless-http.
 // The app and its database pool are created once per warm instance and reused across requests.
 import serverless from 'serverless-http';
+import { connectLambda } from '@netlify/blobs';
 import { createApp } from './app.js';
 import { openPg } from './pg.js';
 import { migrate } from './schema.js';
@@ -24,6 +25,8 @@ export function createHandler(opts = {}) {
   };
   return async (event, context) => {
     if (context) context.callbackWaitsForEmptyEventLoop = false;
+    // launchpad pictures live in Netlify Blobs: each invocation brings its access
+    if (event?.blobs) connectLambda(event);
     ready ??= init().catch((e) => { ready = null; throw e; });
     const handle = await ready;
     return handle(event, context);

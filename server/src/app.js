@@ -15,6 +15,8 @@ import { createDeposits } from './deposits.js';
 import { createWithdrawals } from './withdrawals.js';
 import { withdrawUi } from './ui.js';
 import { createExplorer } from './explorer.js';
+import * as lp from './launchpad.js';
+import { defaultStorage, sniffImage } from './storage.js';
 
 const sameSecret = (given, key) => {
   if (!key || typeof given !== 'string') return false;
@@ -34,6 +36,10 @@ export async function createApp(opts) {
   const deposits = opts.deposits || createDeposits(db, { publicUrl, rpc: opts.rpc, helius: opts.helius, config: opts.depositConfig });
   const withdrawals = opts.withdrawals || createWithdrawals(db, { rpc: opts.rpc, config: opts.withdrawConfig });
   const explorer = opts.explorer || createExplorer(db, { deposits, withdrawals, rpc: opts.rpc, config: opts.explorerConfig });
+  const storage = opts.storage || await defaultStorage();
+  // the market's owner(s), by X account id (it never changes, unlike a handle someone else could take later):
+  // they review collections and release payouts. /api/me shows a signed-in account its own id.
+  const admins = new Set(String(opts.adminXIds ?? process.env.ADMIN_X_IDS ?? '').split(',').map((h) => h.trim()).filter(Boolean));
   await m.ensurePublicIds(db);
 
   const app = express();
@@ -50,7 +56,7 @@ export async function createApp(opts) {
     next();
   });
 
-  const { provider, router: loginRouter } = createAuth(db, {
+  const { provider, router: loginRouter, siteUser } = createAuth(db, {
     publicUrl,
     xClientId: process.env.X_CLIENT_ID,
     xClientSecret: process.env.X_CLIENT_SECRET,
@@ -90,8 +96,37 @@ export async function createApp(opts) {
   api.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   // amounts in the public API are plain numbers of $MCP (1 $MCP = $1)
   const num = units;
-  const shape = (n) => ({ ...n, price: num(n.price), image: `/img/${n.id}.png`, thumb: `/thumb/${n.id}.png` });
+  // /img/<id>.png is the full picture (28x28 pixel art at its native size when pixel is true), /thumb/<id>.png 252 px
+  const shape = (n) => ({ ...n, price: num(n.price), image: `/img/${n.id}.png`, thumb: `/thumb/${n.id}.png`,
+    ...(n.activity ? { activity: n.activity.map((a) => ({ ...a, price: num(a.price) })) } : {}) });
   const str = (v) => (typeof v === 'string' ? v : undefined);
+  const intOr = (v, d = null) => (/^\d{1,15}$/.test(String(v ?? '')) ? Number(v) : d);
+  // an NFT's number: a Postgres int
+  const nftIdOr = (v) => (/^\d{1,9}$/.test(String(v ?? '')) ? Number(v) : null);
+  // ?trait=Chassis:Bunny&trait=Lid:Beanie
+  const traitsOf = (q) => [].concat(q.trait || []).filter((t) => typeof t === 'string').slice(0, 40)
+    .map((t) => [t.slice(0, t.indexOf(':')), t.slice(t.indexOf(':') + 1)]).filter(([k, v]) => k && v);
+  const nftQuery = (q) => ({
+    ...Object.fromEntries(['status', 'sort', 'rarity', 'collection'].map((k) => [k, str(q[k])])),
+    traits: traitsOf(q),
+    limit: intOr(q.limit, 200),
+    offset: intOr(q.offset, 0),
+  });
+  const colView = ({ id, ...c }) => ({ ...c, mint_price: num(c.mint_price), floor: num(c.floor), volume: num(c.volume),
+    trading_open: !c.trade_after_sold_out || c.minted >= c.supply,
+    cover: c.cover_nft ? `/img/${c.cover_nft}.png` : `/covers/${c.slug}.png` });
+  const isAdmin = (u) => !!u && admins.has(String(u.x_id));
+  // a collection that is not public (draft, review, rejected) shows only to its creator and the owner
+  const visible = async (req, slug) => {
+    const pub = (await m.collections(db, { statuses: ['live', 'paused', 'frozen'] })).find((x) => x.slug === slug);
+    if (pub) return pub;
+    const u = await siteUser(req);
+    if (!u) return null;
+    const all = await m.collections(db, { statuses: ['draft', 'review', 'rejected'] });
+    const c = all.find((x) => x.slug === slug);
+    const [own] = c ? await db.query('select creator_id from collections where id = $1', [c.id]) : [];
+    return c && (isAdmin(u) || own?.creator_id === u.id) ? c : null;
+  };
   // whether this deploy can build the withdrawal form (it needs the bundled MCP Apps SDK file)
   const formInfo = () => {
     try {
@@ -102,7 +137,8 @@ export async function createApp(opts) {
     }
   };
   api.get('/stats', async (req, res) => {
-    const s = await m.stats(db);
+    const s = await m.stats(db, { collection: str(req.query.collection) });
+    if (!s) return res.status(404).json({ error: 'not found' });
     res.json({
       ...s, floor: num(s.floor), volume: num(s.volume), mint_price: num(s.mint_price), currency: 'MCP', usd_per_mcp: 1,
       deposits: deposits.enabled ? { network: deposits.cluster === 'mainnet' ? 'solana' : `solana-${deposits.cluster}`, tokens: deposits.tokens.map((t) => t.symbol) } : null,
@@ -110,17 +146,106 @@ export async function createApp(opts) {
       withdrawals: withdrawals.enabled ? { network: withdrawals.cluster, form: formInfo() } : null,
     });
   });
+  api.get('/collections', async (req, res) => res.json((await m.collections(db)).map(colView)));
+  api.get('/collections/:slug', async (req, res) => {
+    const c = await visible(req, String(req.params.slug).toLowerCase());
+    if (!c) return res.status(404).json({ error: 'not found' });
+    const full = await m.getCollection(db, c.slug);
+    const s = await m.stats(db, { collection: c.slug, anyStatus: true }); // visible() decided who may see it
+    // traits: [{type, values: [{value, count, percent}]}], most common first
+    const rank = (t) => { const i = (full.trait_order || []).indexOf(t); return i < 0 ? 1e6 : i; };
+    const traits = Object.entries(full.traits || {}).sort(([a], [b]) => rank(a) - rank(b)).map(([type, vals]) => ({
+      type,
+      values: Object.entries(vals).map(([value, count]) => ({ value, count, percent: Math.round((count / full.supply) * 10000) / 100 }))
+        .sort((a, b) => b.count - a.count),
+    }));
+    res.json({ ...colView(c), holders: s.holders, sales: s.sales, traits });
+  });
+  api.get('/collections/:slug/nfts', async (req, res) => {
+    if (!await visible(req, String(req.params.slug).toLowerCase())) return res.status(404).json({ error: 'not found' });
+    const q = { ...nftQuery(req.query), collection: String(req.params.slug), anyStatus: true };
+    const [items, total] = await Promise.all([m.browse(db, q), m.browseCount(db, q)]);
+    res.json({ total, items: items.map(shape) });
+  });
   api.get('/nfts', async (req, res) => {
-    const q = Object.fromEntries(['status', 'sort', 'character', 'rarity'].map((k) => [k, str(req.query[k])]));
     const owner = str(req.query.owner); // an MCP address
-    res.json((await m.browse(db, { ...q, ownerAddr: owner && m.isPublicId(owner) ? owner : undefined })).map(shape));
+    const q = { ...nftQuery(req.query), ownerAddr: owner && m.isPublicId(owner) ? owner : undefined };
+    // ?count=1: how many match in all, for paging
+    if (req.query.count === '1') res.set('X-Total-Count', String(await m.browseCount(db, q)));
+    res.json((await m.browse(db, q)).map(shape));
   });
   api.get('/nfts/:id', async (req, res) => {
-    const id = Number(req.params.id);
-    const n = Number.isInteger(id) ? await m.getNft(db, id) : null;
+    const id = nftIdOr(req.params.id);
+    let n = id != null ? await m.getNft(db, id) : null;
+    if (!n && id != null) {
+      // an NFT of a collection in review: only for its creator and the owner
+      const u = await siteUser(req);
+      const hidden = u ? await m.getNft(db, id, { anyStatus: true }) : null;
+      if (hidden && (isAdmin(u) || hidden.collection_creator === u.id)) n = hidden;
+    }
     if (!n) return res.status(404).json({ error: 'not found' });
+    delete n.collection_creator;
     res.json({ ...shape(n), history: n.history.map((h) => ({ ...h, price: num(h.price) })) });
   });
+  // ---------- the launchpad (site sessions; every change needs the site's header and origin) ----------
+  const siteOrigin = new URL(publicUrl).origin;
+  // signed in on the site; changes also need the site's own header and origin, so another site can't make them
+  const guard = async (req, res, next) => {
+    if (req.method !== 'GET' && (req.get('x-mcp-site') !== '1' || (req.get('origin') && req.get('origin') !== siteOrigin))) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    req.user = await siteUser(req);
+    if (!req.user) return res.status(401).json({ error: 'Sign in first.' });
+    next();
+  };
+  const wrap = (fn) => async (req, res) => {
+    try {
+      res.json(await fn(req, res));
+    } catch (e) {
+      if (e instanceof MoneyError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+  };
+  const idOf = (req) => nftIdOr(req.params.id) ?? -1;
+  const draftView = (c) => ({ ...c, mint_price: num(c.mint_price), traits: undefined, trait_order: undefined });
+  api.get('/me', guard, wrap(async (req) => ({ handle: req.user.handle, public_id: req.user.public_id, x_id: req.user.x_id, admin: isAdmin(req.user) })));
+  const launch = express.Router();
+  launch.use(guard, express.json({ limit: '5mb' }));
+  launch.get('/mine', wrap(async (req) => {
+    const rows = await db.query(`select c.*, (select count(*)::int from nfts where collection_id = c.id) as uploaded,
+      (select count(*)::int from nfts where collection_id = c.id and minted_at is not null) as minted
+      from collections c where c.creator_id = $1 order by c.id desc`, [req.user.id]);
+    return Promise.all(rows.map(async (c) => ({ ...draftView(c), earnings: await lp.earnings(db, c.id) })));
+  }));
+  launch.post('/', wrap(async (req) => draftView(await lp.createDraft(db, req.user.id, req.body || {}))));
+  launch.patch('/:id', wrap(async (req) => draftView(await lp.updateDraft(db, req.user.id, idOf(req), req.body || {}))));
+  launch.post('/:id/items', wrap(async (req) => {
+    const items = (Array.isArray(req.body?.items) ? req.body.items : []).map((it) => ({
+      ...it, image: Buffer.from(String(it?.image || ''), 'base64'), thumb: Buffer.from(String(it?.thumb || ''), 'base64'),
+    }));
+    return lp.addItems(db, storage, sniffImage, req.user.id, idOf(req), items);
+  }));
+  launch.post('/:id/cover', wrap(async (req) => ({ cover_nft: await lp.setCover(db, req.user.id, idOf(req), req.body?.edition) })));
+  launch.post('/:id/submit', wrap(async (req) => draftView(await lp.submit(db, req.user.id, idOf(req)))));
+  launch.delete('/:id', wrap(async (req) => ({ deleted: await lp.removeCollection(db, storage, req.user.id, idOf(req)) })));
+  api.use('/launch', launch);
+  // the owner's review queue and money actions
+  const admin = express.Router();
+  admin.use(guard, express.json({ limit: '16kb' }), (req, res, next) => (isAdmin(req.user) ? next() : res.status(403).json({ error: 'Only the owner of the market can do this.' })));
+  admin.get('/collections', wrap(async () => {
+    const rows = await db.query(`select c.*, u.handle as creator_handle, u.public_id as creator_addr,
+      (select count(*)::int from nfts where collection_id = c.id and minted_at is not null) as minted
+      from collections c join users u on u.id = c.creator_id where c.status <> 'draft' order by (c.status = 'review') desc, c.id desc`);
+    return Promise.all(rows.map(async (c) => ({ ...draftView(c), earnings: await lp.earnings(db, c.id) })));
+  }));
+  admin.post('/collections/:id/approve', wrap(async (req) => draftView(await lp.review(db, idOf(req), { approve: true }))));
+  admin.post('/collections/:id/reject', wrap(async (req) => draftView(await lp.review(db, idOf(req), { approve: false, note: req.body?.note }))));
+  admin.post('/collections/:id/pause', wrap(async (req) => draftView(await lp.setPaused(db, idOf(req), true))));
+  admin.post('/collections/:id/resume', wrap(async (req) => draftView(await lp.setPaused(db, idOf(req), false))));
+  admin.post('/collections/:id/release', wrap(async (req) => lp.release(db, idOf(req))));
+  admin.post('/collections/:id/freeze', wrap(async (req) => lp.freeze(db, idOf(req), req.body?.note)));
+  api.use('/admin', admin);
+
   // only accounts that chose to show their X handle can be found by it
   api.get('/users/:handle', async (req, res) => {
     const [u] = await db.query('select handle, name, avatar, created_at, public_id from users where handle = $1 and show_handle', [req.params.handle.toLowerCase()]);
@@ -128,15 +253,14 @@ export async function createApp(opts) {
     res.json({ ...u, nfts: (await m.browse(db, { ownerAddr: u.public_id })).map(shape) });
   });
   api.get('/sales', async (req, res) => {
-    const rows = await db.query(`select s.nft_id, s.price, s.created_at, ${m.PUBLIC_NAME('se', 'seller')}, ${m.PUBLIC_NAME('b', 'buyer')} from sales s
-      join users se on se.id = s.seller_id join users b on b.id = s.buyer_id order by s.id desc limit 20`);
+    const rows = await db.query(`select s.nft_id, n.name as nft_name, s.price, s.created_at, ${m.PUBLIC_NAME('se', 'seller')}, ${m.PUBLIC_NAME('b', 'buyer')} from sales s
+      join nfts n on n.id = s.nft_id join users se on se.id = s.seller_id join users b on b.id = s.buyer_id order by s.id desc limit 20`);
     res.json(rows.map((r) => ({ ...r, price: num(r.price) })));
   });
 
   // the explorer: public, read-only. Everything is shown under MCP addresses (see explorer.js).
   const ex = express.Router();
-  const intOr = (v, d = null) => (/^\d{1,15}$/.test(String(v ?? '')) ? Number(v) : d);
-  const addrOk = (a) => a === 'treasury' || m.isPublicId(a);
+  const addrOk = (a) => a === 'treasury' || a === 'escrow' || m.isPublicId(a);
   // read-only: sealing, anchors, totals and reserves are done by the scheduled run
   ex.get('/summary', async (req, res) => res.json(await explorer.summary()));
   ex.get('/txs', async (req, res) => {
@@ -152,7 +276,7 @@ export async function createApp(opts) {
   ex.get('/address/:addr', async (req, res) => {
     const a = addrOk(req.params.addr) ? await explorer.address(req.params.addr) : null;
     if (!a) return res.status(404).json({ error: 'not found' });
-    res.json({ ...a, nfts: a.address === 'treasury' ? [] : (await m.browse(db, { ownerAddr: a.address })).map(shape) });
+    res.json({ ...a, nfts: ['treasury', 'escrow'].includes(a.address) ? [] : (await m.browse(db, { ownerAddr: a.address })).map(shape) });
   });
   ex.get('/chain', async (req, res) => res.json(await explorer.chain({ after: intOr(req.query.after, 0), limit: intOr(req.query.limit, 1000) })));
   ex.get('/anchors', async (req, res) => res.json(await explorer.anchors(50)));
@@ -202,6 +326,27 @@ export async function createApp(opts) {
     app.use('/thumb', express.static(thumbsDir, { maxAge: '1d' }));
     app.use(express.static(path.join(root, 'site')));
   }
+  // pictures of launchpad collections (the market's own come from the CDN, or from the folders above locally)
+  app.get(/^\/(img|thumb)\/(\d{1,9})\.png$/, async (req, res) => {
+    const [kind, id] = [req.params[0], Number(req.params[1])];
+    const [n] = await db.query('select n.edition, c.id as cid, c.status, c.creator_id from nfts n join collections c on c.id = n.collection_id where n.id = $1', [id]);
+    if (!n || n.creator_id == null) return res.status(404).json({ error: 'not found' });
+    if (n.status === 'frozen') return res.status(410).json({ error: 'this collection was frozen' });
+    const isPublic = ['live', 'paused'].includes(n.status);
+    if (!isPublic) {
+      const u = await siteUser(req);
+      if (!u || (u.id !== n.creator_id && !isAdmin(u))) return res.status(404).json({ error: 'not found' });
+    }
+    const f = await storage.get(`c${n.cid}/${kind}/${n.edition}`);
+    if (!f) return res.status(404).json({ error: 'not found' });
+    res.set({
+      'Content-Type': f.type,
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Cache-Control': isPublic ? 'public, max-age=300' : 'private, no-store',
+      ...(isPublic ? { 'Netlify-CDN-Cache-Control': 'public, durable, max-age=300', 'Netlify-Cache-Tag': `c${n.cid}` } : {}),
+    });
+    res.send(f.data);
+  });
   app.use((req, res) => res.status(404).json({ error: 'not found' }));
   app.use((err, req, res, next) => {
     console.error('http error', err);

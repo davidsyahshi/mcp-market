@@ -6,10 +6,13 @@ import { z } from 'zod';
 import * as m from './market.js';
 import { toMicro, amount as plain, units, MoneyError } from './money.js';
 import { withdrawUi, UI_MIME } from './ui.js';
+import { sniffImage } from './storage.js';
 
 const INSTRUCTIONS = `MCP is an NFT market that lives inside AI chats. The user has a $MCP balance in this account
-(1 $MCP = $1), topped up with USDC or USDT on Solana: 1 USDC or 1 USDT = 1 $MCP. They can mint NFTs from the collection, list them for sale and buy other people's NFTs.
-NFTs exist only inside this market. All prices and amounts are in $MCP.
+(1 $MCP = $1), topped up with USDC or USDT on Solana: 1 USDC or 1 USDT = 1 $MCP. They can mint NFTs from the collections,
+list them for sale and buy other people's NFTs. The main collection is MCP (5,000 pixel characters with traits and rarity);
+the collections tool lists all of them. A collection can open trading only once every NFT is minted (the collections
+tool says so): until then its NFTs can't be listed or bought, only minted. NFTs exist only inside this market. All prices and amounts are in $MCP.
 Rules for you, the assistant:
 - Before calling buy, tell the user the NFT name and price and get an explicit yes; pass that price as expected_price.
 - Withdrawals and the withdrawal address are handled in a form inside the chat: call withdraw_form, and the user pastes
@@ -35,7 +38,10 @@ export function buildMcpServer(db, userId, opts) {
   // the NFT picture as image content, so the chat shows it inline. Read from disk; if the file isn't
   // bundled with this instance, fetch it from the site's CDN.
   const image = async (id) => {
-    const asContent = (buf) => [{ type: 'image', data: Buffer.from(buf).toString('base64'), mimeType: 'image/png' }];
+    const asContent = (buf) => {
+      const type = sniffImage(buf);
+      return type ? [{ type: 'image', data: Buffer.from(buf).toString('base64'), mimeType: type }] : [];
+    };
     try {
       return asContent(await fs.promises.readFile(path.join(thumbsDir, `${Number(id)}.png`)));
     } catch {}
@@ -47,8 +53,12 @@ export function buildMcpServer(db, userId, opts) {
   };
   const text = (s) => ({ type: 'text', text: s });
   const ok = (...content) => ({ content: content.flat() });
-  const describe = (n) => `${n.name} · ${n.character} (${n.shape}, ${n.palette}) · ${n.rarity}` +
+  // a few traits for one-line lists; the nft tool shows them all
+  const keyTraits = (n) => (n.attributes || []).filter((a) => a.trait_type !== 'Rarity').slice(0, 4).map((a) => a.value).join(', ');
+  const describe = (n) => `${n.name}${n.collection && n.collection !== m.OWN_COLLECTION ? ` (NFT #${n.id}, ${n.collection_name})` : ''}` +
+    `${n.rarity ? ` · ${n.rarity}` : ''}${keyTraits(n) ? ` · ${keyTraits(n)}` : ''}` +
     (n.owner_addr ? ` · owner ${m.label(n.owner_addr, n.owner_name)}` : ' · not minted yet') + (n.price != null ? ` · listed at ${m.fmt(n.price)}` : '');
+  const traitLines = (n) => (n.attributes || []).map((a) => `${a.trait_type}: ${a.value}${a.percent != null ? ` (${a.percent}% have it)` : ''}`).join('\n');
 
   // turn rule violations into a normal answer the assistant can relay, instead of a protocol error
   const tool = (name, config, fn) => server.registerTool(name, config, async (args) => {
@@ -64,7 +74,7 @@ export function buildMcpServer(db, userId, opts) {
 
   const refText = (l) => {
     if (!l.ref) return '';
-    if (/^\d+$/.test(l.ref)) return ' ' + m.nftName(l.ref);
+    if (/^\d+$/.test(l.ref)) return ' ' + (l.nft_name || m.nftName(l.ref));
     if (/^w\d+$/.test(l.ref)) return ` #${l.ref.slice(1)}`;
     const dep = l.kind === 'deposit' && /^(\w+) (\w{20,})/.exec(l.ref); // "USDC <signature> <token account>"
     return dep ? ` ${dep[1]} (tx ${dep[2].slice(0, 6)}…${dep[2].slice(-4)})` : ' ' + l.ref;
@@ -156,14 +166,32 @@ export function buildMcpServer(db, userId, opts) {
     });
   }
 
+  tool('collections', {
+    title: 'Collections',
+    description: 'The NFT collections on this market with their mint price, how many are minted, floor price and per-account mint limit.',
+    annotations: read,
+  }, async () => {
+    const list = await m.collections(db);
+    if (!list.length) return ok(text('No collections are open yet.'));
+    return ok(text(list.map((c) => `${c.name} (collection: ${c.slug}) · ${c.minted}/${c.supply} minted · mint ${m.fmt(c.mint_price)}, up to ${c.mint_limit} per account` +
+      ` · floor ${c.floor != null ? m.fmt(c.floor) : '-'}${c.creator_addr ? ` · by ${m.label(c.creator_addr, c.creator_name)}` : ''}` +
+      `${c.trade_after_sold_out && c.minted < c.supply ? ' · trading opens after the sell-out' : ''}\n${publicUrl}/#/c/${c.slug}`).join('\n\n')));
+  });
+
   tool('mint', {
     title: 'Mint an NFT',
-    description: `Mints one random NFT from the collection for ${m.fmt(m.CONFIG.mintPrice)} from the balance. Limit ${m.CONFIG.mintLimit} per account.`,
+    description: `Mints one random NFT from a collection with the balance and shows it. Without a collection it mints from MCP ` +
+      `(${m.fmt(m.CONFIG.mintPrice)}, up to ${m.CONFIG.mintLimit} per account). For other collections, see the collections tool.`,
+    inputSchema: { collection: z.string().max(40).optional().describe('Collection id from the collections tool, e.g. "mcp"') },
     annotations: write,
-  }, async () => {
-    const n = await m.mint(db, userId);
+  }, async ({ collection }) => {
+    const n = await m.mint(db, userId, { collection: collection || m.OWN_COLLECTION });
     const u = await m.getUser(db, userId);
-    return ok(text(`Minted ${n.name}: ${n.character} (${n.shape}, ${n.palette}), ${n.rarity}.\nPaid ${m.fmt(m.CONFIG.mintPrice)}. Balance: ${m.fmt(u.balance)}.\n${link(n.id)}`), await image(n.id));
+    const full = await m.getNft(db, n.id);
+    const held = n.collection !== m.OWN_COLLECTION ? ' The creator gets their share after a 7-day hold.' : '';
+    const wait = n.trade_after_sold_out && !n.sold_out ? ' It can be sold once the whole collection is minted.' : '';
+    return ok(text(`Minted ${n.name}${n.collection !== m.OWN_COLLECTION ? ` (NFT #${n.id})` : ''}${n.rarity ? ` · ${n.rarity}` : ''}.\n${traitLines(full)}\n\nPaid ${m.fmt(n.price)}.${held}${wait} Balance: ${m.fmt(u.balance)}. ` +
+      `Minted ${n.minted_by_you} of ${n.mint_limit} allowed in ${n.collection_name}.\n${link(n.id)}`), await image(n.id));
   });
 
   tool('my_nfts', { title: 'My NFTs', description: "Lists the NFTs the user owns, with listing prices.", annotations: read }, async () => {
@@ -175,31 +203,36 @@ export function buildMcpServer(db, userId, opts) {
 
   tool('market', {
     title: 'Browse the market',
-    description: 'NFTs currently listed for sale, cheapest first by default. Optional filters.',
+    description: 'NFTs listed for sale, cheapest first by default. Optional filters: collection, rarity (e.g. Legendary) and traits ' +
+      '(e.g. "Chassis: Bunny").',
     inputSchema: {
+      collection: z.string().max(40).optional().describe('Collection id, e.g. "mcp"'),
       sort: z.enum(['price_asc', 'price_desc', 'recent']).optional(),
-      character: z.enum(['Scarf', 'Void', 'Plug']).optional(),
-      rarity: z.enum(['common', 'uncommon', 'rare', 'legendary']).optional(),
+      rarity: z.string().max(40).optional().describe('e.g. Common, Rare, Epic, Legendary, Ultra-Rare'),
+      traits: z.array(z.string().max(80)).max(6).optional().describe('Each "Trait: Value", e.g. ["Chassis: Bunny", "Lid: Beanie"]'),
       limit: z.number().int().min(1).max(30).optional(),
     },
     annotations: read,
-  }, async ({ sort = 'price_asc', character, rarity, limit = 10 }) => {
-    const rows = await m.browse(db, { status: 'listed', sort, character, rarity, limit });
-    const s = await m.stats(db);
-    const head = `Floor ${s.floor != null ? m.fmt(s.floor) : '-'} · ${s.listed} listed · ${s.minted}/${s.supply} minted · mint price ${m.fmt(s.mint_price)}`;
-    return ok(text(rows.length ? `${head}\n\n${rows.map(describe).join('\n')}\n\nFull market: ${publicUrl}` : `${head}\n\nNothing matches right now.`));
+  }, async ({ collection, sort = 'price_asc', rarity, traits = [], limit = 10 }) => {
+    const pairs = traits.map((t) => t.split(':')).filter((p) => p.length >= 2).map(([k, ...v]) => [k.trim(), v.join(':').trim()]);
+    const rows = await m.browse(db, { status: 'listed', sort, collection, rarity, traits: pairs, limit });
+    const s = await m.stats(db, { collection: collection || m.OWN_COLLECTION });
+    if (!s) return ok(text(`There is no collection "${collection}". Ask for the list of collections.`));
+    const head = `${collection || m.OWN_COLLECTION}: floor ${s.floor != null ? m.fmt(s.floor) : '-'} · ${s.listed} listed · ${s.minted}/${s.supply} minted · mint price ${m.fmt(s.mint_price)}`;
+    return ok(text(rows.length ? `${head}\n\n${rows.map(describe).join('\n')}\n\nFull market: ${publicUrl}` : `${head}\n\nNothing for sale matches right now.`));
   });
 
   tool('nft', {
     title: 'NFT details',
-    description: 'Details, owner, price, sale history and image of one NFT. Accepts the number, e.g. 1241 or "MCP #1241".',
+    description: 'Details, traits with how rare each one is, owner, price, sale history and image of one NFT. Takes its number: 1241 for "MCP #1241"; ' +
+      'NFTs of other collections show it as "NFT #<number>".',
     inputSchema: { nft_id: z.number().int().positive() },
     annotations: read,
   }, async ({ nft_id }) => {
     const n = await m.getNft(db, nft_id);
     if (!n) return ok(text(`${m.nftName(nft_id)} does not exist.`));
     const hist = n.history.map((h) => `${m.fmt(h.price)} ${m.label(h.seller_addr, h.seller_name)} → ${m.label(h.buyer_addr, h.buyer_name)}`).join('\n');
-    return ok(text(`${describe(n)}\n${hist ? 'Sales:\n' + hist : 'No sales yet.'}\n${link(n.id)}`), await image(n.id));
+    return ok(text(`${describe(n)}\n\nTraits:\n${traitLines(n)}\n\n${hist ? 'Sales:\n' + hist : 'No sales yet.'}\n${link(n.id)}`), await image(n.id));
   });
 
   tool('buy', {

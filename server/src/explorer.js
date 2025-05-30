@@ -14,6 +14,7 @@ import * as sol from './solana.js';
 import { depositConfig } from './deposits.js';
 import { explorerTx } from './withdrawals.js';
 import { ensurePublicIds, nftName } from './market.js';
+import { isEscrowKind, ESCROW_KINDS } from './launchpad.js';
 
 export const GENESIS = '0'.repeat(64);
 const SEAL_LOCK = 727274010;
@@ -42,7 +43,8 @@ export function explorerConfig(env = process.env) {
   };
 }
 
-const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', buy: 'buy', withdraw: 'withdrawal', withdraw_refund: 'refund' };
+const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', buy: 'buy', withdraw: 'withdrawal', withdraw_refund: 'refund', payout: 'payout', mint_refund: 'refund' };
+const ESCROW_SQL = `(${ESCROW_KINDS.map((k) => `'${k}'`).join(', ')})`;
 
 export function createExplorer(db, opts = {}) {
   const cfg = { ...explorerConfig(), ...(opts.config || {}) };
@@ -62,7 +64,8 @@ export function createExplorer(db, opts = {}) {
   const entry = (r) => ({
     seq: r.seq == null ? null : Number(r.seq),
     id: Number(r.id),
-    account: r.user_id == null ? 'treasury' : r.public_id,
+    // the market's two accounts: the escrow (launchpad mint money on hold) and the treasury (everything else)
+    account: r.user_id == null ? (isEscrowKind(r.kind) ? 'escrow' : 'treasury') : r.public_id,
     delta: String(r.delta),
     kind: r.kind,
     ref: publicRef(r.kind, r.ref),
@@ -152,8 +155,11 @@ export function createExplorer(db, opts = {}) {
       (select coalesce(sum(balance), 0)::bigint from users) as user_balances,
       (select coalesce(sum(case when status = 'rejected' then amount + fee else amount end), 0)::bigint from withdrawals
         where network = $1 and status in ('review', 'pending', 'sending', 'rejected')) as withdrawals,
-      (select coalesce(sum(delta), 0)::bigint from ledger where user_id is null) as treasury`, [network]);
-    return { balances: BigInt(r.balances), userBalances: BigInt(r.user_balances), withdrawals: BigInt(r.withdrawals), treasury: BigInt(r.treasury) };
+      (select coalesce(sum(delta), 0)::bigint from ledger where user_id is null and kind not in ${ESCROW_SQL}) as treasury,
+      (select coalesce(sum(delta), 0)::bigint from ledger where user_id is null and kind in ${ESCROW_SQL}) as escrow,
+      (select coalesce(sum(amount), 0)::bigint from mint_holds where released_at is null and refunded_at is null) as holds`, [network]);
+    return { balances: BigInt(r.balances), userBalances: BigInt(r.user_balances), withdrawals: BigInt(r.withdrawals), treasury: BigInt(r.treasury),
+      escrow: BigInt(r.escrow), holds: BigInt(r.holds) };
   }
 
   async function reserves() {
@@ -191,7 +197,8 @@ export function createExplorer(db, opts = {}) {
     for (const a of accounts) held[a.token] += a.amount || 0n;
     const total = Object.values(held).reduce((x, y) => x + y, 0n);
     const o = await owed();
-    const owedTotal = o.balances + o.withdrawals;
+    // mint money held for creators is owed too: to the creator, or back to the minters
+    const owedTotal = o.balances + o.withdrawals + o.escrow;
     const snap = {
       at: new Date().toISOString(),
       network,
@@ -199,6 +206,8 @@ export function createExplorer(db, opts = {}) {
       held_total: String(total),
       owed_balances: String(o.balances),
       owed_withdrawals: String(o.withdrawals),
+      owed_escrow: String(o.escrow),
+      escrow_matches: o.escrow === o.holds,
       owed_total: String(owedTotal),
       // the balances on users must equal the ledger; if not, the snapshot says so
       ledger_matches: o.balances === o.userBalances,
@@ -210,6 +219,7 @@ export function createExplorer(db, opts = {}) {
       deposit_wallets: depWallets.size,
     };
     if (!snap.ledger_matches) log(`ALERT: user balances (${o.userBalances}) do not match the ledger (${o.balances})`);
+    if (!snap.escrow_matches) log(`ALERT: the escrow in the ledger (${o.escrow}) does not match the open mint holds (${o.holds})`);
     await db.query("insert into app_meta (key, value) values ('reserves', $1) on conflict (key) do update set value = excluded.value", [JSON.stringify(snap)]);
     return { held: snap.held_total, owed: snap.owed_total, coverage: snap.coverage };
   }
@@ -243,7 +253,7 @@ export function createExplorer(db, opts = {}) {
   // ---------- read side (the public API) ----------
 
   const typeOf = (kinds) => {
-    for (const k of ['deposit', 'withdraw', 'withdraw_refund', 'buy', 'mint', 'faucet']) if (kinds.includes(k)) return KINDS[k];
+    for (const k of ['deposit', 'withdraw', 'withdraw_refund', 'mint_refund', 'payout', 'buy', 'mint', 'faucet']) if (kinds.includes(k)) return KINDS[k];
     return kinds[0] || 'other';
   };
 
@@ -256,6 +266,15 @@ export function createExplorer(db, opts = {}) {
     const wIds = [...new Set(rows.filter((r) => /^w\d+$/.test(r.ref || '')).map((r) => Number(r.ref.slice(1))))];
     const ws = wIds.length ? await db.query('select id, status, tx from withdrawals where id = any($1)', [wIds]) : [];
     const wById = new Map(ws.map((w) => [Number(w.id), w]));
+    // NFT rows (mints, buys) carry the NFT's number: its name, picture and collection for the page
+    const nIds = [...new Set(rows.filter((r) => ['mint', 'buy', 'mint_refund'].includes(r.kind) && /^\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref)))];
+    // payouts carry "c<collection id>"
+    const cIds = [...new Set(rows.filter((r) => /^c\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref.slice(1))))];
+    const cs = cIds.length ? await db.query('select id, slug, name from collections where id = any($1)', [cIds]) : [];
+    const cById = new Map(cs.map((c) => [Number(c.id), { slug: c.slug, name: c.name }]));
+    const ns = nIds.length ? await db.query(`select n.id, n.name, n.rarity, n.pixel, c.slug, c.name as collection_name
+      from nfts n join collections c on c.id = n.collection_id where n.id = any($1)`, [nIds]) : [];
+    const nById = new Map(ns.map((n) => [Number(n.id), n]));
     return [...byX.values()].map((g) => {
       const kinds = g.map((r) => r.kind);
       const type = typeOf(kinds);
@@ -276,8 +295,17 @@ export function createExplorer(db, opts = {}) {
         const w = wById.get(Number(ref.slice(1)));
         t.withdrawal = { id: Number(ref.slice(1)), status: w?.status || null };
         if (w?.tx && ['sending', 'sent'].includes(w.status)) t.solana = { token: 'USDC', tx: w.tx, url: txUrl(w.tx) };
-      } else if (/^\d+$/.test(ref) && ['mint', 'buy'].includes(type)) {
-        t.nft = { id: Number(ref), name: nftName(ref) };
+      } else if (/^c\d+$/.test(ref)) {
+        t.collection = cById.get(Number(ref.slice(1))) || null;
+      }
+      if (kinds.filter((k) => k === 'mint_refund').length > 1) {
+        // a freeze: every refunded mint of the collection in one transaction
+        t.refunds = g.filter((r) => r.kind === 'mint_refund').length;
+        t.refunded = g.filter((r) => r.kind === 'mint_refund').reduce((s, r) => s + Number(r.delta), 0) / 1e6;
+      } else if (/^\d+$/.test(ref) && ['mint', 'buy', 'refund'].includes(type)) {
+        const n = nById.get(Number(ref));
+        t.nft = n ? { id: Number(ref), name: n.name, rarity: n.rarity, collection: n.slug, collection_name: n.collection_name,
+          image: `/img/${Number(ref)}.png`, thumb: `/thumb/${Number(ref)}.png`, pixel: n.pixel } : { id: Number(ref), name: nftName(ref) };
       }
       return t;
     }).sort((a, b) => b.id - a.id);
@@ -289,12 +317,13 @@ export function createExplorer(db, opts = {}) {
     // The newest rows by id (index), then their whole transactions. A transaction's rows have neighbouring ids,
     // so a window of 4 rows per transaction is plenty; a page may come out a little short, never wrong.
     let userId = null;
-    if (addr && addr !== 'treasury') {
+    if (addr && addr !== 'treasury' && addr !== 'escrow') {
       const [u] = await db.query('select id from users where public_id = $1', [addr]);
       if (!u) return [];
       userId = u.id;
     }
-    const filter = addr === 'treasury' ? 'and user_id is null' : userId != null ? 'and user_id = $3' : '';
+    const filter = addr === 'treasury' ? `and user_id is null and kind not in ${ESCROW_SQL}` : addr === 'escrow' ? `and user_id is null and kind in ${ESCROW_SQL}`
+      : userId != null ? 'and user_id = $3' : '';
     const groups = await db.query(`select xact, min(id) as first from ledger where xact in (
         select xact from ledger where ($1::bigint is null or id < $1) ${filter} order by id desc limit $2 * 4)
       group by xact having ($1::bigint is null or min(id) < $1) order by first desc limit $2`,
@@ -314,6 +343,10 @@ export function createExplorer(db, opts = {}) {
     if (addr === 'treasury') {
       const o = await owed();
       return { address: 'treasury', name: 'MCP treasury', balance: Number(o.treasury) / 1e6, nfts: [] };
+    }
+    if (addr === 'escrow') {
+      const o = await owed();
+      return { address: 'escrow', name: 'Escrow', balance: Number(o.escrow) / 1e6, nfts: [] };
     }
     const [u] = await db.query(`select id, public_id, balance, created_at, show_handle, handle, avatar from users where public_id = $1`, [addr]);
     if (!u) return null;
@@ -348,8 +381,9 @@ export function createExplorer(db, opts = {}) {
       (select count(distinct xact)::int from ledger) as transactions,
       (select coalesce(sum(delta), 0)::bigint from ledger where kind = 'deposit') as deposited,
       (select coalesce(sum(amount), 0)::bigint from withdrawals where status = 'sent' and network = $1) as withdrawn,
-      (select coalesce(sum(price), 0)::bigint from sales) as volume`, [network]);
-    const v = { at: new Date().toISOString(), transactions: s.transactions, deposited: String(s.deposited), withdrawn: String(s.withdrawn), volume: String(s.volume) };
+      (select coalesce(sum(price), 0)::bigint from sales) as volume,
+      (select count(*)::int from nfts where minted_at is not null) as minted`, [network]);
+    const v = { at: new Date().toISOString(), transactions: s.transactions, deposited: String(s.deposited), withdrawn: String(s.withdrawn), volume: String(s.volume), minted: s.minted };
     await db.query("insert into app_meta (key, value) values ('explorer_stats', $1) on conflict (key) do update set value = excluded.value", [JSON.stringify(v)]);
     return v;
   }
@@ -371,6 +405,7 @@ export function createExplorer(db, opts = {}) {
       deposited: Number(totals.deposited) / 1e6,
       withdrawn: Number(totals.withdrawn) / 1e6,
       volume: Number(totals.volume) / 1e6,
+      minted: totals.minted ?? null,
       totals_at: totals.at,
       chain: { head_seq: s.head_seq == null ? 0 : Number(s.head_seq), head_hash: head?.hash || GENESIS, unsealed: s.unsealed, genesis: GENESIS },
       last_anchor: anchorsList[0] || null,
@@ -379,5 +414,5 @@ export function createExplorer(db, opts = {}) {
     };
   }
 
-  return { network, seal, anchor, confirmAnchors, reserves, refreshStats, tick, txs, tx, address, chain, anchors, summary };
+  return { network, seal, anchor, confirmAnchors, reserves, refreshStats, tick, txs, tx, address, chain, anchors, summary, owed };
 }
