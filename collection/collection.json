@@ -1,0 +1,962 @@
+[
+ {
+  "id": 1,
+  "name": "MCP #0001",
+  "character": "Plug",
+  "shape": "classic",
+  "palette": "ultra",
+  "rarity": "legendary"
+ },
+ {
+  "id": 2,
+  "name": "MCP #0002",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 3,
+  "name": "MCP #0003",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "paper",
+  "rarity": "common"
+ },
+ {
+  "id": 4,
+  "name": "MCP #0004",
+  "character": "Void",
+  "shape": "ball",
+  "palette": "cherry",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 5,
+  "name": "MCP #0005",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "taxi",
+  "rarity": "common"
+ },
+ {
+  "id": 6,
+  "name": "MCP #0006",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "cherry",
+  "rarity": "common"
+ },
+ {
+  "id": 7,
+  "name": "MCP #0007",
+  "character": "Scarf",
+  "shape": "onigiri",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 8,
+  "name": "MCP #0008",
+  "character": "Plug",
+  "shape": "classic",
+  "palette": "mint",
+  "rarity": "rare"
+ },
+ {
+  "id": 9,
+  "name": "MCP #0009",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "acid",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 10,
+  "name": "MCP #0010",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 11,
+  "name": "MCP #0011",
+  "character": "Void",
+  "shape": "ball",
+  "palette": "taxi",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 12,
+  "name": "MCP #0012",
+  "character": "Void",
+  "shape": "tall",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 13,
+  "name": "MCP #0013",
+  "character": "Scarf",
+  "shape": "onigiri",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 14,
+  "name": "MCP #0014",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "ultra",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 15,
+  "name": "MCP #0015",
+  "character": "Plug",
+  "shape": "classic",
+  "palette": "taxi",
+  "rarity": "rare"
+ },
+ {
+  "id": 16,
+  "name": "MCP #0016",
+  "character": "Void",
+  "shape": "tall",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 17,
+  "name": "MCP #0017",
+  "character": "Void",
+  "shape": "tall",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 18,
+  "name": "MCP #0018",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "ultra",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 19,
+  "name": "MCP #0019",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 20,
+  "name": "MCP #0020",
+  "character": "Void",
+  "shape": "ball",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 21,
+  "name": "MCP #0021",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "taxi",
+  "rarity": "common"
+ },
+ {
+  "id": 22,
+  "name": "MCP #0022",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 23,
+  "name": "MCP #0023",
+  "character": "Scarf",
+  "shape": "onigiri",
+  "palette": "taxi",
+  "rarity": "common"
+ },
+ {
+  "id": 24,
+  "name": "MCP #0024",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 25,
+  "name": "MCP #0025",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "acid",
+  "rarity": "rare"
+ },
+ {
+  "id": 26,
+  "name": "MCP #0026",
+  "character": "Void",
+  "shape": "block",
+  "palette": "cherry",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 27,
+  "name": "MCP #0027",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "paper",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 28,
+  "name": "MCP #0028",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "paper",
+  "rarity": "common"
+ },
+ {
+  "id": 29,
+  "name": "MCP #0029",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 30,
+  "name": "MCP #0030",
+  "character": "Plug",
+  "shape": "classic",
+  "palette": "acid",
+  "rarity": "legendary"
+ },
+ {
+  "id": 31,
+  "name": "MCP #0031",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 32,
+  "name": "MCP #0032",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 33,
+  "name": "MCP #0033",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 34,
+  "name": "MCP #0034",
+  "character": "Void",
+  "shape": "tall",
+  "palette": "paper",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 35,
+  "name": "MCP #0035",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 36,
+  "name": "MCP #0036",
+  "character": "Void",
+  "shape": "ball",
+  "palette": "paper",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 37,
+  "name": "MCP #0037",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "taxi",
+  "rarity": "common"
+ },
+ {
+  "id": 38,
+  "name": "MCP #0038",
+  "character": "Scarf",
+  "shape": "onigiri",
+  "palette": "paper",
+  "rarity": "common"
+ },
+ {
+  "id": 39,
+  "name": "MCP #0039",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "acid",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 40,
+  "name": "MCP #0040",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "paper",
+  "rarity": "common"
+ },
+ {
+  "id": 41,
+  "name": "MCP #0041",
+  "character": "Void",
+  "shape": "block",
+  "palette": "taxi",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 42,
+  "name": "MCP #0042",
+  "character": "Plug",
+  "shape": "classic",
+  "palette": "cyber",
+  "rarity": "legendary"
+ },
+ {
+  "id": 43,
+  "name": "MCP #0043",
+  "character": "Void",
+  "shape": "ball",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 44,
+  "name": "MCP #0044",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 45,
+  "name": "MCP #0045",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "ultra",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 46,
+  "name": "MCP #0046",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 47,
+  "name": "MCP #0047",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 48,
+  "name": "MCP #0048",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "acid",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 49,
+  "name": "MCP #0049",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "cherry",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 50,
+  "name": "MCP #0050",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "taxi",
+  "rarity": "common"
+ },
+ {
+  "id": 51,
+  "name": "MCP #0051",
+  "character": "Void",
+  "shape": "block",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 52,
+  "name": "MCP #0052",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "cherry",
+  "rarity": "common"
+ },
+ {
+  "id": 53,
+  "name": "MCP #0053",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "taxi",
+  "rarity": "common"
+ },
+ {
+  "id": 54,
+  "name": "MCP #0054",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 55,
+  "name": "MCP #0055",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 56,
+  "name": "MCP #0056",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 57,
+  "name": "MCP #0057",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "acid",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 58,
+  "name": "MCP #0058",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "cherry",
+  "rarity": "common"
+ },
+ {
+  "id": 59,
+  "name": "MCP #0059",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 60,
+  "name": "MCP #0060",
+  "character": "Plug",
+  "shape": "classic",
+  "palette": "klein",
+  "rarity": "rare"
+ },
+ {
+  "id": 61,
+  "name": "MCP #0061",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "acid",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 62,
+  "name": "MCP #0062",
+  "character": "Void",
+  "shape": "ball",
+  "palette": "ultra",
+  "rarity": "rare"
+ },
+ {
+  "id": 63,
+  "name": "MCP #0063",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "paper",
+  "rarity": "common"
+ },
+ {
+  "id": 64,
+  "name": "MCP #0064",
+  "character": "Plug",
+  "shape": "classic",
+  "palette": "paper",
+  "rarity": "rare"
+ },
+ {
+  "id": 65,
+  "name": "MCP #0065",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "ultra",
+  "rarity": "rare"
+ },
+ {
+  "id": 66,
+  "name": "MCP #0066",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "acid",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 67,
+  "name": "MCP #0067",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 68,
+  "name": "MCP #0068",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "taxi",
+  "rarity": "common"
+ },
+ {
+  "id": 69,
+  "name": "MCP #0069",
+  "character": "Void",
+  "shape": "block",
+  "palette": "acid",
+  "rarity": "rare"
+ },
+ {
+  "id": 70,
+  "name": "MCP #0070",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 71,
+  "name": "MCP #0071",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 72,
+  "name": "MCP #0072",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 73,
+  "name": "MCP #0073",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 74,
+  "name": "MCP #0074",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 75,
+  "name": "MCP #0075",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 76,
+  "name": "MCP #0076",
+  "character": "Void",
+  "shape": "block",
+  "palette": "paper",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 77,
+  "name": "MCP #0077",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 78,
+  "name": "MCP #0078",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 79,
+  "name": "MCP #0079",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "ultra",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 80,
+  "name": "MCP #0080",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 81,
+  "name": "MCP #0081",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 82,
+  "name": "MCP #0082",
+  "character": "Void",
+  "shape": "block",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 83,
+  "name": "MCP #0083",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 84,
+  "name": "MCP #0084",
+  "character": "Void",
+  "shape": "tall",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 85,
+  "name": "MCP #0085",
+  "character": "Void",
+  "shape": "block",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 86,
+  "name": "MCP #0086",
+  "character": "Void",
+  "shape": "block",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 87,
+  "name": "MCP #0087",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "ultra",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 88,
+  "name": "MCP #0088",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "taxi",
+  "rarity": "common"
+ },
+ {
+  "id": 89,
+  "name": "MCP #0089",
+  "character": "Scarf",
+  "shape": "onigiri",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 90,
+  "name": "MCP #0090",
+  "character": "Scarf",
+  "shape": "onigiri",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 91,
+  "name": "MCP #0091",
+  "character": "Void",
+  "shape": "ball",
+  "palette": "acid",
+  "rarity": "rare"
+ },
+ {
+  "id": 92,
+  "name": "MCP #0092",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "acid",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 93,
+  "name": "MCP #0093",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 94,
+  "name": "MCP #0094",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 95,
+  "name": "MCP #0095",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "paper",
+  "rarity": "common"
+ },
+ {
+  "id": 96,
+  "name": "MCP #0096",
+  "character": "Void",
+  "shape": "tall",
+  "palette": "cherry",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 97,
+  "name": "MCP #0097",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "cherry",
+  "rarity": "common"
+ },
+ {
+  "id": 98,
+  "name": "MCP #0098",
+  "character": "Scarf",
+  "shape": "bean",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 99,
+  "name": "MCP #0099",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "cherry",
+  "rarity": "common"
+ },
+ {
+  "id": 100,
+  "name": "MCP #0100",
+  "character": "Void",
+  "shape": "ball",
+  "palette": "blaze",
+  "rarity": "common"
+ },
+ {
+  "id": 101,
+  "name": "MCP #0101",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 102,
+  "name": "MCP #0102",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "barbie",
+  "rarity": "common"
+ },
+ {
+  "id": 103,
+  "name": "MCP #0103",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 104,
+  "name": "MCP #0104",
+  "character": "Void",
+  "shape": "block",
+  "palette": "ultra",
+  "rarity": "rare"
+ },
+ {
+  "id": 105,
+  "name": "MCP #0105",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "ultra",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 106,
+  "name": "MCP #0106",
+  "character": "Scarf",
+  "shape": "block",
+  "palette": "mint",
+  "rarity": "common"
+ },
+ {
+  "id": 107,
+  "name": "MCP #0107",
+  "character": "Void",
+  "shape": "drop",
+  "palette": "taxi",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 108,
+  "name": "MCP #0108",
+  "character": "Scarf",
+  "shape": "pancake",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 109,
+  "name": "MCP #0109",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "paper",
+  "rarity": "common"
+ },
+ {
+  "id": 110,
+  "name": "MCP #0110",
+  "character": "Void",
+  "shape": "tall",
+  "palette": "ultra",
+  "rarity": "rare"
+ },
+ {
+  "id": 111,
+  "name": "MCP #0111",
+  "character": "Scarf",
+  "shape": "tuft",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 112,
+  "name": "MCP #0112",
+  "character": "Void",
+  "shape": "tall",
+  "palette": "taxi",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 113,
+  "name": "MCP #0113",
+  "character": "Scarf",
+  "shape": "onigiri",
+  "palette": "acid",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 114,
+  "name": "MCP #0114",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 115,
+  "name": "MCP #0115",
+  "character": "Void",
+  "shape": "block",
+  "palette": "cyber",
+  "rarity": "rare"
+ },
+ {
+  "id": 116,
+  "name": "MCP #0116",
+  "character": "Scarf",
+  "shape": "classic",
+  "palette": "ultra",
+  "rarity": "uncommon"
+ },
+ {
+  "id": 117,
+  "name": "MCP #0117",
+  "character": "Scarf",
+  "shape": "flame",
+  "palette": "cherry",
+  "rarity": "common"
+ },
+ {
+  "id": 118,
+  "name": "MCP #0118",
+  "character": "Plug",
+  "shape": "classic",
+  "palette": "barbie",
+  "rarity": "rare"
+ },
+ {
+  "id": 119,
+  "name": "MCP #0119",
+  "character": "Scarf",
+  "shape": "onigiri",
+  "palette": "klein",
+  "rarity": "common"
+ },
+ {
+  "id": 120,
+  "name": "MCP #0120",
+  "character": "Scarf",
+  "shape": "round",
+  "palette": "cherry",
+  "rarity": "common"
+ }
+]
