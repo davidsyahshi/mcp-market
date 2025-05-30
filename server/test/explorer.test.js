@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 
 process.env.TEST_MODE = '1';
+process.env.MCP_TRADING = 'open'; // these tests trade MCP NFTs long before 5,000 are minted
 const { openDb } = await import('../src/db.js');
 const { createApp } = await import('../src/app.js');
 const { entryHash, GENESIS } = await import('../src/explorer.js');
@@ -77,7 +78,8 @@ test('a buy is one transaction: buyer, seller and the fee, under MCP addresses o
   assert.equal(buy.entries.length, 3);
   assert.deepEqual(buy.entries.map((e) => [e.account, e.amount, e.kind]), [
     [buyer.public_id, -10, 'buy'], [seller.public_id, 9.75, 'sale'], ['treasury', 0.25, 'fee']]);
-  assert.deepEqual(buy.nft, { id: nft.id, name: m.nftName(nft.id) });
+  assert.deepEqual(buy.nft, { id: nft.id, name: `MCP #${nft.id}`, rarity: nft.rarity, collection: 'mcp', collection_name: 'MCP',
+    image: `/img/${nft.id}.png`, thumb: `/thumb/${nft.id}.png`, pixel: nft.pixel });
   assert.equal(list.find((t) => t.type === 'deposit').solana.url.startsWith('https://solscan.io/tx/'), true);
   // nothing public names the X handles
   for (const p of ['/api/explorer/txs', `/api/explorer/address/${seller.public_id}`, `/api/nfts/${nft.id}`, '/api/explorer/summary', '/api/explorer/chain']) {

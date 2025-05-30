@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.TEST_MODE = '1';
+process.env.MCP_TRADING = 'open'; // these tests trade MCP NFTs long before 5,000 are minted
 process.env.ADMIN_TOKEN = 'admin-secret';
 const { createApp } = await import('../src/app.js');
 const { openDb } = await import('../src/db.js');

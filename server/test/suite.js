@@ -115,7 +115,7 @@ export function runSuite(setup) {
     assert.equal(plain.length, 0, 'no plain-text tokens in the database');
 
     const tools = (await alice.listTools()).tools.map((t) => t.name).sort();
-    assert.deepEqual(tools, ['account', 'buy', 'cancel_listing', 'deposit', 'faucet', 'market', 'mint', 'my_nfts', 'nft', 'public_profile', 'sell',
+    assert.deepEqual(tools, ['account', 'buy', 'cancel_listing', 'collections', 'deposit', 'faucet', 'market', 'mint', 'my_nfts', 'nft', 'public_profile', 'sell',
       'withdraw_form', 'withdraw_form_state', 'withdraw_form_bind', 'withdraw_form_submit', 'my_withdrawals'].sort());
 
     // no money yet
@@ -139,7 +139,7 @@ export function runSuite(setup) {
     assert.match(fraction.text, /at most 2 decimals/);
     const listed = await call(alice, 'sell', { nft_id: id1, price: 8 });
     assert.match(listed.text, /listed at 8 \$MCP\. If it sells you get 7\.80 \$MCP/);
-    assert.match((await call(bob, 'market')).text, new RegExp(`MCP #${String(id1).padStart(4, '0')}.* 8 \\$MCP`));
+    assert.match((await call(bob, 'market')).text, new RegExp(`MCP #${id1} .* 8 \\$MCP`));
 
     await call(bob, 'faucet');
     // price guard: bob agreed to $7, the listing says $8
@@ -461,7 +461,7 @@ export function runSuite(setup) {
 
   test('public preview API', async () => {
     const s = await fetch(`${base}/api/stats`).then((r) => r.json());
-    assert.equal(s.supply, 120);
+    assert.equal(s.supply, 5000);
     assert.equal(s.minted, 6, 'alice minted 5, seller minted 1');
     assert.equal(s.test_mode, true);
     assert.equal(s.currency, 'MCP');
@@ -471,7 +471,10 @@ export function runSuite(setup) {
     const listed = await fetch(`${base}/api/nfts?status=listed&sort=price_asc`).then((r) => r.json());
     assert.ok(Array.isArray(listed));
     const one = await fetch(`${base}/api/nfts/1`).then((r) => r.json());
-    assert.equal(one.name, 'MCP #0001');
+    assert.equal(one.name, 'MCP #1');
+    assert.equal(one.collection, 'mcp');
+    assert.equal(one.attributes[0].trait_type, 'Rarity');
+    assert.ok(one.attributes.every((a) => a.count > 0 && a.percent > 0 && a.percent <= 100), 'every trait says how many NFTs share it');
     assert.equal((await fetch(`${base}/api/nfts/abc`)).status, 404);
     // NFT owners are shown by MCP address; a handle only when its owner chose to show it
     assert.ok(listed.every((n) => !('owner' in n) && /^mcp_/.test(n.owner_addr) && (n.owner_name === null || n.owner_name === 'bob')));

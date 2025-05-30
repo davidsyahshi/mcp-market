@@ -364,7 +364,7 @@ test('migration: old whole-$MCP amounts become dollars once (1 old unit = 1 cent
   // pretend this database was written by the previous version: plain integer $MCP and no migration marker
   await db.query("update users set balance = 1680 where id = $1", [u.id]);
   await db.query("insert into ledger (user_id, delta, kind, ref) values ($1, 2000, 'faucet', 'test'), ($1, -500, 'mint', '1'), (null, 500, 'mint', '1'), ($1, 180, 'sale', '2')", [u.id]);
-  await db.query("insert into nfts (id, name, character, shape, palette, rarity, owner_id, price) values (9001, 'x', 'Scarf', 's', 'p', 'common', $1, 999)", [u.id]);
+  await db.query("insert into nfts (id, name, owner_id, price) values (9001, 'x', $1, 999)", [u.id]);
   await db.query("insert into withdrawals (user_id, amount, address) values ($1, 100, 'addr')", [u.id]);
   await db.query("delete from app_meta where key in ('data:usd-micro', 'data:withdraw-v2')");
   await db.query("update app_meta set value = 'old' where key = 'schema'");
