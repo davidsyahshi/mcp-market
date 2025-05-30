@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MCP Market</title>
+<meta name="description" content="The first memecoin inside your AI. Browse the collection here, buy it in Claude or ChatGPT.">
+<link rel="icon" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0D0D0F; --panel: #16161A; --edge: #26262C; --line: #3A3A42;
+  --cream: #F5F1E8; --dim: #8A8A93; --red: #FF2A1F; --red-d: #B81D15;
+  --r-common: #8A8A93; --r-uncommon: #F5F1E8; --r-rare: #FF2A1F; --r-legendary: #FFE600;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--cream); }
+body { font: 14px/1.5 'JetBrains Mono', ui-monospace, Menlo, monospace; min-height: 100vh;
+  background-image: radial-gradient(#18181C 1px, transparent 1px); background-size: 24px 24px; }
+a { color: inherit; }
+.px { font-family: Silkscreen, monospace; font-weight: 400; letter-spacing: .02em; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+img.pix { image-rendering: pixelated; display: block; }
+
+header.top { position: sticky; top: 0; z-index: 5; background: rgba(13,13,15,.92); backdrop-filter: blur(6px); border-bottom: 2px solid var(--edge); }
+header.top .wrap { display: flex; align-items: center; gap: 14px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand img { width: 36px; height: 36px; }
+.brand b { font-size: 24px; }
+.spacer { flex: 1; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border: 2px solid var(--cream);
+  background: var(--cream); color: var(--bg); font: 700 13px 'JetBrains Mono', monospace; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: #fff; }
+.btn.red { background: var(--red); border-color: var(--red); color: var(--cream); }
+.btn.red:hover { background: #ff4a40; }
+.btn.ghost { background: transparent; color: var(--cream); border-color: var(--line); }
+.btn.ghost:hover { border-color: var(--cream); }
+.btn:focus-visible, select:focus-visible, .tab:focus-visible, .card:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+.hero { padding: 48px 0 28px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: end; }
+.hero h1 { margin: 0; font-size: clamp(30px, 5vw, 56px); line-height: 1.05; }
+.hero h1 span { color: var(--red); }
+.hero p { color: var(--dim); max-width: 520px; margin: 16px 0 0; }
+.hero .cta { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; background: var(--edge); border: 2px solid var(--edge); }
+.stat { background: var(--panel); padding: 14px 16px; }
+.stat .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.stat .v { font-size: 22px; margin-top: 2px; }
+.stat .v small { font-size: 12px; color: var(--dim); }
+
+.ticker { border-top: 2px solid var(--edge); border-bottom: 2px solid var(--edge); background: var(--panel); overflow: hidden; white-space: nowrap; }
+.ticker .row { display: inline-block; padding: 10px 0; animation: scroll 40s linear infinite; }
+.ticker span { margin: 0 28px; color: var(--dim); }
+.ticker span b { color: var(--cream); font-weight: 400; }
+.ticker span i { color: var(--red); font-style: normal; }
+@keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .ticker .row { animation: none; } }
+
+.bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 22px 0 16px; }
+.tabs { display: flex; border: 2px solid var(--edge); }
+.tab { padding: 8px 14px; background: transparent; color: var(--dim); border: 0; font: inherit; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--cream); color: var(--bg); font-weight: 700; }
+select { background: var(--panel); color: var(--cream); border: 2px solid var(--edge); padding: 8px 10px; font: inherit; }
+.count { color: var(--dim); margin-left: auto; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; padding-bottom: 60px; }
+.card { background: var(--panel); border: 2px solid var(--edge); text-decoration: none; display: flex; flex-direction: column; transition: transform .08s, border-color .08s; }
+.card:hover { border-color: var(--cream); transform: translateY(-2px); }
+.card img { width: 100%; aspect-ratio: 1; }
+.card .meta { padding: 10px 12px 12px; display: grid; gap: 2px; }
+.card .name { font-weight: 700; }
+.card .row2 { display: flex; justify-content: space-between; gap: 8px; color: var(--dim); font-size: 12px; }
+.card .price { font-size: 15px; margin-top: 4px; }
+.card .price.na { color: var(--dim); font-size: 13px; }
+.rar { text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+.rar.common { color: var(--r-common); } .rar.uncommon { color: var(--r-uncommon); } .rar.rare { color: var(--r-rare); } .rar.legendary { color: var(--r-legendary); }
+.empty { color: var(--dim); padding: 40px 0; grid-column: 1 / -1; text-align: center; }
+
+dialog { border: 2px solid var(--edge); background: var(--panel); color: var(--cream); padding: 0; max-width: min(920px, calc(100vw - 32px)); width: 100%; }
+dialog::backdrop { background: rgba(0,0,0,.75); }
+.detail { display: grid; grid-template-columns: 1fr 1fr; }
+.detail img { width: 100%; aspect-ratio: 1; }
+.detail .info { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.detail h2 { margin: 0; font-size: 30px; }
+.traits { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--edge); border: 2px solid var(--edge); }
+.traits div { background: var(--bg); padding: 8px 10px; }
+.traits .k { color: var(--dim); font-size: 11px; text-transform: uppercase; }
+.pricebox { border: 2px solid var(--edge); padding: 14px; }
+.pricebox .big { font-size: 26px; }
+.pricebox .acts { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.cmd { display: flex; gap: 8px; align-items: center; margin-top: 10px; color: var(--dim); font-size: 12px; }
+.cmd code { flex: 1; background: var(--bg); padding: 6px 8px; color: var(--cream); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist { font-size: 12px; color: var(--dim); }
+.hist div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--edge); padding: 5px 0; }
+.close { position: absolute; top: 10px; right: 10px; background: var(--bg); color: var(--cream); border: 2px solid var(--edge); width: 36px; height: 36px; font: 700 16px monospace; cursor: pointer; }
+.steps { padding: 26px; display: grid; gap: 16px; }
+.steps h2 { margin: 0; }
+.steps ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.url { display: flex; gap: 8px; }
+.url code { flex: 1; background: var(--bg); border: 2px solid var(--edge); padding: 10px; font-size: 13px; overflow-x: auto; white-space: nowrap; }
+.say { background: var(--bg); border-left: 3px solid var(--red); padding: 10px 14px; color: var(--dim); }
+.say b { color: var(--cream); font-weight: 400; }
+.profile { padding: 34px 0 6px; display: flex; gap: 16px; align-items: center; }
+.profile img { width: 64px; height: 64px; border: 2px solid var(--edge); }
+.profile h1 { margin: 0; font-size: 32px; }
+.testbar { background: var(--red); color: var(--cream); text-align: center; font-size: 12px; padding: 6px 16px; }
+.testbar b { font-weight: 700; }
+footer { border-top: 2px solid var(--edge); color: var(--dim); padding: 22px 0 40px; font-size: 12px; }
+nav.main { display: flex; gap: 4px; }
+nav.main a { padding: 8px 12px; color: var(--dim); text-decoration: none; border: 2px solid transparent; }
+nav.main a:hover { color: var(--cream); }
+nav.main a[aria-current="page"] { color: var(--cream); border-color: var(--edge); }
+.addr { font-family: 'JetBrains Mono', monospace; color: var(--cream); text-decoration: none; border-bottom: 1px dotted var(--line); }
+.addr:hover { border-bottom-color: var(--cream); }
+.addr.tre { color: var(--r-legendary); }
+.ex-head { padding: 34px 0 10px; display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.ex-head h1 { margin: 0; font-size: clamp(26px, 4vw, 40px); }
+.ex-head p { margin: 6px 0 0; color: var(--dim); max-width: 640px; }
+.search { display: flex; gap: 8px; margin-left: auto; min-width: min(420px, 100%); }
+.search input { flex: 1; min-width: 0; background: var(--panel); color: var(--cream); border: 2px solid var(--edge); padding: 9px 10px; font: inherit; }
+.search input:focus { outline: none; border-color: var(--cream); }
+.tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: var(--edge); border: 2px solid var(--edge); margin: 18px 0; }
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.panel { background: var(--panel); border: 2px solid var(--edge); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel h2 { margin: 0; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+.panel .lead { font-size: 30px; line-height: 1.1; }
+.panel .lead small { font-size: 13px; color: var(--dim); }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; font-size: 13px; }
+.kv > span:nth-child(odd) { color: var(--dim); }
+.kv > span:nth-child(even) { text-align: right; font-variant-numeric: tabular-nums; }
+.note { color: var(--dim); font-size: 12px; margin: 0; }
+.pill { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border: 1px solid var(--line); color: var(--dim); }
+.pill.ok { color: #7AE582; border-color: #2f6b3a; }
+.pill.bad { color: var(--red); border-color: var(--red-d); }
+.pill.wait { color: var(--r-legendary); border-color: #6b5f00; }
+.hash { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); word-break: break-all; }
+table.txs { width: 100%; border-collapse: collapse; background: var(--panel); border: 2px solid var(--edge); font-size: 13px; }
+table.txs th { text-align: left; color: var(--dim); font-weight: 400; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 10px 12px; border-bottom: 2px solid var(--edge); }
+table.txs td { padding: 10px 12px; border-bottom: 1px solid var(--edge); vertical-align: top; }
+table.txs tr:last-child td { border-bottom: 0; }
+table.txs td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.txs a.tx { color: var(--cream); }
+.type { text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+.type.deposit { color: #7AE582; } .type.withdrawal { color: var(--red); } .type.buy { color: var(--r-legendary); }
+.type.mint { color: var(--cream); } .type.refund, .type.faucet { color: var(--dim); }
+.plus { color: #7AE582; } .minus { color: var(--cream); }
+.more { display: flex; justify-content: center; padding: 16px 0 50px; }
+.wallets { display: grid; gap: 4px; font-size: 12px; max-height: 180px; overflow: auto; }
+.wallets div { display: flex; justify-content: space-between; gap: 10px; }
+.idbox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.idbox code { font-size: 18px; background: var(--panel); border: 2px solid var(--edge); padding: 6px 10px; }
+@media (max-width: 820px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .tiles .stat:last-child:nth-child(odd) { grid-column: span 2; }
+  .panels { grid-template-columns: 1fr; }
+  table.txs .hide-sm { display: none; }
+  .search { margin-left: 0; }
+}
+
+@media (max-width: 820px) {
+  .hero { grid-template-columns: 1fr; padding-top: 30px; }
+  .detail { grid-template-columns: 1fr; }
+  header.top .hide-sm { display: none; }
+  .count { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="testbar" id="testbar" hidden><b>TEST SERVER</b> · balances are free test $MCP from the faucet and Solana devnet, nothing here is real money</div>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#/"><img class="pix" src="/logo.png" alt=""><b class="px">MCP</b></a>
+    <nav class="main" aria-label="Main"><a href="#/" data-nav="market">Market</a><a href="#/explorer" data-nav="explorer">Explorer</a></nav>
+    <span class="spacer"></span>
+    <button class="btn red" id="connectBtn">Connect to your AI</button>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<dialog id="nftDlg" aria-label="NFT details"></dialog>
+<dialog id="connectDlg" aria-label="Connect MCP">
+  <button class="close" data-close aria-label="Close">×</button>
+  <div class="steps">
+    <h2 class="px">Plug MCP into your AI</h2>
+    <div>
+      <div style="color:var(--dim);margin-bottom:6px">Connector URL</div>
+      <div class="url"><code id="mcpUrl">…</code><button class="btn" id="copyUrl">Copy</button></div>
+    </div>
+    <div>
+      <b>Claude</b>
+      <div style="margin:8px 0"><a class="btn red" data-add-claude href="https://claude.ai/customize/connectors?modal=add-custom-connector&amp;connectorName=MCP&amp;connectorUrl=https%3A%2F%2Fmcp.credit%2Fmcp" target="_blank" rel="noopener">Add to Claude</a></div>
+      <ol>
+        <li>Press <b>Add to Claude</b>, check the URL, press <b>Continue</b> and <b>Add</b></li>
+        <li>Press <b>Connect</b> and sign in with X. One X account = one MCP account.</li>
+      </ol>
+      <div style="color:var(--dim);font-size:12px;margin-top:6px">Works on every Claude plan; the free plan allows one custom connector.</div>
+    </div>
+    <div>
+      <b>ChatGPT</b>
+      <ol><li>Settings → Apps &amp; Connectors → add a connector with the same URL, then sign in with X.</li></ol>
+    </div>
+    <div class="say">Then just talk to it: <b>"mint me an MCP"</b>, <b>"what's on the market under 10?"</b>, <b>"buy #0042"</b>, <b>"list my Scarf for 9"</b>, <b>"top up my balance"</b></div>
+  </div>
+</dialog>
+
+<footer><div class="wrap">MCP · the first memecoin inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="#/explorer">Explorer</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+// amounts come from the API as plain numbers of $MCP (1 $MCP = $1): 20, 9.99, 0.5 -> 0.50
+const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2, maximumFractionDigits: 6 });
+const api = (p) => fetch('/api' + p).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+const pad = (id) => String(id).padStart(4, '0');
+const claudeLink = (q) => 'https://claude.ai/new?q=' + encodeURIComponent(q);
+// opens Claude's "Add custom connector" dialog with our name and URL filled in
+const addToClaude = (url) => 'https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=MCP&connectorUrl=' + encodeURIComponent(url);
+const setAddLinks = (url) => document.querySelectorAll('[data-add-claude]').forEach((a) => { a.href = addToClaude(url); });
+const gptLink = (q) => 'https://chatgpt.com/?q=' + encodeURIComponent(q);
+// accounts are shown by MCP address; an X handle only when its owner chose to show it
+const label = (addr, name) => (name ? '@' + name : addr);
+const who = (addr, name) => (!addr ? '—' : addr === 'treasury' ? '<a class="addr tre" href="#/a/treasury">treasury</a>'
+  : `<a class="addr" href="#/a/${esc(addr)}">${esc(label(addr, name))}</a>`);
+const shortSig = (sig) => `${sig.slice(0, 6)}…${sig.slice(-4)}`;
+const ago = (iso) => {
+  const sec = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)} h ago`;
+  return new Date(iso).toLocaleDateString();
+};
+let stats = null;
+const state = { status: 'listed', sort: 'price_asc', character: '', rarity: '' };
+try { Object.assign(state, JSON.parse(localStorage.getItem('mcp-filter') || '{}')); } catch {}
+
+function card(n) {
+  const price = n.price != null ? `<div class="price">${fmt(n.price)} <small style="color:var(--dim)">$MCP</small></div>`
+    : `<div class="price na">${n.minted_at ? 'not for sale' : 'mintable'}</div>`;
+  return `<a class="card" href="#/nft/${n.id}">
+    <img class="pix" src="${n.thumb}" alt="${esc(n.name)}" loading="lazy" width="256" height="256">
+    <div class="meta">
+      <div class="name">${esc(n.name)}</div>
+      <div class="row2"><span>${esc(n.character)} · ${esc(n.palette)}</span><span class="rar ${n.rarity}">${n.rarity}</span></div>
+      <div class="row2"><span>${n.owner_addr ? esc(label(n.owner_addr, n.owner_name)) : '—'}</span></div>
+      ${price}
+    </div></a>`;
+}
+
+async function renderMarket() {
+  const app = $('#app');
+  if (!$('#grid')) {
+    app.innerHTML = `<div class="wrap">
+      <section class="hero">
+        <div>
+          <h1 class="px">The first memecoin<br><span>inside your AI.</span></h1>
+          <p>Browse the collection here. Mint, buy and sell only by talking to Claude or ChatGPT. Your balance and NFTs live in your MCP account. 1 $MCP = $1: top it up with USDC or USDT on Solana.</p>
+          <div class="cta">
+            <a class="btn red" data-add-claude href="${addToClaude(stats?.mcp_url || location.origin + '/mcp')}" target="_blank" rel="noopener">Add to Claude</a>
+            <a class="btn ghost" href="${claudeLink('Mint me an MCP NFT')}" target="_blank" rel="noopener">Mint in Claude</a>
+            <button class="btn ghost" data-connect>ChatGPT &amp; other AI</button>
+          </div>
+        </div>
+        <div class="stats" id="stats"></div>
+      </section></div>
+      <div class="ticker" id="ticker" hidden></div>
+      <div class="wrap">
+        <div class="bar">
+          <div class="tabs" role="tablist">
+            <button class="tab" role="tab" data-status="listed">For sale</button>
+            <button class="tab" role="tab" data-status="all">All</button>
+            <button class="tab" role="tab" data-status="unminted">Mintable</button>
+          </div>
+          <select id="character" aria-label="Character"><option value="">All characters</option><option>Scarf</option><option>Void</option><option>Plug</option></select>
+          <select id="rarity" aria-label="Rarity"><option value="">All rarities</option><option>common</option><option>uncommon</option><option>rare</option><option>legendary</option></select>
+          <select id="sort" aria-label="Sort"><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="recent">Recently listed</option><option value="id">Number</option></select>
+          <span class="count" id="count"></span>
+        </div>
+        <div class="grid" id="grid"></div>
+      </div>`;
+    app.querySelectorAll('.tab').forEach((t) => t.onclick = () => { state.status = t.dataset.status; loadGrid(); });
+    ['character', 'rarity', 'sort'].forEach((k) => $('#' + k).onchange = (e) => { state[k] = e.target.value; loadGrid(); });
+    loadStats(); loadTicker();
+  }
+  loadGrid();
+}
+
+async function loadStats() {
+  stats = await api('/stats');
+  exNet = stats.withdrawals?.network || (stats.deposits?.network === 'solana' ? 'mainnet' : 'devnet');
+  $('#testbar').hidden = !stats.test_mode;
+  $('#mcpUrl').textContent = stats.mcp_url;
+  setAddLinks(stats.mcp_url);
+  const el = $('#stats');
+  if (!el) return;
+  el.innerHTML = [
+    ['Floor', stats.floor != null ? `${fmt(stats.floor)} <small>$MCP</small>` : '—'],
+    ['Minted', `${stats.minted}<small>/${stats.supply}</small>`],
+    ['Mint price', `${fmt(stats.mint_price)} <small>$MCP</small>`],
+    ['Listed', stats.listed], ['Holders', stats.holders], ['Volume', `${fmt(stats.volume)} <small>$MCP</small>`],
+  ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+}
+
+async function loadTicker() {
+  const sales = await api('/sales');
+  if (!sales.length) return;
+  const items = sales.map((s) => `<span><b>MCP #${pad(s.nft_id)}</b> sold for <i>${fmt(s.price)} $MCP</i> · ${esc(label(s.buyer_addr, s.buyer_name))}</span>`).join('');
+  const t = $('#ticker');
+  t.innerHTML = `<div class="row">${items}${items}</div>`;
+  t.hidden = false;
+}
+
+async function loadGrid() {
+  localStorage.setItem('mcp-filter', JSON.stringify(state));
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.status === state.status)));
+  ['character', 'rarity', 'sort'].forEach((k) => $('#' + k).value = state[k]);
+  const q = new URLSearchParams(Object.entries(state).filter(([, v]) => v));
+  const rows = await api('/nfts?' + q);
+  $('#count').textContent = `${rows.length} item${rows.length === 1 ? '' : 's'}`;
+  $('#grid').innerHTML = rows.map(card).join('') || `<div class="empty">${state.status === 'listed'
+    ? 'Nothing for sale right now. Be first: mint one in Claude and list it.' : 'Nothing matches these filters.'}</div>`;
+}
+
+// #/u/<handle>: only accounts that show their handle can be found by it; they live at their MCP address
+async function renderProfile(handle) {
+  try {
+    const u = await api('/users/' + encodeURIComponent(handle));
+    location.replace('#/a/' + u.public_id);
+  } catch {
+    $('#app').innerHTML = `<div class="wrap"><div class="empty">No public MCP account @${esc(handle)}. Accounts are shown by their MCP address unless the owner shows their X handle.</div></div>`;
+  }
+}
+
+async function openNft(id) {
+  const dlg = $('#nftDlg');
+  const n = await api('/nfts/' + id).catch(() => null);
+  if (!n) return;
+  const q = n.price != null ? `Buy MCP #${pad(n.id)} for ${n.price} $MCP` : !n.minted_at ? 'Mint me an MCP NFT' : `Show me MCP #${pad(n.id)}`;
+  const action = n.price != null
+    ? `<div class="big">${fmt(n.price)} <small style="color:var(--dim)">$MCP</small></div>
+       <div class="acts"><a class="btn red" href="${claudeLink(q)}" target="_blank" rel="noopener">Buy in Claude</a>
+       <a class="btn ghost" href="${gptLink(q)}" target="_blank" rel="noopener">Buy in ChatGPT</a></div>`
+    : !n.minted_at
+      ? `<div class="big" style="font-size:18px">Not minted yet</div><div style="color:var(--dim);font-size:12px">Mint gives you a random NFT from the collection for ${fmt(stats?.mint_price ?? 5)} $MCP.</div>
+       <div class="acts"><a class="btn red" href="${claudeLink(q)}" target="_blank" rel="noopener">Mint in Claude</a>
+       <a class="btn ghost" href="${gptLink(q)}" target="_blank" rel="noopener">Mint in ChatGPT</a></div>`
+      : `<div class="big" style="font-size:18px">Not for sale</div><div style="color:var(--dim);font-size:12px">Owned by ${who(n.owner_addr, n.owner_name)}.</div>`;
+  dlg.innerHTML = `<button class="close" data-close aria-label="Close">×</button>
+    <div class="detail"><img class="pix" src="${n.image}" alt="${esc(n.name)}">
+    <div class="info">
+      <div><span class="rar ${n.rarity}">${n.rarity}</span><h2 class="px">${esc(n.name)}</h2>
+        <div style="color:var(--dim)">${n.owner_addr ? `owned by ${who(n.owner_addr, n.owner_name)}` : 'in the mint pool'}</div></div>
+      <div class="pricebox">${action}
+        <div class="cmd">or type <code>${esc(q)}</code><button class="btn ghost" data-copy="${esc(q)}" style="padding:4px 8px">Copy</button></div></div>
+      <div class="traits">
+        <div><div class="k">Character</div>${esc(n.character)}</div><div><div class="k">Shape</div>${esc(n.shape)}</div>
+        <div><div class="k">Palette</div>${esc(n.palette)}</div><div><div class="k">Rarity</div>${esc(n.rarity)}</div>
+      </div>
+      <div class="hist"><div style="color:var(--cream)"><span>Sales</span><span></span></div>
+        ${n.history.map((h) => `<div><span>${who(h.seller_addr, h.seller_name)} → ${who(h.buyer_addr, h.buyer_name)}</span><span>${fmt(h.price)} $MCP</span></div>`).join('') || '<div><span>No sales yet</span><span></span></div>'}
+      </div>
+    </div></div>`;
+  if (!dlg.open) dlg.showModal();
+}
+
+// ---------- the explorer ----------
+let exNet = 'mainnet';
+const solscan = (kind, id) => `https://solscan.io/${kind}/${id}${exNet === 'mainnet' ? '' : '?cluster=' + exNet}`;
+const nftLink = (n) => (n ? `<a href="#/nft/${n.id}">${esc(n.name)}</a>` : 'an NFT');
+const usd = (n) => fmt(Math.round(Number(n) * 100) / 100);
+const micro = (s) => Number(s) / 1e6;
+
+function txSummary(t) {
+  const find = (k, notTreasury = true) => t.entries.find((e) => e.kind === k && (!notTreasury || e.account !== 'treasury'));
+  const user = t.entries.find((e) => e.account !== 'treasury') || t.entries[0];
+  if (t.type === 'deposit' && t.manual) return { what: `credited by support → ${who(user.account, user.name)}`, amount: `+${usd(user.amount)}`, unit: '$MCP', cls: 'plus' };
+  if (t.type === 'deposit') return { what: `Solana → ${who(user.account, user.name)}`, amount: `+${usd(user.amount)}`, unit: t.solana?.token || '$MCP', cls: 'plus' };
+  if (t.type === 'withdrawal') { const e = find('withdraw'); return { what: `${who(e.account, e.name)} → Solana`, amount: usd(-e.amount), unit: 'USDC', cls: 'minus' }; }
+  if (t.type === 'buy') {
+    const b = find('buy');
+    const se = find('sale');
+    return { what: `${who(b.account, b.name)} bought ${nftLink(t.nft)} from ${se ? who(se.account, se.name) : '—'}`, amount: usd(-b.amount), unit: '$MCP' };
+  }
+  if (t.type === 'mint') return { what: `${who(user.account, user.name)} minted ${nftLink(t.nft)}`, amount: usd(-user.amount), unit: '$MCP' };
+  if (t.type === 'refund') return { what: `withdrawal #${t.withdrawal?.id ?? '?'} rejected → ${who(user.account, user.name)}`, amount: `+${usd(user.amount)}`, unit: '$MCP', cls: 'plus' };
+  return { what: who(user.account, user.name), amount: `${user.amount > 0 ? '+' : ''}${usd(user.amount)}`, unit: '$MCP' };
+}
+
+function txRow(t) {
+  const s = txSummary(t);
+  const chainCell = t.solana ? `<a href="${esc(t.solana.url)}" target="_blank" rel="noopener">${shortSig(t.solana.tx)} ↗</a>`
+    : t.withdrawal ? `<span class="pill wait">${esc(t.withdrawal.status || 'pending')}</span>` : t.manual ? '<span class="note">support</span>' : '<span class="note">inside MCP</span>';
+  return `<tr><td><a class="tx" href="#/tx/${t.id}">#${t.id}</a></td><td class="hide-sm note">${ago(t.at)}</td>
+    <td><span class="type ${esc(t.type)}">${esc(t.type)}</span></td><td>${s.what}</td>
+    <td class="num ${s.cls || ''}">${s.amount} <small style="color:var(--dim)">${esc(s.unit)}</small></td><td class="hide-sm">${chainCell}</td></tr>`;
+}
+
+function txTable(id) {
+  return `<table class="txs"><thead><tr><th>Tx</th><th class="hide-sm">When</th><th>Type</th><th>What</th><th style="text-align:right">Amount</th><th class="hide-sm">Solana</th></tr></thead>
+    <tbody id="${id}"><tr><td colspan="6" class="note">Loading…</td></tr></tbody></table>`;
+}
+
+// fills a transaction table page by page ("Load more" goes back in time)
+async function loadTxs(tbodyId, moreId, addr) {
+  const body = $('#' + tbodyId);
+  const more = $('#' + moreId);
+  let before = null;
+  const page = async () => {
+    const q = new URLSearchParams({ limit: 30, ...(addr ? { addr } : {}), ...(before ? { before } : {}) });
+    const list = await api('/explorer/txs?' + q);
+    if (before == null) body.innerHTML = '';
+    body.insertAdjacentHTML('beforeend', list.map(txRow).join('') || (before == null ? '<tr><td colspan="6" class="note">No transactions yet.</td></tr>' : ''));
+    before = list.length ? list[list.length - 1].id : before;
+    more.hidden = list.length < 30;
+  };
+  more.onclick = () => page();
+  await page();
+}
+
+function searchBox() {
+  return `<form class="search" id="exSearch" role="search"><input id="exQ" placeholder="MCP address, tx # or @handle" aria-label="Search the explorer" autocomplete="off" spellcheck="false"><button class="btn">Go</button></form>`;
+}
+function wireSearch() {
+  $('#exSearch').onsubmit = (e) => {
+    e.preventDefault();
+    const q = $('#exQ').value.trim();
+    if (/^mcp_[1-9A-HJ-NP-Za-km-z]{12}$/.test(q) || q === 'treasury') location.hash = '#/a/' + q;
+    else if (/^#?\d+$/.test(q)) location.hash = '#/tx/' + q.replace('#', '');
+    else if (/^@?\w{1,15}$/.test(q)) location.hash = '#/u/' + q.replace('@', '');
+    else $('#exQ').value = '';
+  };
+}
+
+async function renderExplorer() {
+  const app = $('#app');
+  app.innerHTML = `<div class="wrap">
+    <div class="ex-head"><div><h1 class="px">MCP Explorer</h1>
+      <p>Every balance change in the market, as it happens. Accounts are MCP addresses. Deposits and withdrawals link to Solana, the rest happens inside MCP.</p></div>
+      ${searchBox()}</div>
+    <div class="tiles" id="exTiles"></div>
+    <div class="panels">
+      <section class="panel" id="exReserves" aria-label="Proof of reserves"><h2 class="px">Reserves</h2><div class="note">Loading…</div></section>
+      <section class="panel" id="exChain" aria-label="The chain"><h2 class="px">The chain</h2><div class="note">Loading…</div></section>
+    </div>
+    ${txTable('exTxs')}
+    <div class="more"><button class="btn ghost" id="exMore" hidden>Load more</button></div></div>`;
+  wireSearch();
+  const s = await api('/explorer/summary');
+  exNet = s.network;
+  $('#exTiles').innerHTML = [
+    ['Accounts', s.accounts], ['Transactions', s.transactions],
+    ['Deposited', `${usd(s.deposited)} <small>$</small>`], ['Withdrawn', `${usd(s.withdrawn)} <small>$</small>`], ['NFT volume', `${usd(s.volume)} <small>$MCP</small>`],
+  ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  renderReserves(s.reserves);
+  renderChain(s);
+  await loadTxs('exTxs', 'exMore');
+}
+
+function renderReserves(r) {
+  const el = $('#exReserves');
+  if (!r) {
+    el.innerHTML = '<h2 class="px">Reserves</h2><p class="note">The first snapshot is being made. Check back in a few minutes.</p>';
+    return;
+  }
+  const owedTotal = micro(r.owed_total);
+  const cov = r.coverage;
+  // the same, counting only addresses the market itself uses (not the owner's declared reserve wallets)
+  const ownHeld = r.accounts.filter((a) => a.kind !== 'reserve').reduce((x, a) => x + micro(a.amount), 0);
+  const covOwn = owedTotal > 0 ? ownHeld / owedTotal : null;
+  const hasReserve = r.accounts.some((a) => a.kind === 'reserve');
+  const covText = cov == null ? 'Nothing owed yet' : `${cov.toFixed(2)}× <small>backed</small>`;
+  const covPill = r.ledger_matches === false ? '<span class="pill bad">balances ≠ ledger</span>'
+    : cov == null ? '' : cov >= 1 ? '<span class="pill ok">fully backed</span>' : '<span class="pill bad">short</span>';
+  const held = Object.entries(r.held).map(([t, v]) => `<span>Held on Solana · ${esc(t)}</span><span>${usd(micro(v))}</span>`).join('');
+  const kindName = { payout: 'Payout wallet', reserve: 'Reserve wallet', deposit: 'Deposit address' };
+  const line = (a) => `<div><a href="${solscan('account', a.token_account)}" target="_blank" rel="noopener">${kindName[a.kind]} ${shortSig(a.wallet)} · ${esc(a.token)} ↗</a><span>${usd(micro(a.amount))}</span></div>`;
+  const order = { payout: 0, reserve: 1, deposit: 2 };
+  el.innerHTML = `<h2 class="px">Reserves ${covPill}</h2>
+    <div class="lead">${covText}</div>
+    ${hasReserve && covOwn != null ? `<div class="note">${covOwn.toFixed(2)}× without the reserve wallets the owner declared</div>` : ''}
+    <div class="kv">
+      <span>Owed to users (balances)</span><span>${usd(micro(r.owed_balances))}</span>
+      <span>Withdrawals not paid yet</span><span>${usd(micro(r.owed_withdrawals))}</span>
+      <span style="color:var(--cream)">Total owed</span><span style="color:var(--cream)">${usd(owedTotal)}</span>
+      ${held}
+      <span style="color:var(--cream)">Total held</span><span style="color:var(--cream)">${usd(micro(r.held_total))}</span>
+      <span>Market's own funds (fees, mints)</span><span>${usd(micro(r.treasury))}</span>
+    </div>
+    <div class="wallets">${[...r.accounts].sort((x, y) => order[x.kind] - order[y.kind]).map(line).join('')}</div>
+    <p class="note">Read from Solana ${ago(r.at)}: USDC and USDT on ${r.deposit_wallets} deposit address${r.deposit_wallets === 1 ? '' : 'es'} and the payout wallet, which only this market uses${hasReserve ? ', plus reserve wallets the owner declared as theirs (Solscan proves the balance, not who controls the wallet)' : ''}. Owed is the sum of the ledger, the same entries as the chain. Every line opens on Solscan.</p>`;
+}
+
+const DEFAULT_RPC = { mainnet: 'https://solana-rpc.publicnode.com', devnet: 'https://api.devnet.solana.com' };
+
+function renderChain(s) {
+  const a = s.last_anchor;
+  const landed = a && ['confirmed', 'finalized'].includes(a.status);
+  $('#exChain').innerHTML = `<h2 class="px">The chain</h2>
+    <div class="kv"><span>Entries</span><span>${s.chain.head_seq.toLocaleString('en-US')}${s.chain.unsealed ? ` <small style="color:var(--dim)">+${s.chain.unsealed} being sealed</small>` : ''}</span>
+      <span>Latest hash</span><span class="hash" title="${esc(s.chain.head_hash)}">${esc(s.chain.head_hash.slice(0, 16))}…</span>
+      <span>Last anchor on Solana</span><span>${a ? `#${a.seq} · <a href="${esc(a.url)}" target="_blank" rel="noopener">${landed ? esc(a.status) : 'not landed yet'} ↗</a>` : 'not yet'}</span>
+      ${s.payout_wallet ? `<span>Anchors come from</span><span><a href="${solscan('account', s.payout_wallet)}" target="_blank" rel="noopener">${shortSig(s.payout_wallet)} ↗</a></span>` : ''}</div>
+    <p class="note">Each entry's hash covers the entry and the hash before it, so changing any past entry breaks every hash after it. About once an hour the latest hash is written to Solana from the payout wallet as a memo (<code>mcp:anchor:${esc(s.network)}:&lt;entry&gt;:&lt;hash&gt;</code>), where nobody can change it. Entries after the last anchor are covered once the next one lands.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="exVerify">Verify the whole chain</button>
+      <input id="exRpc" value="${esc(DEFAULT_RPC[s.network] || DEFAULT_RPC.mainnet)}" aria-label="Solana RPC used to read the anchors" title="Solana RPC used to read the anchors" style="flex:1;min-width:0;background:var(--bg);color:var(--dim);border:2px solid var(--edge);padding:6px 8px;font:12px 'JetBrains Mono',monospace"></div>
+    <div id="exVerifyOut" class="note" aria-live="polite"></div>`;
+  $('#exVerify').onclick = () => verifyChain(s);
+}
+
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// reads an anchor's memo and signer from Solana itself (not from our server)
+async function anchorOnSolana(rpcUrl, signature) {
+  const r = await fetch(rpcUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10_000),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTransaction', params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }] }) });
+  const j = await r.json();
+  const tx = j.result;
+  if (!tx) return null;
+  const ix = (tx.transaction?.message?.instructions || []).find((i) => i.program === 'spl-memo' || i.programId === 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+  const key0 = tx.transaction?.message?.accountKeys?.[0];
+  return { memo: typeof ix?.parsed === 'string' ? ix.parsed : null, signer: typeof key0 === 'string' ? key0 : key0?.pubkey, failed: !!tx.meta?.err };
+}
+
+// downloads every entry and recomputes every hash here, in the browser, then reads the anchors from Solana
+async function verifyChain(s) {
+  const btn = $('#exVerify');
+  const out = $('#exVerifyOut');
+  btn.disabled = true;
+  try {
+    const anchors = (await api('/explorer/anchors')).filter((a) => ['confirmed', 'finalized'].includes(a.status));
+    const bySeq = new Map(anchors.map((a) => [a.seq, a]));
+    const mine = new Map(); // seq -> hash recomputed here, for the anchored entries
+    let prev = s.chain.genesis;
+    let after = 0;
+    for (;;) {
+      const page = await api(`/explorer/chain?after=${after}&limit=1000`);
+      if (!page.length) break;
+      for (const e of page) {
+        if (e.seq !== after + 1) throw new Error(`entry #${after + 1} is missing`);
+        const h = await sha256hex([prev, e.seq, e.id, e.account, e.delta, e.kind, e.ref, e.at].join('\n'));
+        if (h !== e.hash) throw new Error(`entry #${e.seq} does not match its hash`);
+        if (bySeq.has(e.seq)) mine.set(e.seq, h);
+        prev = h;
+        after = e.seq;
+      }
+      out.textContent = `Checked ${after.toLocaleString('en-US')} entries…`;
+    }
+    let msg = `<span class="pill ok">ok</span> All ${after.toLocaleString('en-US')} entries match their hashes.`;
+    // the newest anchors, read from Solana: memo must equal what was recomputed here, signed by the payout wallet
+    const rpcUrl = $('#exRpc').value.trim();
+    const check = anchors.slice(0, 3);
+    let read = 0;
+    for (const a of check) {
+      out.innerHTML = `${msg} Reading anchor #${a.seq} from Solana…`;
+      let onChain = null;
+      try { onChain = await anchorOnSolana(rpcUrl, a.signature); } catch { onChain = null; }
+      if (!onChain) continue;
+      const expect = `mcp:anchor:${s.network}:${a.seq}:${mine.get(a.seq)}`;
+      if (onChain.failed || onChain.memo !== expect) throw new Error(`the anchor on Solana for entry #${a.seq} says "${onChain.memo}", the chain gives "${expect}"`);
+      if (s.payout_wallet && onChain.signer !== s.payout_wallet) throw new Error(`the anchor for entry #${a.seq} is not signed by the payout wallet`);
+      read++;
+    }
+    if (read) msg += ` ${read} anchor${read === 1 ? '' : 's'} read from Solana match too (up to entry #${Math.max(...check.map((a) => a.seq))}).`;
+    else if (check.length) msg += ` This RPC couldn't return the anchors (public ones keep little history): open <a href="${esc(check[0].url)}" target="_blank" rel="noopener">the latest anchor</a> and compare its memo with <span class="hash">mcp:anchor:${esc(s.network)}:${check[0].seq}:${esc(mine.get(check[0].seq) || '')}</span>, or use another RPC.`;
+    else msg += ' No anchor has landed on Solana yet.';
+    out.innerHTML = msg;
+  } catch (e) {
+    out.innerHTML = `<span class="pill bad">failed</span> ${esc(e.message || e)}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function renderTx(id) {
+  const app = $('#app');
+  app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Transaction #${esc(id)}</h1></div>${searchBox()}</div><div id="txBody" class="note">Loading…</div></div>`;
+  wireSearch();
+  let t;
+  try { t = await api('/explorer/tx/' + id); } catch { $('#txBody').textContent = 'No such transaction.'; return; }
+  const s = txSummary(t);
+  $('#txBody').outerHTML = `<div class="panel" style="margin:12px 0 18px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="type ${esc(t.type)}" style="font-size:14px">${esc(t.type)}</span>
+        <span class="note">${new Date(t.at).toLocaleString()}</span>${t.sealed ? '<span class="pill ok">sealed</span>' : '<span class="pill wait">being sealed</span>'}</div>
+      <div style="font-size:18px">${s.what}</div>
+      <div class="kv"><span>Amount</span><span class="${s.cls || ''}">${s.amount} ${esc(s.unit)}</span>
+        ${t.solana ? `<span>On Solana</span><span><a href="${esc(t.solana.url)}" target="_blank" rel="noopener">${shortSig(t.solana.tx)} ↗</a></span>` : ''}
+        ${t.withdrawal ? `<span>Withdrawal #${t.withdrawal.id}</span><span>${esc(t.withdrawal.status || '')}</span>` : ''}</div>
+    </div>
+    <table class="txs"><thead><tr><th>Entry</th><th>Account</th><th style="text-align:right">Change</th><th>Kind</th><th class="hide-sm">Hash</th></tr></thead><tbody>
+      ${t.entries.map((e) => `<tr><td>${e.seq != null ? '#' + e.seq : '—'}</td><td>${who(e.account, e.name)}</td>
+        <td class="num ${e.amount > 0 ? 'plus' : ''}">${e.amount > 0 ? '+' : ''}${fmt(e.amount)}</td><td class="note">${esc(e.kind)}</td>
+        <td class="hide-sm hash" title="${esc(e.hash || '')}">${e.hash ? esc(e.hash.slice(0, 16)) + '…' : 'being sealed'}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="note" style="padding:12px 0 40px">Amounts in $MCP (1 $MCP = $1). Each entry is one line of the chain; its hash covers the entry and the one before it.</p>`;
+}
+
+async function renderAddress(addr) {
+  const app = $('#app');
+  app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">${addr === 'treasury' ? 'Market treasury' : 'Account'}</h1></div>${searchBox()}</div><div id="addrBody" class="note">Loading…</div></div>`;
+  wireSearch();
+  let a;
+  try { a = await api('/explorer/address/' + encodeURIComponent(addr)); } catch { $('#addrBody').textContent = 'No such MCP address.'; return; }
+  $('#addrBody').outerHTML = `<div class="profile" style="padding-top:8px">${a.avatar ? `<img src="${esc(a.avatar)}" alt="">` : ''}
+      <div style="display:grid;gap:8px"><div class="idbox"><code>${esc(a.address)}</code>${a.address !== 'treasury' ? `<button class="btn ghost" data-copy="${esc(a.address)}" style="padding:6px 10px">Copy</button>` : ''}</div>
+      <div class="note">${a.name ? `@${esc(a.name)} · ` : a.address !== 'treasury' ? 'X handle hidden by its owner · ' : ''}${a.joined ? `joined ${new Date(a.joined).toLocaleDateString()} · ` : ''}balance <b style="color:var(--cream)">${usd(a.balance)} $MCP</b>${a.transactions != null ? ` · ${a.transactions} transaction${a.transactions === 1 ? '' : 's'}` : ''}</div>
+      ${a.address !== 'treasury' ? '<div class="note">An MCP address is an account number inside MCP, not a Solana wallet: never send tokens to it.</div>' : '<div class="note">Market fees and mint payments.</div>'}</div></div>
+    ${a.nfts.length ? `<h2 class="px" style="margin:18px 0 10px;font-size:18px">NFTs</h2><div class="grid" style="padding-bottom:20px">${a.nfts.map(card).join('')}</div>` : ''}
+    <h2 class="px" style="margin:18px 0 10px;font-size:18px">Transactions</h2>
+    ${txTable('addrTxs')}<div class="more"><button class="btn ghost" id="addrMore" hidden>Load more</button></div>`;
+  await loadTxs('addrTxs', 'addrMore', addr);
+}
+
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-close],[data-connect],[data-copy]');
+  if (!t) return;
+  if (t.dataset.copy !== undefined) {
+    await navigator.clipboard?.writeText(t.dataset.copy).catch(() => {});
+    t.textContent = 'Copied';
+  } else if (t.hasAttribute('data-connect')) {
+    $('#connectDlg').showModal();
+  } else {
+    t.closest('dialog').close();
+  }
+});
+$('#connectBtn').onclick = () => $('#connectDlg').showModal();
+$('#copyUrl').onclick = async (e) => { await navigator.clipboard?.writeText($('#mcpUrl').textContent).catch(() => {}); e.target.textContent = 'Copied'; };
+$('#nftDlg').addEventListener('close', () => { if (location.hash.startsWith('#/nft/')) history.replaceState(null, '', '#/'); });
+document.querySelectorAll('dialog').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
+
+async function route() {
+  const h = location.hash.replace(/^#/, '') || '/';
+  let mm;
+  const inExplorer = /^\/(explorer|tx\/|a\/|u\/)/.test(h);
+  document.querySelectorAll('[data-nav]').forEach((a) => {
+    if ((a.dataset.nav === 'explorer') === inExplorer) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+  if (inExplorer) window.scrollTo(0, 0);
+  if (!h.startsWith('/nft/') && $('#nftDlg').open) $('#nftDlg').close(); // e.g. an owner link inside the NFT window
+  if ((mm = h.match(/^\/u\/(\w+)/))) return renderProfile(mm[1]);
+  if (h === '/explorer') return renderExplorer();
+  if ((mm = h.match(/^\/tx\/(\d+)/))) return renderTx(mm[1]);
+  if ((mm = h.match(/^\/a\/(mcp_[1-9A-HJ-NP-Za-km-z]{12}|treasury)\b/))) return renderAddress(mm[1]);
+  if (!$('#grid')) await renderMarket();
+  if ((mm = h.match(/^\/nft\/(\d+)/))) openNft(Number(mm[1]));
+}
+window.addEventListener('hashchange', route);
+loadStats().then(route);
+</script>
+</body>
+</html>
