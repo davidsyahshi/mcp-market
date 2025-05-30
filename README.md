@@ -3,9 +3,9 @@
 <img src="site/logo.png" width="96" align="right" alt="MCP logo">
 
 An NFT market that lives inside Claude and ChatGPT. You add one connector, sign in with X, and then just talk:
-*"mint me an MCP"*, *"what's on the market under 10?"*, *"buy #0042"*, *"list my Scarf for 9"*, *"top up my balance"*
+*"mint me an MCP"*, *"what's on the market under 10?"*, *"any Legendary Bunny for sale?"*, *"buy MCP #42"*, *"list MCP #42 for 9"*, *"top up my balance"*
 
-The website only shows the collection, prices and owners. Every action happens in your AI chat.
+The website only shows the collections, prices, traits and owners. Every action happens in your AI chat.
 
 This repository is the whole server, so you can read exactly what the connector does before you plug it in.
 
@@ -34,8 +34,9 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 | `public_profile` | show or hide your X handle on public pages (hidden by default) | your profile's visibility |
 | `deposit` | your personal Solana address for USDC/USDT, and a check for new deposits | credits deposits that arrived |
 | `faucet` | free test $MCP once a day (test server only) | your balance |
-| `mint` | random NFT from the collection for 5 $MCP, max 5 per account | your balance, NFT owner |
-| `my_nfts`, `market`, `nft` | look around | no |
+| `collections` | the collections on the market: mint price, minted / supply, floor, mint limit | no |
+| `mint` | a random unminted NFT of a collection (MCP by default: 5 $MCP, max 5 per account) | your balance, NFT owner |
+| `my_nfts`, `market`, `nft` | look around: the market filters by collection, rarity and traits; `nft` shows every trait and how many NFTs share it | no |
 | `buy` | buy a listed NFT; needs the exact price you agreed to | your balance, NFT owner |
 | `sell`, `cancel_listing` | list your NFT or take it off sale | listing |
 | `withdraw_form` | shows the withdrawal form in the chat (below) | no |
@@ -66,6 +67,25 @@ NFT images, site ──▶ CDN (static)
 - **Balances are in $MCP, and 1 $MCP = $1.** You top up with USDC or USDT (1 token = 1 $MCP) and withdraw USDC. Amounts are stored as integer micro-units (6 decimals, exactly like USDC/USDT), so deposits are credited to the last unit.
 - **Every balance change** writes a ledger row in the same database transaction, so balances always add up. The tests check this.
 - **Market fee:** 2.5% of each sale goes to the treasury.
+
+## The collection
+
+**MCP** is 5,000 pixel characters, each with 9 to 12 traits (Rarity, Render Engine, Chassis, Bloodline, Paint Job, Habitat, Trim, Lid, Optics, Fit, Bling, Side Quest). Rarity tiers: Common 2,750 · Rare 1,400 · Epic 600 · Legendary 200 · Ultra-Rare 50. Every NFT has its own page (`/#/nft/<number>`) with its traits, how many NFTs share each one, the owner and every mint and sale, each linked to its transaction in the explorer. The collection page (`/#/c/mcp`) filters by any combination of traits.
+
+- **Minting** gives a random NFT nobody has minted yet, for 5 $MCP, at most 5 per account (`MINT_PRICE_USD`, `MINT_LIMIT_PER_USER`). Mint money goes to the treasury. **Mint phase:** MCP NFTs can't be listed or bought until all 5,000 are minted; trading opens by itself with the last mint (`MCP_TRADING=open` opens it earlier).
+- **Metadata** is [`collection/collection.json`](collection/collection.json): every NFT's traits, public before anyone mints. The server loads it into the database on its first start.
+- **Pictures** ship as two archives, [`collection/mcp-images.tar.gz`](collection/mcp-images.tar.gz) (`/img/<n>.png`) and [`collection/mcp-thumbs.tar.gz`](collection/mcp-thumbs.tar.gz) (`/thumb/<n>.png`, 252 px), unpacked by the build ([`server/src/assets.js`](server/src/assets.js)). 4,618 of the 5,000 are 28×28 pixel art stored at their native size (the site scales them up without smoothing); the other render engines (ASCII, Mosaic, LED Wall, …) are stored at 1,008 px.
+
+## Launchpad
+
+Anyone signed in with X can launch a collection on MCP at [`/#/launch`](https://mcp.credit/#/launch): name, id, mint price, mints per account, and a folder or .zip with the pictures and the usual generator metadata (`1.png`, `2.png`, … with `1.json`, … or one `_metadata.json`). The browser reads them, makes the thumbnails and uploads them in batches; nothing goes public before the market's owner reviews it. Code: [`server/src/launchpad.js`](server/src/launchpad.js), [`site/launch.js`](site/launch.js).
+
+- **Review.** A collection goes live only after the owner approves it (`ADMIN_X_IDS`, their X account ids; the page is `/#/admin`). Until then its page and pictures show only to its creator and the owner.
+- **Mint money.** Each mint: 10% to the market (`LAUNCH_FEE_BPS`), the rest into the **escrow**, an account of its own in the ledger and the explorer. It is held at least 7 days per mint (`HOLD_DAYS`) and goes to the creator's balance only when the owner releases it. The creator withdraws it like any balance.
+- **Frozen.** If a collection turns out to be a scam, the owner freezes it: minting and trading stop, and every mint still in the escrow is refunded in full (the market's fee too) to whoever minted it.
+- **Counted as owed.** The escrow is part of what the market owes in the proof of reserves, and the explorer checks it against the open holds.
+- **Pictures** of launchpad collections live in Netlify Blobs and are served by the function at the same addresses as the MCP collection's (`/img/<n>.png`, `/thumb/<n>.png`). Only PNG, JPEG, GIF and WEBP, at most 1 MB each, checked by their first bytes; never SVG or HTML.
+- **Sign-in on the site** is the same X sign-in as the connector's, then a session cookie (`HttpOnly`, `SameSite=Lax`, 30 days). Every change needs the site's own header and origin, so another website can't make one for you.
 
 ## Explorer
 
@@ -153,7 +173,8 @@ server/src/
   app.js      HTTP routes: /mcp, OAuth, public API, explorer API, Helius webhook, manual credit
   mcp.js      the tools listed above, and the withdrawal form as an MCP App
   ui.js       builds the withdrawal form with the MCP Apps SDK built in (pinned by sha256)
-  market.js   rules: balances, mint, listings, buys, MCP addresses
+  market.js   rules: collections, balances, mint, listings, buys, trait filters, MCP addresses
+  assets.js   unpacks the NFT picture archives for the build
   explorer.js public explorer: hash chain, Solana anchors, proof of reserves
   withdrawals.js payouts: limits, hot wallet, never-twice sending, refunds
   tx.js       Solana transaction building and signing
@@ -168,7 +189,7 @@ server/src/
   index.js    plain Node entry (npm start)
 server/ui/    the withdrawal form (HTML)
 site/         the preview website and the explorer
-collection/   NFT images and traits
+collection/   the MCP collection: metadata (collection.json) and picture archives
 netlify/      Netlify function wrapper
 ```
 
@@ -183,6 +204,8 @@ npm run demo              # optional: 8 fake traders so the site has something t
 npm start                 # http://localhost:3000, connector at http://localhost:3000/mcp (also runs the 5-minute deposit/payout job)
 npm test                  # end-to-end tests: real OAuth, real MCP client, two users trading
 ```
+
+`npm test` runs on an embedded database. With a real Postgres, `TEST_DATABASE_URL=postgres://… npm test` also runs `server/test/races.test.js`: trades, mints, uploads and the owner's freeze forced into their worst interleavings.
 
 ## Deploy your own
 
@@ -200,10 +223,13 @@ npm test                  # end-to-end tests: real OAuth, real MCP client, two u
 | `WITHDRAW_WALLET_KEY` | the payout hot wallet's secret key (Phantom: *Export private key*). Keep only a small float on it. Withdrawals also need `DEPOSIT_POOL_KEY` (or `WITHDRAW_MAC_KEY`), which signs withdrawal rows |
 | `ADMIN_TOKEN` | optional: long random secret for manual credits (`POST /admin/deposit`); unset means off |
 | `MINT_PRICE_USD`, `MIN_DEPOSIT_USD`, `FAUCET_USD` | optional, in $MCP (= USD), defaults 5, 0.01, 20 |
+| `MCP_TRADING` | `after_sold_out` (default): MCP NFTs trade only once all of them are minted; `open`: right away |
 | `MIN_WITHDRAW_USD`, `WITHDRAW_FEE`, `WITHDRAW_AUTO_MAX`, `WITHDRAW_USER_DAILY`, `WITHDRAW_DAILY`, `WITHDRAW_HARD_DAILY` | optional, defaults 5, 0.5, 100, 300, 1000, 2000 |
 | `WITHDRAW_ADDRESS_DELAY_HOURS`, `WITHDRAWALS_PAUSED` | optional: hours before a new address can receive (24; 0 on the test server), `1` stops payouts |
 | `RESERVE_WALLETS` | optional: your cold wallets holding swept deposits (public addresses, comma-separated), so the explorer counts them as reserves |
 | `ANCHOR_EVERY_MINUTES`, `ANCHORS_OFF`, `RESERVES_EVERY_MINUTES` | optional: how often the chain's hash goes to Solana (60), `1` stops anchors, how often reserves are read (10) |
+| `ADMIN_X_IDS` | the X account ids (numbers, not handles: a handle can change hands) of the market's owner(s), comma-separated: they review launchpad collections at `/#/admin` and release payouts. Sign in on the site and open `/api/me` to see yours (`x_id`) |
+| `LAUNCH_FEE_BPS`, `HOLD_DAYS`, `LAUNCH_MAX_SUPPLY` | optional: the market's share of launchpad mints in basis points (1000 = 10%), the hold in days (7), the largest collection (10,000) |
 
 Deposits start working once `HELIUS_API_KEY` and `DEPOSIT_POOL_KEY` are set (and deployed) and the pool CSV is imported; the scheduled function registers the Helius webhook within 5 minutes of the first address handed out.
 
@@ -219,7 +245,8 @@ Deposits start working once `HELIUS_API_KEY` and `DEPOSIT_POOL_KEY` are set (and
 - [x] Withdrawal form inside the chat (MCP Apps): the user presses the buttons, not the AI
 - [x] Public explorer: MCP addresses, hash chain, anchors on Solana, proof of reserves
 - [x] Live on Solana mainnet at [mcp.credit](https://mcp.credit)
-- [ ] Final collection
+- [x] Final collection: 5,000 MCP with traits and rarity, NFT and collection pages, mints in the explorer
+- [x] Launchpad: anyone can launch a collection after review; mint money held in an escrow 7 days, paid out after a check
 
 ## Honest risks
 
