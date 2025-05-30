@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MCP withdrawal</title>
+<!--
+  The withdrawal form shown inside the chat (an MCP App). The assistant only opens it; binding the address and
+  sending a withdrawal happen when the person presses the button here. The server inlines the MCP Apps SDK in
+  place of the marker in the script below (server/src/ui.js), so the page needs no outside domains.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --cherry: #FF2A1F;
+    --ink: #0B0B0B;
+    --fg: var(--color-text-primary, #141413);
+    --fg2: var(--color-text-secondary, #3D3D3A);
+    --fg3: var(--color-text-tertiary, #73726C);
+    --bg2: var(--color-background-secondary, #F5F4ED);
+    --line: var(--color-border-tertiary, rgba(31, 30, 29, .15));
+    --line2: var(--color-border-primary, rgba(31, 30, 29, .4));
+    --ring: var(--color-ring-primary, rgba(20, 20, 19, .7));
+    --danger: var(--color-text-danger, #7F2C28);
+    --danger-bg: var(--color-background-danger, #F7ECEC);
+    --ok: var(--color-text-success, #265B19);
+    --ok-bg: var(--color-background-success, #E9F1DC);
+    --warn: var(--color-text-warning, #5A4815);
+    --warn-bg: var(--color-background-warning, #F6EEDF);
+    --r: var(--border-radius-md, 8px);
+    --rl: var(--border-radius-lg, 10px);
+    --sans: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+    --mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    --pad-t: 16px; --pad-r: 16px; --pad-b: 16px; --pad-l: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fg: var(--color-text-primary, #FAF9F5);
+      --fg2: var(--color-text-secondary, #C2C0B6);
+      --fg3: var(--color-text-tertiary, #9C9A92);
+      --bg2: var(--color-background-secondary, #262624);
+      --line: var(--color-border-tertiary, rgba(222, 220, 209, .15));
+      --line2: var(--color-border-primary, rgba(222, 220, 209, .4));
+      --ring: var(--color-ring-primary, rgba(250, 249, 245, .7));
+      --danger: var(--color-text-danger, #EE8884);
+      --danger-bg: var(--color-background-danger, #602A28);
+      --ok: var(--color-text-success, #7AB948);
+      --ok-bg: var(--color-background-success, #1B4614);
+      --warn: var(--color-text-warning, #D1A041);
+      --warn-bg: var(--color-background-warning, #483A0F);
+    }
+  }
+  :root[data-theme="dark"] {
+    --fg: var(--color-text-primary, #FAF9F5);
+    --fg2: var(--color-text-secondary, #C2C0B6);
+    --fg3: var(--color-text-tertiary, #9C9A92);
+    --bg2: var(--color-background-secondary, #262624);
+    --line: var(--color-border-tertiary, rgba(222, 220, 209, .15));
+    --line2: var(--color-border-primary, rgba(222, 220, 209, .4));
+    --ring: var(--color-ring-primary, rgba(250, 249, 245, .7));
+    --danger: var(--color-text-danger, #EE8884);
+    --danger-bg: var(--color-background-danger, #602A28);
+    --ok: var(--color-text-success, #7AB948);
+    --ok-bg: var(--color-background-success, #1B4614);
+    --warn: var(--color-text-warning, #D1A041);
+    --warn-bg: var(--color-background-warning, #483A0F);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body {
+    font-family: var(--sans);
+    font-size: var(--font-text-sm-size, 14px);
+    line-height: var(--font-text-sm-line-height, 1.4);
+    color: var(--fg);
+    padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+    -webkit-text-size-adjust: 100%;
+  }
+  main { display: flex; flex-direction: column; gap: 14px; max-width: 560px; }
+  [hidden] { display: none !important; }
+
+  header { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 38px; height: 32px; border-radius: var(--r); overflow: hidden; flex: none; display: block; }
+  .logo svg { width: 100%; height: 100%; display: block; }
+  .ttl { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .ttl b { font-size: var(--font-heading-sm-size, 14px); font-weight: var(--font-weight-semibold, 600); letter-spacing: .06em; text-transform: uppercase; }
+  .ttl small { color: var(--fg3); font-size: var(--font-text-xs-size, 12px); }
+  .badge { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--ink); background: var(--cherry); border-radius: var(--border-radius-full, 999px); padding: 3px 8px; flex: none; }
+
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .label { color: var(--fg3); font-size: var(--font-text-xs-size, 12px); text-transform: uppercase; letter-spacing: .06em; flex: none; }
+  .big { font-size: var(--font-heading-lg-size, 20px); font-weight: var(--font-weight-semibold, 600); font-variant-numeric: tabular-nums; }
+  .unit { color: var(--fg3); font-size: .7em; font-weight: 500; margin-left: 3px; }
+
+  .addr { display: flex; flex-direction: column; gap: 4px; }
+  .addr code { font-family: var(--mono); font-size: 13px; word-break: break-all; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; color: var(--fg); }
+  .addr code mark { background: none; color: inherit; font-weight: 700; }
+
+  .field { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line2); border-radius: var(--rl); padding: 4px 4px 4px 12px; background: transparent; }
+  .field:focus-within { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font: inherit; font-size: 20px; font-weight: 600; padding: 8px 0; font-variant-numeric: tabular-nums; }
+  .field input.addr-in { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+  .field .unit { font-size: 14px; }
+  .chip { flex: none; min-height: 36px; padding: 0 12px; border: 1px solid var(--line2); border-radius: var(--border-radius-full, 999px); background: transparent; color: var(--fg); font: inherit; font-weight: 600; cursor: pointer; }
+
+  .sum { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-variant-numeric: tabular-nums; }
+  .sum span:nth-child(odd) { color: var(--fg3); }
+  .sum span:nth-child(even) { text-align: right; }
+  .sum span.tot { font-weight: 600; color: var(--fg); }
+
+  .actions { display: flex; gap: 8px; }
+  button.primary, button.ghost { min-height: 44px; border-radius: var(--rl); font: inherit; font-weight: var(--font-weight-semibold, 600); font-size: 15px; cursor: pointer; padding: 0 16px; }
+  button.primary { flex: 1; border: 0; background: var(--cherry); color: var(--ink); }
+  button.ghost { border: 1px solid var(--line2); background: transparent; color: var(--fg); }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+  .note { margin: 0; padding: 10px 12px; border-radius: var(--r); font-size: 13px; }
+  .note.warn { background: var(--warn-bg); color: var(--warn); }
+  .note.err { background: var(--danger-bg); color: var(--danger); }
+  .note.ok { background: var(--ok-bg); color: var(--ok); }
+  .fine { margin: 0; color: var(--fg3); font-size: var(--font-text-xs-size, 12px); }
+
+  .done { display: flex; flex-direction: column; gap: 6px; }
+  .done .big { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cherry); flex: none; }
+  .dot.live { animation: pulse 1.2s ease-in-out infinite; }
+  .dot.ok { background: var(--ok); }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+
+  .sk { height: 14px; border-radius: 6px; background: var(--bg2); }
+  .sk.w60 { width: 60%; } .sk.w40 { width: 40%; } .sk.h44 { height: 44px; border-radius: var(--rl); }
+  .off { opacity: .55; pointer-events: none; }
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite">
+  <header>
+    <span class="logo"><svg viewBox="0 0 19 16" shape-rendering="crispEdges" aria-hidden="true"><rect width="19" height="16" fill="#FF2A1F"/><path fill="#F5F1E8" d="M8 1h8v1h-8zM6 2h11v1h-11zM5 3h13v1h-13zM5 4h13v1h-13zM5 5h3v1h-3zM10 5h4v1h-4zM16 5h2v1h-2zM5 6h13v1h-13zM5 7h13v1h-13zM8 10h8v1h-8zM8 11h8v1h-8zM9 12h6v1h-6zM9 13h1v1h-1zM13 13h1v1h-1zM9 14h1v1h-1zM13 14h1v1h-1z"/><path fill="#B5B2AB" d="M17 2h1v1h-1zM18 3h1v1h-1zM18 4h1v1h-1zM18 5h1v1h-1zM18 6h1v1h-1zM18 7h1v1h-1zM6 8h12v1h-12zM10 13h1v1h-1zM14 13h1v1h-1zM10 14h1v1h-1zM14 14h1v1h-1z"/><path fill="#0B0B0B" d="M3 9h14v1h-14zM2 10h2v1h-2zM1 11h1v1h-1z"/><path fill="#363636" d="M17 9h1v1h-1zM2 11h1v1h-1z"/></svg></span>
+    <div class="ttl"><b>Withdraw</b><small id="net">USDC on Solana</small></div>
+    <span class="badge" id="test" hidden>TEST</span>
+  </header>
+
+  <section id="loading" aria-label="Loading">
+    <div class="sk w40"></div><div class="sk w60"></div><div class="sk h44"></div>
+  </section>
+
+  <div class="row" id="balrow" hidden><span class="label">Balance</span><span class="big" id="bal"></span></div>
+
+  <!-- step 1, once: bind the address withdrawals go to -->
+  <section id="bind" hidden>
+    <div class="addr">
+      <span class="label">Your Solana wallet address</span>
+      <label class="field"><input id="addrIn" class="addr-in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste from Phantom, Solflare…" aria-label="Solana wallet address"></label>
+    </div>
+    <p class="note warn" style="margin-top:10px">Withdrawals will only ever go to this address, and it can be set once. Copy it from your own wallet app and check the first and last 4 characters. Not an exchange deposit address.</p>
+    <div class="actions" style="margin-top:12px" id="bindActs"><button class="primary" id="bindBtn" disabled>Bind address</button></div>
+    <div class="actions" style="margin-top:12px" id="bindConfirm" hidden>
+      <button class="ghost" id="bindNo">Back</button><button class="primary" id="bindYes">Yes, bind <span id="bindShort"></span></button>
+    </div>
+  </section>
+
+  <!-- step 2: the withdrawal -->
+  <section id="form" hidden>
+    <div class="addr"><span class="label">To your wallet</span><code id="addr"></code></div>
+    <div style="margin-top:12px">
+      <span class="label" id="amtLabel">Amount</span>
+      <label class="field" style="margin-top:4px"><input id="amount" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-labelledby="amtLabel"><span class="unit">USDC</span><button class="chip" id="max" type="button">Max</button></label>
+    </div>
+    <div class="sum" id="sum" style="margin-top:12px">
+      <span>You receive</span><span id="sRecv">—</span>
+      <span>Fee</span><span id="sFee">—</span>
+      <span class="tot">Taken from balance</span><span class="tot" id="sTot">—</span>
+    </div>
+    <p class="note err" id="formErr" style="margin-top:12px" hidden></p>
+    <p class="note err" id="sendErr" style="margin-top:12px" role="alert" hidden></p>
+    <p class="note warn" id="opens" style="margin-top:12px" hidden></p>
+    <div class="actions" style="margin-top:12px" id="goActs"><button class="primary" id="go" disabled>Withdraw</button></div>
+    <div class="actions" style="margin-top:12px" id="confirmActs" hidden>
+      <button class="ghost" id="no">Cancel</button><button class="primary" id="yes">Confirm</button>
+    </div>
+    <p class="fine" id="limits" style="margin-top:10px"></p>
+  </section>
+
+  <!-- step 3: what happened -->
+  <section id="result" class="done" hidden>
+    <div class="big"><span class="dot" id="rDot"></span><span id="rHead"></span></div>
+    <div class="fine" id="rBody"></div>
+    <div class="actions" style="margin-top:6px">
+      <button class="ghost" id="again">New withdrawal</button><button class="primary" id="tx" hidden>View transaction</button>
+    </div>
+  </section>
+
+  <p class="note" id="msg" hidden></p>
+</main>
+
+<script type="module">
+/*MCP_APPS_SDK*/
+
+const $ = (id) => document.getElementById(id);
+const MICRO = 1e6;
+const TOKEN = 'mcp-market/form-token';
+const micro = (n) => Math.round(Number(n) * MICRO);
+// 20 → "20", 20.5 → "20.50", 0.249975 → "0.249975" (same as the site)
+const fmt = (n) => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  return Number.isInteger(v) ? v.toLocaleString('en-US') : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+};
+const short = (a) => (a ? `${a.slice(0, 4)}…${a.slice(-4)}` : '');
+const newKey = () => (crypto.randomUUID ? crypto.randomUUID() : [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join(''));
+const textOf = (r) => (r?.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+const EXPIRED = 'This form has expired. Ask the assistant to open the withdrawal form again.';
+
+let st = null;          // the latest state from the server
+let prefill = {};       // the amount from the chat
+let token = null;       // the form's pass, from the tool result's _meta
+let busy = false;
+// Request key of the withdrawal being confirmed. It is dropped only once the server has answered for it (made it,
+// or definitely refused it). While the outcome is unknown it stays, so the next Confirm can't send a second one.
+let key = null;
+let current = null;     // the withdrawal this form made
+let pollRun = 0;
+let armedAt = 0;        // a Confirm button only works a moment after it appears: a double click can't confirm
+
+const app = new McpApps.App({ name: 'MCP withdrawal', version: '1.0.0' }, {}, { autoResize: true });
+
+function applyContext(ctx) {
+  if (!ctx) return;
+  if (ctx.theme) McpApps.applyDocumentTheme(ctx.theme);
+  if (ctx.styles?.variables) McpApps.applyHostStyleVariables(ctx.styles.variables);
+  if (ctx.styles?.css?.fonts) McpApps.applyHostFonts(ctx.styles.css.fonts);
+  const s = ctx.safeAreaInsets;
+  if (s) {
+    const r = document.documentElement.style;
+    r.setProperty('--pad-t', `${Math.max(16, s.top)}px`);
+    r.setProperty('--pad-r', `${Math.max(16, s.right)}px`);
+    r.setProperty('--pad-b', `${Math.max(16, s.bottom)}px`);
+    r.setProperty('--pad-l', `${Math.max(16, s.left)}px`);
+  }
+}
+
+function show(id, on) { $(id).hidden = !on; }
+function message(text, kind = 'err') {
+  const el = $('msg');
+  el.textContent = text || '';
+  el.className = `note ${kind}`;
+  el.hidden = !text;
+}
+function sendError(text) {
+  $('sendErr').textContent = text || '';
+  $('sendErr').hidden = !text;
+}
+let skew = 0;           // server clock minus this device's clock, from fresh answers
+const tokenOk = () => !!token && Number(String(token).split('.')[0]) > Date.now() + skew + 5000;
+const arm = () => { armedAt = Date.now() + 700; };
+const armed = () => Date.now() >= armedAt;
+
+// ---------- calls to our server, made only by the buttons below ----------
+
+async function callTool(name, args = {}) {
+  const r = await app.callServerTool({ name, arguments: args });
+  if (r?._meta?.[TOKEN]) token = r._meta[TOKEN];
+  const at = Number(r?.structuredContent?.state?.issued_at);
+  if (at) skew = at - Date.now(); // just made by the server
+  if (r?.structuredContent?.state) setState(r.structuredContent.state);
+  return r;
+}
+
+// fresh state; with a request key whose outcome is unknown, also what happened to it
+async function refresh() {
+  try {
+    const r = await callTool('withdraw_form_state', { ...(token ? { form_token: token } : {}), ...(key ? { request_key: key } : {}) });
+    const found = r?.structuredContent?.by_key;
+    if (found && key) {
+      key = null;
+      current = found;
+      renderResult();
+      tellAssistant();
+      if (['sending', 'pending'].includes(found.status)) poll();
+    }
+    return r;
+  } catch {
+    return null; // keep what we have
+  }
+}
+
+// ---------- rendering ----------
+
+function setState(s) {
+  if (!s || s.v !== 1) return;
+  st = s;
+  show('loading', false);
+  $('net').textContent = `${s.token} on Solana${s.network === 'mainnet' ? '' : ' ' + s.network}`;
+  show('test', s.network !== 'mainnet');
+  $('bal').innerHTML = `${fmt(s.balance)}<span class="unit">$MCP</span>`;
+  show('balrow', true);
+  if (!s.open) {
+    if (current) { renderResult(); return; } // keep showing what happened to this withdrawal
+    show('bind', false); show('form', false); show('result', false);
+    message(s.closed_reason || 'Withdrawals are not open yet. Your balance is safe.', 'warn');
+    return;
+  }
+  if (!current) message(tokenOk() ? '' : EXPIRED, 'warn');
+  if (!s.address) {
+    show('form', false); show('result', false); show('bind', true);
+    onAddrInput();
+    return;
+  }
+  show('bind', false);
+  const code = $('addr');
+  code.innerHTML = '';
+  const hl = (t) => Object.assign(document.createElement('mark'), { textContent: t });
+  code.append(hl(s.address.slice(0, 4)), s.address.slice(4, -4), hl(s.address.slice(-4)));
+  const last = s.recent?.[0];
+  const lastText = last ? ` Last withdrawal: #${last.id}, ${fmt(last.amount)} USDC, ${{ review: 'waiting for a check', pending: 'queued', sending: 'on its way', sent: 'sent', rejected: 'rejected', refunded: 'refunded' }[last.status] || last.status}.` : '';
+  $('limits').textContent = `Minimum ${fmt(s.min)} $MCP. Sent automatically up to ${fmt(s.auto_max)} at once and ${fmt(s.user_daily)} a day; more waits for a manual check (usually within 24 hours).${lastText}`;
+  if (s.opens_at && new Date(s.opens_at) > new Date()) {
+    $('opens').textContent = `For safety, withdrawals to a newly bound address open at ${new Date(s.opens_at).toLocaleString()}.`;
+    show('opens', true);
+  } else show('opens', false);
+  if (!current) { show('result', false); show('form', true); }
+  const amt = $('amount');
+  if (!amt.value && prefill.amount && !amt.dataset.used) { amt.value = String(prefill.amount); amt.dataset.used = '1'; }
+  onAmountInput();
+  if (current) renderResult();
+}
+
+function amountCheck() {
+  const raw = $('amount').value.trim().replace(',', '.');
+  if (!raw) return { ok: false };
+  if (!/^\d+(\.\d{1,6})?$/.test(raw)) return { ok: false, err: 'Enter an amount like 12.5' };
+  const a = micro(raw);
+  const fee = micro(st.fee);
+  if (a < micro(st.min)) return { ok: false, a, err: `Minimum is ${fmt(st.min)} $MCP` };
+  if (a + fee > micro(st.balance)) return { ok: false, a, err: `Not enough: with the ${fmt(st.fee)} $MCP fee you can withdraw up to ${fmt(Math.max(0, (micro(st.balance) - fee) / MICRO))}` };
+  return { ok: true, a };
+}
+
+function onAmountInput() {
+  if (!st || !st.open) return;
+  const c = amountCheck();
+  const a = c.a ?? 0;
+  $('sRecv').textContent = c.a ? `${fmt(a / MICRO)} USDC` : '—';
+  $('sFee').textContent = `${fmt(st.fee)} $MCP`;
+  $('sTot').textContent = c.a ? `${fmt((a + micro(st.fee)) / MICRO)} $MCP` : '—';
+  const err = $('formErr');
+  err.textContent = c.err || '';
+  err.hidden = !c.err;
+  const locked = !!(st.opens_at && new Date(st.opens_at) > new Date());
+  $('go').disabled = !c.ok || busy || locked || !tokenOk();
+  $('go').textContent = c.ok ? `Withdraw ${fmt(a / MICRO)} USDC` : 'Withdraw';
+  if (!$('confirmActs').hidden && !c.ok && !busy) closeConfirm();
+}
+
+function onAddrInput() {
+  const v = $('addrIn').value.trim();
+  $('bindBtn').disabled = busy || !tokenOk() || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v);
+}
+
+function closeConfirm() {
+  show('confirmActs', false); show('goActs', true);
+  $('amount').disabled = false; $('max').disabled = false;
+}
+
+function renderResult() {
+  const w = current;
+  if (!w) return;
+  show('form', false); show('bind', false); show('result', true);
+  message('');
+  const amt = `${fmt(w.amount)} USDC`;
+  const to = short(w.address);
+  const heads = {
+    sent: [`Sent ${amt}`, 'ok', `Arrived at ${to}. Fee ${fmt(w.fee)} $MCP.`],
+    sending: [`${amt} on its way`, 'live', `Confirming on the network, usually under a minute. To ${to}.`],
+    pending: [`${amt} queued`, 'live', `Goes out automatically within a few minutes. To ${to}.`],
+    review: [`${amt} waits for a check`, '', 'Above the automatic limit, so it is checked by hand, usually within 24 hours. The amount is reserved from your balance.'],
+    rejected: [`${amt} rejected`, '', 'The amount and fee are on their way back to your balance.'],
+    refunded: [`${amt} refunded`, '', 'Rejected; the amount and fee are back on your balance.'],
+  };
+  const [head, cls, body] = heads[w.status] || [`Withdrawal #${w.id}: ${w.status}`, '', ''];
+  $('rHead').textContent = head;
+  $('rDot').className = `dot ${cls}`;
+  $('rBody').textContent = `#${w.id} · ${body}`;
+  show('tx', !!w.explorer);
+}
+
+// ---------- actions ----------
+
+$('amount').addEventListener('input', () => { sendError(''); onAmountInput(); });
+$('addrIn').addEventListener('input', onAddrInput);
+$('max').addEventListener('click', () => {
+  if (!st) return;
+  const max = Math.max(0, micro(st.balance) - micro(st.fee)) / MICRO;
+  $('amount').value = max ? String(max) : '';
+  sendError('');
+  onAmountInput();
+});
+
+$('go').addEventListener('click', () => {
+  const c = amountCheck();
+  if (!c.ok || busy) return;
+  if (!key) key = newKey();
+  $('yes').textContent = `Confirm: send ${fmt(c.a / MICRO)} USDC to ${short(st.address)}`;
+  $('amount').disabled = true; $('max').disabled = true;
+  show('goActs', false); show('confirmActs', true);
+  arm();
+  $('no').focus();
+});
+$('no').addEventListener('click', async () => {
+  closeConfirm();
+  // after an unanswered Confirm, find out whether that one went through
+  if (key && !$('sendErr').hidden) await refresh();
+});
+
+$('yes').addEventListener('click', async () => {
+  const c = amountCheck();
+  if (!c.ok || busy || !armed()) return;
+  busy = true;
+  sendError('');
+  $('yes').disabled = true; $('no').disabled = true;
+  const label = $('yes').textContent;
+  $('yes').textContent = 'Sending…';
+  try {
+    const r = await callTool('withdraw_form_submit', { amount: c.a / MICRO, request_key: key, form_token: token || '' });
+    if (r?.isError && r?.structuredContent?.refused) {
+      key = null; // refused before anything was taken: a new attempt is a new request
+      closeConfirm();
+      sendError(textOf(r) || 'The withdrawal was refused.');
+    } else if (r?.structuredContent?.withdrawal) {
+      key = null;
+      current = r.structuredContent.withdrawal;
+      renderResult();
+      if (micro(current.amount) !== c.a) $('rBody').textContent += ` This is your earlier request of ${fmt(current.amount)} USDC, which went through; nothing new was sent.`;
+      tellAssistant();
+      if (['sending', 'pending'].includes(current.status)) poll();
+    } else {
+      // an error that doesn't say what happened: keep the key and ask the server
+      sendError('Not sure it went through. Checking…');
+      await refresh();
+      if (!current) sendError('Could not confirm it went through. Press Confirm again: the same withdrawal is never sent twice.');
+    }
+  } catch {
+    // the answer got lost on the way: keep the same key, so pressing Confirm again can't send twice
+    sendError('No answer from the server. Press Confirm again: the same withdrawal is never sent twice.');
+  } finally {
+    busy = false;
+    $('yes').disabled = false; $('no').disabled = false;
+    if ($('yes').textContent === 'Sending…') $('yes').textContent = label;
+    onAmountInput();
+  }
+});
+
+async function poll() {
+  const run = ++pollRun;
+  for (let i = 0; i < 16; i++) {
+    await new Promise((r) => setTimeout(r, i < 3 ? 3000 : 6000));
+    if (run !== pollRun || !current) return; // superseded or reset
+    const id = current.id;
+    await refresh();
+    if (run !== pollRun || !current || current.id !== id) return;
+    const fresh = st?.recent?.find((w) => w.id === id);
+    if (fresh) {
+      const changed = fresh.status !== current.status;
+      current = fresh;
+      renderResult();
+      if (changed) tellAssistant();
+    }
+    if (!['sending', 'pending'].includes(current.status)) return;
+  }
+}
+
+// lets the assistant answer "did it go through?" without the user retyping it
+function tellAssistant() {
+  if (!current || !app.getHostCapabilities()?.updateModelContext) return;
+  const w = current;
+  app.updateModelContext({
+    content: [{ type: 'text', text: `The user withdrew in the form: withdrawal #${w.id}, ${w.amount} USDC to ${w.address}, status ${w.status}` + (w.explorer ? `, transaction ${w.explorer}` : '') + '.' }],
+  }).catch(() => {});
+}
+
+$('again').addEventListener('click', async () => {
+  current = null; pollRun++;
+  $('amount').value = '';
+  sendError('');
+  closeConfirm();
+  show('result', false);
+  if (st) setState(st);
+  await refresh();
+});
+
+$('tx').addEventListener('click', async () => {
+  const url = current?.explorer;
+  if (!url) return;
+  try {
+    const r = await app.openLink({ url });
+    if (r?.isError) message(url, 'ok');
+  } catch { message(url, 'ok'); }
+});
+
+$('bindBtn').addEventListener('click', () => {
+  const v = $('addrIn').value.trim();
+  $('bindShort').textContent = short(v);
+  show('bindActs', false); show('bindConfirm', true);
+  $('addrIn').disabled = true;
+  arm();
+  $('bindNo').focus();
+});
+const closeBind = () => { show('bindConfirm', false); show('bindActs', true); $('addrIn').disabled = false; };
+$('bindNo').addEventListener('click', closeBind);
+$('bindYes').addEventListener('click', async () => {
+  if (busy || !armed()) return;
+  busy = true;
+  $('bindYes').disabled = true; $('bindNo').disabled = true;
+  try {
+    const r = await callTool('withdraw_form_bind', { address: $('addrIn').value.trim(), form_token: token || '' });
+    if (r?.isError) {
+      closeBind();
+      if (!r?.structuredContent?.refused) await refresh();
+      if (!st?.address) message(textOf(r) || 'Could not bind that address.');
+    } else if (!r?.structuredContent?.state) await refresh();
+  } catch {
+    closeBind();
+    message('No answer from the server. Checking…');
+    await refresh(); // it may have gone through: then the form switches to the withdrawal
+    if (!st?.address) message('No answer from the server. Try again.');
+  } finally {
+    busy = false;
+    $('bindYes').disabled = false; $('bindNo').disabled = false;
+    onAddrInput();
+    onAmountInput();
+  }
+});
+
+// ---------- talking to the chat app ----------
+
+app.ontoolinput = ({ arguments: args } = {}) => {
+  prefill = { amount: args?.amount };
+};
+app.ontoolresult = (r) => {
+  if (r?._meta?.[TOKEN]) token = r._meta[TOKEN];
+  const s = r?.structuredContent?.state;
+  if (s) {
+    if (s.prefill?.amount) prefill = { ...prefill, amount: s.prefill.amount };
+    setState(s);
+    // reopened later (the chat keeps the original result): fetch the current balance first
+    if (Date.now() - Number(s.issued_at || 0) > 60_000) refresh();
+  } else {
+    show('loading', false);
+    message(textOf(r) || 'The withdrawal form is not available right now.');
+  }
+};
+app.ontoolcancelled = () => { show('loading', false); message('Cancelled.', 'warn'); };
+app.onhostcontextchanged = applyContext;
+
+await app.connect();
+applyContext(app.getHostContext());
+</script>
+</body>
+</html>
