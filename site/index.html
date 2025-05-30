@@ -12,7 +12,7 @@
 :root {
   --bg: #0D0D0F; --panel: #16161A; --edge: #26262C; --line: #3A3A42;
   --cream: #F5F1E8; --dim: #8A8A93; --red: #FF2A1F; --red-d: #B81D15;
-  --r-common: #8A8A93; --r-uncommon: #F5F1E8; --r-rare: #FF2A1F; --r-legendary: #FFE600;
+  --r-common: #8A8A93; --r-rare: #3B9BFF; --r-epic: #A55BFF; --r-legendary: #F5A623; --r-ultra: #FF3EA5;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -23,6 +23,7 @@ a { color: inherit; }
 .px { font-family: Silkscreen, monospace; font-weight: 400; letter-spacing: .02em; }
 .wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
 img.pix { image-rendering: pixelated; display: block; }
+img.smooth { image-rendering: auto; display: block; }
 
 header.top { position: sticky; top: 0; z-index: 5; background: rgba(13,13,15,.92); backdrop-filter: blur(6px); border-bottom: 2px solid var(--edge); }
 header.top .wrap { display: flex; align-items: center; gap: 14px; height: 64px; }
@@ -37,6 +38,7 @@ header.top .wrap { display: flex; align-items: center; gap: 14px; height: 64px; 
 .btn.red:hover { background: #ff4a40; }
 .btn.ghost { background: transparent; color: var(--cream); border-color: var(--line); }
 .btn.ghost:hover { border-color: var(--cream); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn:focus-visible, select:focus-visible, .tab:focus-visible, .card:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
 .hero { padding: 48px 0 28px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: end; }
@@ -75,7 +77,8 @@ select { background: var(--panel); color: var(--cream); border: 2px solid var(--
 .card .price { font-size: 15px; margin-top: 4px; }
 .card .price.na { color: var(--dim); font-size: 13px; }
 .rar { text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
-.rar.common { color: var(--r-common); } .rar.uncommon { color: var(--r-uncommon); } .rar.rare { color: var(--r-rare); } .rar.legendary { color: var(--r-legendary); }
+.rar.common { color: var(--r-common); } .rar.rare { color: var(--r-rare); } .rar.epic { color: var(--r-epic); }
+.rar.legendary { color: var(--r-legendary); } .rar.ultra-rare { color: var(--r-ultra); }
 .empty { color: var(--dim); padding: 40px 0; grid-column: 1 / -1; text-align: center; }
 
 dialog { border: 2px solid var(--edge); background: var(--panel); color: var(--cream); padding: 0; max-width: min(920px, calc(100vw - 32px)); width: 100%; }
@@ -114,14 +117,14 @@ nav.main a:hover { color: var(--cream); }
 nav.main a[aria-current="page"] { color: var(--cream); border-color: var(--edge); }
 .addr { font-family: 'JetBrains Mono', monospace; color: var(--cream); text-decoration: none; border-bottom: 1px dotted var(--line); }
 .addr:hover { border-bottom-color: var(--cream); }
-.addr.tre { color: var(--r-legendary); }
+.addr.tre { color: #FFE600; }
 .ex-head { padding: 34px 0 10px; display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
 .ex-head h1 { margin: 0; font-size: clamp(26px, 4vw, 40px); }
 .ex-head p { margin: 6px 0 0; color: var(--dim); max-width: 640px; }
 .search { display: flex; gap: 8px; margin-left: auto; min-width: min(420px, 100%); }
 .search input { flex: 1; min-width: 0; background: var(--panel); color: var(--cream); border: 2px solid var(--edge); padding: 9px 10px; font: inherit; }
 .search input:focus { outline: none; border-color: var(--cream); }
-.tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: var(--edge); border: 2px solid var(--edge); margin: 18px 0; }
+.tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; background: var(--edge); border: 2px solid var(--edge); margin: 18px 0; }
 .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
 .panel { background: var(--panel); border: 2px solid var(--edge); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .panel h2 { margin: 0; font-size: 18px; display: flex; align-items: center; gap: 10px; }
@@ -134,7 +137,7 @@ nav.main a[aria-current="page"] { color: var(--cream); border-color: var(--edge)
 .pill { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border: 1px solid var(--line); color: var(--dim); }
 .pill.ok { color: #7AE582; border-color: #2f6b3a; }
 .pill.bad { color: var(--red); border-color: var(--red-d); }
-.pill.wait { color: var(--r-legendary); border-color: #6b5f00; }
+.pill.wait { color: #FFE600; border-color: #6b5f00; }
 .hash { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); word-break: break-all; }
 table.txs { width: 100%; border-collapse: collapse; background: var(--panel); border: 2px solid var(--edge); font-size: 13px; }
 table.txs th { text-align: left; color: var(--dim); font-weight: 400; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 10px 12px; border-bottom: 2px solid var(--edge); }
@@ -143,14 +146,70 @@ table.txs tr:last-child td { border-bottom: 0; }
 table.txs td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 table.txs a.tx { color: var(--cream); }
 .type { text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
-.type.deposit { color: #7AE582; } .type.withdrawal { color: var(--red); } .type.buy { color: var(--r-legendary); }
-.type.mint { color: var(--cream); } .type.refund, .type.faucet { color: var(--dim); }
+.type.deposit { color: #7AE582; } .type.withdrawal { color: var(--red); } .type.buy { color: #FFE600; }
+.type.mint { color: var(--cream); } .type.refund, .type.faucet { color: var(--dim); } .type.payout { color: #7AE582; }
 .plus { color: #7AE582; } .minus { color: var(--cream); }
 .more { display: flex; justify-content: center; padding: 16px 0 50px; }
 .wallets { display: grid; gap: 4px; font-size: 12px; max-height: 180px; overflow: auto; }
 .wallets div { display: flex; justify-content: space-between; gap: 10px; }
 .idbox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .idbox code { font-size: 18px; background: var(--panel); border: 2px solid var(--edge); padding: 6px 10px; }
+/* collections, a collection's page, an NFT's page */
+.cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; padding: 18px 0 60px; }
+.col { background: var(--panel); border: 2px solid var(--edge); text-decoration: none; display: flex; flex-direction: column; transition: transform .08s, border-color .08s; }
+.col:hover { border-color: var(--cream); transform: translateY(-2px); }
+.col img { width: 100%; aspect-ratio: 1; }
+.col .body { padding: 14px 16px 16px; display: grid; gap: 8px; }
+.col h2 { margin: 0; font-size: 22px; }
+.col p { margin: 0; color: var(--dim); font-size: 13px; }
+.progress { height: 8px; background: var(--bg); border: 1px solid var(--edge); }
+.progress i { display: block; height: 100%; background: var(--red); }
+.c-head { display: grid; grid-template-columns: 220px 1fr; gap: 24px; padding: 30px 0 8px; align-items: end; }
+.c-head img { width: 220px; height: 220px; border: 2px solid var(--edge); }
+.c-head h1 { margin: 0; font-size: clamp(30px, 5vw, 52px); line-height: 1; }
+.c-head p { margin: 10px 0 0; color: var(--dim); max-width: 620px; }
+.c-head .cta { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.c-tiles { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: var(--edge); border: 2px solid var(--edge); margin: 18px 0 6px; }
+.c-body { display: grid; grid-template-columns: 250px 1fr; gap: 18px; align-items: start; }
+.filters { position: sticky; top: 78px; max-height: calc(100vh - 90px); overflow: auto; background: var(--panel); border: 2px solid var(--edge); }
+.filters .fh { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 2px solid var(--edge); }
+.filters details { border-bottom: 1px solid var(--edge); }
+.filters summary { cursor: pointer; padding: 9px 12px; display: flex; justify-content: space-between; gap: 8px; list-style: none; }
+.filters summary::-webkit-details-marker { display: none; }
+.filters summary small { color: var(--dim); }
+.filters summary b { color: var(--red); font-weight: 400; }
+.filters label { display: flex; gap: 8px; align-items: center; padding: 4px 12px 4px 14px; font-size: 12px; cursor: pointer; }
+.filters label:hover { background: var(--bg); }
+.filters label span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filters label small { color: var(--dim); font-variant-numeric: tabular-nums; }
+.filters input[type=checkbox] { accent-color: var(--red); margin: 0; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--bg); color: var(--cream); font: 12px 'JetBrains Mono', monospace; padding: 3px 8px; cursor: pointer; }
+.chip:hover { border-color: var(--red); }
+.crumbs { padding: 22px 0 0; color: var(--dim); font-size: 12px; }
+.crumbs a { color: var(--dim); }
+.nftpage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 14px 0 22px; }
+.nftpage .art img { width: 100%; aspect-ratio: 1; border: 2px solid var(--edge); background: var(--panel); }
+.nftpage .info { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.nftpage h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); line-height: 1.05; }
+.ttable { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); border-top: 1px solid var(--edge); border-left: 1px solid var(--edge); }
+.ttable a { background: var(--bg); padding: 8px 10px; text-decoration: none; display: grid; gap: 1px; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+.ttable a:hover { background: var(--panel); }
+.ttable .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.ttable .p { color: var(--dim); font-size: 11px; }
+a.nftl { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
+@media (max-width: 1000px) { .c-tiles { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 820px) {
+  .c-head { grid-template-columns: 1fr; }
+  .c-head img { width: 140px; height: 140px; }
+  .c-tiles { grid-template-columns: repeat(2, 1fr); }
+  .c-tiles .stat:last-child:nth-child(odd) { grid-column: span 2; }
+  .c-body { grid-template-columns: 1fr; }
+  .filters { position: static; max-height: none; }
+  .nftpage { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 820px) {
   .tiles { grid-template-columns: repeat(2, 1fr); }
   .tiles .stat:last-child:nth-child(odd) { grid-column: span 2; }
@@ -159,6 +218,17 @@ table.txs a.tx { color: var(--cream); }
   .search { margin-left: 0; }
 }
 
+@media (max-width: 820px) {
+  header.top .wrap { gap: 8px; }
+  nav.main { overflow-x: auto; scrollbar-width: none; }
+  nav.main a { padding: 8px 7px; white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  #connectBtn { display: none; }
+}
+@media (max-width: 440px) {
+  .brand b { display: none; }
+}
 @media (max-width: 820px) {
   .hero { grid-template-columns: 1fr; padding-top: 30px; }
   .detail { grid-template-columns: 1fr; }
@@ -172,7 +242,7 @@ table.txs a.tx { color: var(--cream); }
 <header class="top">
   <div class="wrap">
     <a class="brand" href="#/"><img class="pix" src="/logo.png" alt=""><b class="px">MCP</b></a>
-    <nav class="main" aria-label="Main"><a href="#/" data-nav="market">Market</a><a href="#/explorer" data-nav="explorer">Explorer</a></nav>
+    <nav class="main" aria-label="Main"><a href="#/" data-nav="market">Market</a><a href="#/collections" data-nav="collections">Collections</a><a href="#/explorer" data-nav="explorer">Explorer</a></nav>
     <span class="spacer"></span>
     <button class="btn red" id="connectBtn">Connect to your AI</button>
   </div>
@@ -180,7 +250,6 @@ table.txs a.tx { color: var(--cream); }
 
 <main id="app"></main>
 
-<dialog id="nftDlg" aria-label="NFT details"></dialog>
 <dialog id="connectDlg" aria-label="Connect MCP">
   <button class="close" data-close aria-label="Close">×</button>
   <div class="steps">
@@ -202,12 +271,13 @@ table.txs a.tx { color: var(--cream); }
       <b>ChatGPT</b>
       <ol><li>Settings → Apps &amp; Connectors → add a connector with the same URL, then sign in with X.</li></ol>
     </div>
-    <div class="say">Then just talk to it: <b>"mint me an MCP"</b>, <b>"what's on the market under 10?"</b>, <b>"buy #0042"</b>, <b>"list my Scarf for 9"</b>, <b>"top up my balance"</b></div>
+    <div class="say">Then just talk to it: <b>"mint me an MCP"</b>, <b>"what's on the market under 10?"</b>, <b>"buy MCP #42"</b>, <b>"list MCP #42 for 9"</b>, <b>"top up my balance"</b></div>
   </div>
 </dialog>
 
-<footer><div class="wrap">MCP · the first memecoin inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="#/explorer">Explorer</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
+<footer><div class="wrap">MCP · the first memecoin inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="#/explorer">Explorer</a> · <a href="#/launch">Launch a collection</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
 
+<script src="/launch.js"></script>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -223,6 +293,7 @@ const gptLink = (q) => 'https://chatgpt.com/?q=' + encodeURIComponent(q);
 // accounts are shown by MCP address; an X handle only when its owner chose to show it
 const label = (addr, name) => (name ? '@' + name : addr);
 const who = (addr, name) => (!addr ? '—' : addr === 'treasury' ? '<a class="addr tre" href="#/a/treasury">treasury</a>'
+  : addr === 'escrow' ? '<a class="addr tre" href="#/a/escrow">escrow</a>'
   : `<a class="addr" href="#/a/${esc(addr)}">${esc(label(addr, name))}</a>`);
 const shortSig = (sig) => `${sig.slice(0, 6)}…${sig.slice(-4)}`;
 const ago = (iso) => {
@@ -233,17 +304,30 @@ const ago = (iso) => {
   return new Date(iso).toLocaleDateString();
 };
 let stats = null;
-const state = { status: 'listed', sort: 'price_asc', character: '', rarity: '' };
+const PAGE = 60;
+const state = { status: 'listed', sort: 'price_asc', rarity: '' };
 try { Object.assign(state, JSON.parse(localStorage.getItem('mcp-filter') || '{}')); } catch {}
+delete state.character;
+const RARITIES = ['Common', 'Rare', 'Epic', 'Legendary', 'Ultra-Rare'];
+if (!RARITIES.includes(state.rarity)) state.rarity = '';
+if (!['price_asc', 'price_desc', 'recent', 'minted', 'id'].includes(state.sort)) state.sort = 'price_asc';
+const rarClass = (r) => String(r || '').toLowerCase().replace(/[^a-z]+/g, '-');
+// 28x28 pixel art comes at its native size and is scaled up sharp; other pictures come full size
+const pic = (n, big = false) => n.pixel
+  ? `<img class="pix" src="${n.image}" alt="${esc(n.name)}" loading="lazy" width="256" height="256">`
+  : `<img class="smooth" src="${big ? n.image : n.thumb}" alt="${esc(n.name)}" loading="lazy" width="256" height="256">`;
+const minted = (n) => n.minted_at;
+// what to type in the chat for this NFT ("MCP #42" is enough in MCP; other collections add the NFT's number)
+const nftRef = (n) => (n.collection && n.collection !== 'mcp' ? `${n.name} (NFT #${n.id})` : n.name);
 
 function card(n) {
   const price = n.price != null ? `<div class="price">${fmt(n.price)} <small style="color:var(--dim)">$MCP</small></div>`
-    : `<div class="price na">${n.minted_at ? 'not for sale' : 'mintable'}</div>`;
+    : `<div class="price na">${minted(n) ? 'not for sale' : 'mintable'}</div>`;
   return `<a class="card" href="#/nft/${n.id}">
-    <img class="pix" src="${n.thumb}" alt="${esc(n.name)}" loading="lazy" width="256" height="256">
+    ${pic(n)}
     <div class="meta">
       <div class="name">${esc(n.name)}</div>
-      <div class="row2"><span>${esc(n.character)} · ${esc(n.palette)}</span><span class="rar ${n.rarity}">${n.rarity}</span></div>
+      <div class="row2"><span>${esc(n.collection_name || '')}</span><span class="rar ${rarClass(n.rarity)}">${esc(n.rarity || '')}</span></div>
       <div class="row2"><span>${n.owner_addr ? esc(label(n.owner_addr, n.owner_name)) : '—'}</span></div>
       ${price}
     </div></a>`;
@@ -251,40 +335,40 @@ function card(n) {
 
 async function renderMarket() {
   const app = $('#app');
-  if (!$('#grid')) {
-    app.innerHTML = `<div class="wrap">
-      <section class="hero">
-        <div>
-          <h1 class="px">The first memecoin<br><span>inside your AI.</span></h1>
-          <p>Browse the collection here. Mint, buy and sell only by talking to Claude or ChatGPT. Your balance and NFTs live in your MCP account. 1 $MCP = $1: top it up with USDC or USDT on Solana.</p>
-          <div class="cta">
-            <a class="btn red" data-add-claude href="${addToClaude(stats?.mcp_url || location.origin + '/mcp')}" target="_blank" rel="noopener">Add to Claude</a>
-            <a class="btn ghost" href="${claudeLink('Mint me an MCP NFT')}" target="_blank" rel="noopener">Mint in Claude</a>
-            <button class="btn ghost" data-connect>ChatGPT &amp; other AI</button>
-          </div>
+  app.innerHTML = `<div class="wrap">
+    <section class="hero">
+      <div>
+        <h1 class="px">The first memecoin<br><span>inside your AI.</span></h1>
+        <p>Browse here. Mint, buy and sell only by talking to Claude or ChatGPT. Your balance and NFTs live in your MCP account. 1 $MCP = $1: top it up with USDC or USDT on Solana.</p>
+        <div class="cta">
+          <a class="btn red" data-add-claude href="${addToClaude(stats?.mcp_url || location.origin + '/mcp')}" target="_blank" rel="noopener">Add to Claude</a>
+          <a class="btn ghost" href="${claudeLink('Mint me an MCP NFT')}" target="_blank" rel="noopener">Mint in Claude</a>
+          <a class="btn ghost" href="#/c/mcp">The collection</a>
+          <button class="btn ghost" data-connect>ChatGPT &amp; other AI</button>
         </div>
-        <div class="stats" id="stats"></div>
-      </section></div>
-      <div class="ticker" id="ticker" hidden></div>
-      <div class="wrap">
-        <div class="bar">
-          <div class="tabs" role="tablist">
-            <button class="tab" role="tab" data-status="listed">For sale</button>
-            <button class="tab" role="tab" data-status="all">All</button>
-            <button class="tab" role="tab" data-status="unminted">Mintable</button>
-          </div>
-          <select id="character" aria-label="Character"><option value="">All characters</option><option>Scarf</option><option>Void</option><option>Plug</option></select>
-          <select id="rarity" aria-label="Rarity"><option value="">All rarities</option><option>common</option><option>uncommon</option><option>rare</option><option>legendary</option></select>
-          <select id="sort" aria-label="Sort"><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="recent">Recently listed</option><option value="id">Number</option></select>
-          <span class="count" id="count"></span>
+      </div>
+      <div class="stats" id="stats"></div>
+    </section></div>
+    <div class="ticker" id="ticker" hidden></div>
+    <div class="wrap">
+      <div class="bar">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" data-status="listed">For sale</button>
+          <button class="tab" role="tab" data-status="all">All</button>
+          <button class="tab" role="tab" data-status="unminted">Mintable</button>
         </div>
-        <div class="grid" id="grid"></div>
-      </div>`;
-    app.querySelectorAll('.tab').forEach((t) => t.onclick = () => { state.status = t.dataset.status; loadGrid(); });
-    ['character', 'rarity', 'sort'].forEach((k) => $('#' + k).onchange = (e) => { state[k] = e.target.value; loadGrid(); });
-    loadStats(); loadTicker();
-  }
-  loadGrid();
+        <select id="rarity" aria-label="Rarity"><option value="">All rarities</option>${RARITIES.map((r) => `<option>${r}</option>`).join('')}</select>
+        <select id="sort" aria-label="Sort"><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="recent">Recently listed</option><option value="minted">Recently minted</option><option value="id">Number</option></select>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="more"><button class="btn ghost" id="gridMore" hidden>Load more</button></div>
+    </div>`;
+  app.querySelectorAll('.tab').forEach((t) => t.onclick = () => { state.status = t.dataset.status; loadGrid(); });
+  ['rarity', 'sort'].forEach((k) => $('#' + k).onchange = (e) => { state[k] = e.target.value; loadGrid(); });
+  $('#gridMore').onclick = () => loadGrid(true);
+  loadStats(); loadTicker();
+  await loadGrid();
 }
 
 async function loadStats() {
@@ -297,7 +381,7 @@ async function loadStats() {
   if (!el) return;
   el.innerHTML = [
     ['Floor', stats.floor != null ? `${fmt(stats.floor)} <small>$MCP</small>` : '—'],
-    ['Minted', `${stats.minted}<small>/${stats.supply}</small>`],
+    ['Minted', `${stats.minted.toLocaleString('en-US')}<small>/${stats.supply.toLocaleString('en-US')}</small>`],
     ['Mint price', `${fmt(stats.mint_price)} <small>$MCP</small>`],
     ['Listed', stats.listed], ['Holders', stats.holders], ['Volume', `${fmt(stats.volume)} <small>$MCP</small>`],
   ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
@@ -306,21 +390,29 @@ async function loadStats() {
 async function loadTicker() {
   const sales = await api('/sales');
   if (!sales.length) return;
-  const items = sales.map((s) => `<span><b>MCP #${pad(s.nft_id)}</b> sold for <i>${fmt(s.price)} $MCP</i> · ${esc(label(s.buyer_addr, s.buyer_name))}</span>`).join('');
+  const items = sales.map((s) => `<span><b>${esc(s.nft_name)}</b> sold for <i>${fmt(s.price)} $MCP</i> · ${esc(label(s.buyer_addr, s.buyer_name))}</span>`).join('');
   const t = $('#ticker');
   t.innerHTML = `<div class="row">${items}${items}</div>`;
   t.hidden = false;
 }
 
-async function loadGrid() {
-  localStorage.setItem('mcp-filter', JSON.stringify(state));
+let gridOffset = 0;
+async function loadGrid(more = false) {
+  try { localStorage.setItem('mcp-filter', JSON.stringify(state)); } catch {}
   document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.status === state.status)));
-  ['character', 'rarity', 'sort'].forEach((k) => $('#' + k).value = state[k]);
-  const q = new URLSearchParams(Object.entries(state).filter(([, v]) => v));
-  const rows = await api('/nfts?' + q);
-  $('#count').textContent = `${rows.length} item${rows.length === 1 ? '' : 's'}`;
-  $('#grid').innerHTML = rows.map(card).join('') || `<div class="empty">${state.status === 'listed'
+  ['rarity', 'sort'].forEach((k) => $('#' + k).value = state[k]);
+  if (!more) gridOffset = 0;
+  const q = new URLSearchParams({ ...Object.fromEntries(Object.entries(state).filter(([, v]) => v)), limit: PAGE, offset: gridOffset, count: 1 });
+  const r = await fetch('/api/nfts?' + q);
+  const rows = r.ok ? await r.json() : [];
+  const total = Number(r.headers.get('X-Total-Count') || rows.length);
+  gridOffset += rows.length;
+  $('#count').textContent = `${total.toLocaleString('en-US')} item${total === 1 ? '' : 's'}`;
+  const html = rows.map(card).join('');
+  if (more) $('#grid').insertAdjacentHTML('beforeend', html);
+  else $('#grid').innerHTML = html || `<div class="empty">${state.status === 'listed'
     ? 'Nothing for sale right now. Be first: mint one in Claude and list it.' : 'Nothing matches these filters.'}</div>`;
+  $('#gridMore').hidden = gridOffset >= total;
 }
 
 // #/u/<handle>: only accounts that show their handle can be found by it; they live at their MCP address
@@ -333,42 +425,159 @@ async function renderProfile(handle) {
   }
 }
 
-async function openNft(id) {
-  const dlg = $('#nftDlg');
-  const n = await api('/nfts/' + id).catch(() => null);
-  if (!n) return;
-  const q = n.price != null ? `Buy MCP #${pad(n.id)} for ${n.price} $MCP` : !n.minted_at ? 'Mint me an MCP NFT' : `Show me MCP #${pad(n.id)}`;
-  const action = n.price != null
+// ---------- collections ----------
+async function renderCollections() {
+  const app = $('#app');
+  app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Collections</h1>
+    <p>Every collection on MCP. Mint and trade them by talking to Claude or ChatGPT.</p></div>
+    <a class="btn red" href="#/launch" style="margin-left:auto">Launch your collection</a></div>
+    <div class="cols" id="cols"><div class="note">Loading…</div></div></div>`;
+  const list = await api('/collections');
+  $('#cols').innerHTML = list.map((c) => `<a class="col" href="#/c/${esc(c.slug)}">
+    <img class="pix" src="${esc(c.cover)}" alt="${esc(c.name)}" loading="lazy">
+    <div class="body"><h2 class="px">${esc(c.name)}</h2><p>${esc(c.description || '')}</p>
+      <div class="progress" title="${c.minted} of ${c.supply} minted"><i style="width:${Math.min(100, (c.minted / c.supply) * 100).toFixed(2)}%"></i></div>
+      <div class="kv"><span>Minted</span><span>${c.minted.toLocaleString('en-US')} / ${c.supply.toLocaleString('en-US')}</span>
+        <span>Mint price</span><span>${fmt(c.mint_price)} $MCP</span>
+        <span>Floor</span><span>${c.trading_open === false ? 'after sell-out' : c.floor != null ? fmt(c.floor) + ' $MCP' : '—'}</span>
+        <span>By</span><span>${c.creator_addr ? esc(label(c.creator_addr, c.creator_name)) : 'MCP'}</span></div></div></a>`).join('')
+    || '<div class="empty">No collections yet.</div>';
+}
+
+const cState = { slug: null, status: 'all', sort: 'id', traits: new Set(), offset: 0, total: 0 };
+async function renderCollection(slug, query) {
+  const app = $('#app');
+  app.innerHTML = '<div class="wrap"><div class="note" style="padding:30px 0">Loading…</div></div>';
+  let c;
+  try { c = await api('/collections/' + encodeURIComponent(slug)); } catch { app.innerHTML = '<div class="wrap"><div class="empty">No such collection.</div></div>'; return; }
+  if (cState.slug !== c.slug) Object.assign(cState, { slug: c.slug, status: 'all', sort: 'id', traits: new Set() });
+  // #/c/mcp?t=Chassis:Bunny opens the collection filtered by that trait
+  const t = new URLSearchParams(query || '').getAll('t');
+  if (t.length) cState.traits = new Set(t);
+  const mintQ = c.slug === 'mcp' ? 'Mint me an MCP NFT' : `Mint me an NFT from the ${c.name} collection (${c.slug})`;
+  const banner = {
+    draft: 'Being prepared: only you can see this.',
+    review: 'In review: only its creator and the MCP team can see it until it is approved.',
+    rejected: `Rejected${c.review_note ? ': ' + c.review_note : ''}. Only its creator can see it.`,
+    paused: 'Minting is paused for now. Trading goes on.',
+    frozen: `Frozen by the MCP team${c.review_note ? ': ' + c.review_note : ''}. Minting and trading are stopped; minters whose money was still held got their mint price back.`,
+  }[c.status];
+  const canMint = c.status === 'live';
+  const locked = c.trading_open === false && c.status !== 'frozen'
+    ? `Trading opens after the sell-out: ${c.minted.toLocaleString('en-US')} of ${c.supply.toLocaleString('en-US')} minted. Until then NFTs can only be minted, not listed or bought.` : '';
+  app.innerHTML = `<div class="wrap">
+    <div class="crumbs"><a href="#/collections">Collections</a> / ${esc(c.name)}</div>
+    ${banner ? `<div class="panel" style="margin-top:14px;border-color:${c.status === 'frozen' || c.status === 'rejected' ? 'var(--red-d)' : 'var(--line)'}">${esc(banner)}</div>` : ''}
+    ${locked ? `<div class="panel" style="margin-top:14px;border-color:#6b5f00"><span class="pill wait">Mint phase</span> ${esc(locked)}</div>` : ''}
+    <section class="c-head"><img class="${c.cover_pixel === false ? 'smooth' : 'pix'}" src="${esc(c.cover)}" alt="">
+      <div><h1 class="px">${esc(c.name)}</h1><p>${esc(c.description || '')}</p>
+        ${c.creator_addr ? `<p style="margin-top:6px">by ${who(c.creator_addr, c.creator_name)} · launched on MCP · mint money held 7 days before it is paid out</p>` : ''}
+        <div class="cta">${canMint ? `<a class="btn red" href="${claudeLink(mintQ)}" target="_blank" rel="noopener">Mint in Claude</a>
+          <a class="btn ghost" href="${gptLink(mintQ)}" target="_blank" rel="noopener">Mint in ChatGPT</a>` : ''}
+          <span class="note" style="align-self:center">${fmt(c.mint_price)} $MCP · a random one · up to ${c.mint_limit} per account</span></div></div></section>
+    <div class="c-tiles">${[
+      ['Supply', c.supply.toLocaleString('en-US')], ['Minted', c.minted.toLocaleString('en-US')], ['Holders', c.holders],
+      ['Floor', c.trading_open === false ? 'after sell-out' : c.floor != null ? `${fmt(c.floor)} <small>$MCP</small>` : '—'], ['Mint price', `${fmt(c.mint_price)} <small>$MCP</small>`],
+      ['Per account', c.mint_limit], ['Volume', `${fmt(c.volume)} <small>$MCP</small>`],
+    ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
+    <div class="bar">
+      <div class="tabs" role="tablist">${[['all', 'All'], ['listed', 'For sale'], ['unminted', 'Mintable'], ['minted', 'Minted']]
+        .map(([k, v]) => `<button class="tab" role="tab" data-cstatus="${k}">${v}</button>`).join('')}</div>
+      <select id="cSort" aria-label="Sort"><option value="id">Number</option><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="recent">Recently listed</option><option value="minted">Recently minted</option></select>
+      <span class="count" id="cCount"></span>
+    </div>
+    <div class="c-body">
+      <aside class="filters" aria-label="Traits"><div class="fh"><b class="px">Traits</b><button class="btn ghost" id="cClear" style="padding:3px 8px;font-size:11px">Clear</button></div>
+        ${c.traits.map((tr) => `<details${[...cState.traits].some((x) => x.startsWith(tr.type + ':')) ? ' open' : ''}><summary><span>${esc(tr.type)}</span><small>${tr.values.length}</small></summary>
+          ${tr.values.map((v) => `<label><input type="checkbox" data-trait="${esc(tr.type + ':' + v.value)}"${cState.traits.has(tr.type + ':' + v.value) ? ' checked' : ''}>
+            <span title="${esc(v.value)}">${esc(v.value)}</span><small>${v.count} · ${v.percent}%</small></label>`).join('')}</details>`).join('')}
+      </aside>
+      <div><div class="chips" id="cChips"></div><div class="grid" id="cGrid" style="padding-top:10px;padding-bottom:10px"></div>
+        <div class="more"><button class="btn ghost" id="cMore" hidden>Load more</button></div></div>
+    </div></div>`;
+  app.querySelectorAll('[data-cstatus]').forEach((b) => b.onclick = () => { cState.status = b.dataset.cstatus; loadCollectionGrid(); });
+  $('#cSort').onchange = (e) => { cState.sort = e.target.value; loadCollectionGrid(); };
+  app.querySelectorAll('[data-trait]').forEach((cb) => cb.onchange = () => {
+    if (cb.checked) cState.traits.add(cb.dataset.trait); else cState.traits.delete(cb.dataset.trait);
+    loadCollectionGrid();
+  });
+  $('#cClear').onclick = () => { cState.traits.clear(); app.querySelectorAll('[data-trait]').forEach((cb) => { cb.checked = false; }); loadCollectionGrid(); };
+  $('#cMore').onclick = () => loadCollectionGrid(true);
+  $('#cChips').onclick = (e) => {
+    const b = e.target.closest('[data-untrait]');
+    if (!b) return;
+    cState.traits.delete(b.dataset.untrait);
+    const cb = [...app.querySelectorAll('[data-trait]')].find((x) => x.dataset.trait === b.dataset.untrait);
+    if (cb) cb.checked = false;
+    loadCollectionGrid();
+  };
+  await loadCollectionGrid();
+}
+
+async function loadCollectionGrid(more = false) {
+  document.querySelectorAll('[data-cstatus]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.cstatus === cState.status)));
+  $('#cSort').value = cState.sort;
+  if (!more) cState.offset = 0;
+  const q = new URLSearchParams({ status: cState.status, sort: cState.sort, limit: PAGE, offset: cState.offset });
+  for (const t of cState.traits) q.append('trait', t);
+  const slug = cState.slug;
+  const r = await api(`/collections/${encodeURIComponent(slug)}/nfts?${q}`);
+  if (slug !== cState.slug || !$('#cGrid')) return; // the page changed meanwhile
+  cState.offset += r.items.length;
+  cState.total = r.total;
+  $('#cCount').textContent = `${r.total.toLocaleString('en-US')} item${r.total === 1 ? '' : 's'}`;
+  $('#cChips').innerHTML = [...cState.traits].map((t) => `<button class="chip" data-untrait="${esc(t)}">${esc(t.replace(':', ': '))} ×</button>`).join('');
+  const html = r.items.map(card).join('');
+  if (more) $('#cGrid').insertAdjacentHTML('beforeend', html);
+  else $('#cGrid').innerHTML = html || '<div class="empty">Nothing matches these filters.</div>';
+  $('#cMore').hidden = cState.offset >= r.total;
+}
+
+// ---------- an NFT's page ----------
+async function renderNft(id) {
+  const app = $('#app');
+  app.innerHTML = '<div class="wrap"><div class="note" style="padding:30px 0">Loading…</div></div>';
+  let n;
+  try { n = await api('/nfts/' + id); } catch { app.innerHTML = `<div class="wrap"><div class="empty">There is no NFT #${esc(id)}.</div></div>`; return; }
+  const ref = nftRef(n);
+  const frozen = n.collection_status === 'frozen';
+  const q = n.price != null ? `Buy ${ref} for ${n.price} $MCP` : !minted(n) ? (n.collection === 'mcp' ? 'Mint me an MCP NFT' : `Mint me an NFT from the ${n.collection_name} collection (${n.collection})`) : `Show me ${ref}`;
+  const action = frozen ? `<div class="big" style="font-size:18px">Collection frozen</div><div style="color:var(--dim);font-size:12px">The MCP team stopped minting and trading in ${esc(n.collection_name)}.</div>`
+    : n.price != null
     ? `<div class="big">${fmt(n.price)} <small style="color:var(--dim)">$MCP</small></div>
        <div class="acts"><a class="btn red" href="${claudeLink(q)}" target="_blank" rel="noopener">Buy in Claude</a>
        <a class="btn ghost" href="${gptLink(q)}" target="_blank" rel="noopener">Buy in ChatGPT</a></div>`
-    : !n.minted_at
-      ? `<div class="big" style="font-size:18px">Not minted yet</div><div style="color:var(--dim);font-size:12px">Mint gives you a random NFT from the collection for ${fmt(stats?.mint_price ?? 5)} $MCP.</div>
+    : !minted(n)
+      ? `<div class="big" style="font-size:18px">Not minted yet</div><div style="color:var(--dim);font-size:12px">A mint gives a random NFT from ${esc(n.collection_name)}, maybe this one.</div>
        <div class="acts"><a class="btn red" href="${claudeLink(q)}" target="_blank" rel="noopener">Mint in Claude</a>
        <a class="btn ghost" href="${gptLink(q)}" target="_blank" rel="noopener">Mint in ChatGPT</a></div>`
       : `<div class="big" style="font-size:18px">Not for sale</div><div style="color:var(--dim);font-size:12px">Owned by ${who(n.owner_addr, n.owner_name)}.</div>`;
-  dlg.innerHTML = `<button class="close" data-close aria-label="Close">×</button>
-    <div class="detail"><img class="pix" src="${n.image}" alt="${esc(n.name)}">
-    <div class="info">
-      <div><span class="rar ${n.rarity}">${n.rarity}</span><h2 class="px">${esc(n.name)}</h2>
-        <div style="color:var(--dim)">${n.owner_addr ? `owned by ${who(n.owner_addr, n.owner_name)}` : 'in the mint pool'}</div></div>
-      <div class="pricebox">${action}
-        <div class="cmd">or type <code>${esc(q)}</code><button class="btn ghost" data-copy="${esc(q)}" style="padding:4px 8px">Copy</button></div></div>
-      <div class="traits">
-        <div><div class="k">Character</div>${esc(n.character)}</div><div><div class="k">Shape</div>${esc(n.shape)}</div>
-        <div><div class="k">Palette</div>${esc(n.palette)}</div><div><div class="k">Rarity</div>${esc(n.rarity)}</div>
+  const act = (a) => a.type === 'mint'
+    ? `<tr><td><span class="type mint">mint</span></td><td>${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="#/tx/${a.tx}">#${a.tx}</a></td></tr>`
+    : `<tr><td><span class="type buy">sale</span></td><td>${who(a.from_addr, a.from_name)} → ${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="#/tx/${a.tx}">#${a.tx}</a></td></tr>`;
+  app.innerHTML = `<div class="wrap">
+    <div class="crumbs"><a href="#/collections">Collections</a> / <a href="#/c/${esc(n.collection)}">${esc(n.collection_name)}</a> / ${esc(n.name)}</div>
+    <div class="nftpage">
+      <div class="art">${pic(n, true).replace(' loading="lazy" width="256" height="256"', '')}</div>
+      <div class="info">
+        <div>${n.rarity ? `<span class="rar ${rarClass(n.rarity)}">${esc(n.rarity)}</span>` : ''}<h1 class="px">${esc(n.name)}</h1>
+          <div style="color:var(--dim)"><a href="#/c/${esc(n.collection)}">${esc(n.collection_name)}</a> · ${n.owner_addr ? `owned by ${who(n.owner_addr, n.owner_name)}` : 'not minted yet'}</div></div>
+        <div class="pricebox">${action}
+          <div class="cmd">or type <code>${esc(q)}</code><button class="btn ghost" data-copy="${esc(q)}" style="padding:4px 8px">Copy</button></div></div>
+        <div class="ttable">${n.attributes.map((a) => `<a href="#/c/${esc(n.collection)}?t=${encodeURIComponent(a.trait_type + ':' + a.value)}" title="All with ${esc(a.trait_type)}: ${esc(a.value)}">
+          <span class="k">${esc(a.trait_type)}</span><span>${esc(a.value)}</span>${a.percent != null ? `<span class="p">${a.count} have it · ${a.percent}%</span>` : ''}</a>`).join('')}</div>
       </div>
-      <div class="hist"><div style="color:var(--cream)"><span>Sales</span><span></span></div>
-        ${n.history.map((h) => `<div><span>${who(h.seller_addr, h.seller_name)} → ${who(h.buyer_addr, h.buyer_name)}</span><span>${fmt(h.price)} $MCP</span></div>`).join('') || '<div><span>No sales yet</span><span></span></div>'}
-      </div>
-    </div></div>`;
-  if (!dlg.open) dlg.showModal();
+    </div>
+    <h2 class="px" style="margin:6px 0 10px;font-size:18px">Activity</h2>
+    <table class="txs"><thead><tr><th>Event</th><th>Who</th><th style="text-align:right">Price</th><th class="hide-sm">When</th><th>Tx</th></tr></thead>
+      <tbody>${n.activity.map(act).join('') || '<tr><td colspan="5" class="note">Not minted yet.</td></tr>'}</tbody></table>
+    <p class="note" style="padding:12px 0 40px">Every mint and sale is a transaction in the <a href="#/explorer">explorer</a>, part of the hash chain anchored on Solana.</p></div>`;
 }
 
 // ---------- the explorer ----------
 let exNet = 'mainnet';
 const solscan = (kind, id) => `https://solscan.io/${kind}/${id}${exNet === 'mainnet' ? '' : '?cluster=' + exNet}`;
-const nftLink = (n) => (n ? `<a href="#/nft/${n.id}">${esc(n.name)}</a>` : 'an NFT');
+const nftLink = (n) => (n ? `<a class="nftl" href="#/nft/${n.id}">${n.thumb ? `<img class="${n.pixel ? 'pix' : 'smooth'}" src="${n.pixel ? n.image : n.thumb}" alt="" loading="lazy">` : ''}${esc(n.name)}</a>` : 'an NFT');
 const usd = (n) => fmt(Math.round(Number(n) * 100) / 100);
 const micro = (s) => Number(s) / 1e6;
 
@@ -383,7 +592,10 @@ function txSummary(t) {
     const se = find('sale');
     return { what: `${who(b.account, b.name)} bought ${nftLink(t.nft)} from ${se ? who(se.account, se.name) : '—'}`, amount: usd(-b.amount), unit: '$MCP' };
   }
-  if (t.type === 'mint') return { what: `${who(user.account, user.name)} minted ${nftLink(t.nft)}`, amount: usd(-user.amount), unit: '$MCP' };
+  if (t.type === 'mint') { const mn = find('mint'); return { what: `${who(mn.account, mn.name)} minted ${nftLink(t.nft)}${find('hold', false) ? ' · held for the creator' : ''}`, amount: usd(-mn.amount), unit: '$MCP' }; }
+  if (t.type === 'payout') { const e = find('payout'); return { what: `escrow → ${who(e.account, e.name)}, creator of ${t.collection ? `<a href="#/c/${esc(t.collection.slug)}">${esc(t.collection.name)}</a>` : 'a collection'}`, amount: `+${usd(e.amount)}`, unit: '$MCP', cls: 'plus' }; }
+  if (t.type === 'refund' && t.refunds) return { what: `${t.refunds} mints refunded to their holders (collection frozen)`, amount: `+${usd(t.refunded)}`, unit: '$MCP', cls: 'plus' };
+  if (t.type === 'refund' && find('mint_refund')) { const e = find('mint_refund'); return { what: `mint of ${nftLink(t.nft)} refunded → ${who(e.account, e.name)} (collection frozen)`, amount: `+${usd(e.amount)}`, unit: '$MCP', cls: 'plus' }; }
   if (t.type === 'refund') return { what: `withdrawal #${t.withdrawal?.id ?? '?'} rejected → ${who(user.account, user.name)}`, amount: `+${usd(user.amount)}`, unit: '$MCP', cls: 'plus' };
   return { what: who(user.account, user.name), amount: `${user.amount > 0 ? '+' : ''}${usd(user.amount)}`, unit: '$MCP' };
 }
@@ -420,13 +632,15 @@ async function loadTxs(tbodyId, moreId, addr) {
 }
 
 function searchBox() {
-  return `<form class="search" id="exSearch" role="search"><input id="exQ" placeholder="MCP address, tx # or @handle" aria-label="Search the explorer" autocomplete="off" spellcheck="false"><button class="btn">Go</button></form>`;
+  return `<form class="search" id="exSearch" role="search"><input id="exQ" placeholder="MCP address, tx #, MCP #123 or @handle" aria-label="Search the explorer" autocomplete="off" spellcheck="false"><button class="btn">Go</button></form>`;
 }
 function wireSearch() {
   $('#exSearch').onsubmit = (e) => {
     e.preventDefault();
     const q = $('#exQ').value.trim();
-    if (/^mcp_[1-9A-HJ-NP-Za-km-z]{12}$/.test(q) || q === 'treasury') location.hash = '#/a/' + q;
+    let mm;
+    if (/^mcp_[1-9A-HJ-NP-Za-km-z]{12}$/.test(q) || q === 'treasury' || q === 'escrow') location.hash = '#/a/' + q;
+    else if ((mm = /^(?:mcp|nft)\s*#?\s*(\d{1,9})$/i.exec(q))) location.hash = '#/nft/' + mm[1];
     else if (/^#?\d+$/.test(q)) location.hash = '#/tx/' + q.replace('#', '');
     else if (/^@?\w{1,15}$/.test(q)) location.hash = '#/u/' + q.replace('@', '');
     else $('#exQ').value = '';
@@ -451,7 +665,8 @@ async function renderExplorer() {
   exNet = s.network;
   $('#exTiles').innerHTML = [
     ['Accounts', s.accounts], ['Transactions', s.transactions],
-    ['Deposited', `${usd(s.deposited)} <small>$</small>`], ['Withdrawn', `${usd(s.withdrawn)} <small>$</small>`], ['NFT volume', `${usd(s.volume)} <small>$MCP</small>`],
+    ['Deposited', `${usd(s.deposited)} <small>$</small>`], ['Withdrawn', `${usd(s.withdrawn)} <small>$</small>`],
+    ['NFTs minted', s.minted != null ? s.minted.toLocaleString('en-US') : '—'], ['NFT volume', `${usd(s.volume)} <small>$MCP</small>`],
   ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
   renderReserves(s.reserves);
   renderChain(s);
@@ -483,6 +698,7 @@ function renderReserves(r) {
     <div class="kv">
       <span>Owed to users (balances)</span><span>${usd(micro(r.owed_balances))}</span>
       <span>Withdrawals not paid yet</span><span>${usd(micro(r.owed_withdrawals))}</span>
+      ${r.owed_escrow != null ? `<span>Held for creators (escrow)</span><span>${usd(micro(r.owed_escrow))}</span>` : ''}
       <span style="color:var(--cream)">Total owed</span><span style="color:var(--cream)">${usd(owedTotal)}</span>
       ${held}
       <span style="color:var(--cream)">Total held</span><span style="color:var(--cream)">${usd(micro(r.held_total))}</span>
@@ -601,14 +817,16 @@ async function renderTx(id) {
 
 async function renderAddress(addr) {
   const app = $('#app');
-  app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">${addr === 'treasury' ? 'Market treasury' : 'Account'}</h1></div>${searchBox()}</div><div id="addrBody" class="note">Loading…</div></div>`;
+  app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">${addr === 'treasury' ? 'Market treasury' : addr === 'escrow' ? 'Escrow' : 'Account'}</h1></div>${searchBox()}</div><div id="addrBody" class="note">Loading…</div></div>`;
   wireSearch();
   let a;
   try { a = await api('/explorer/address/' + encodeURIComponent(addr)); } catch { $('#addrBody').textContent = 'No such MCP address.'; return; }
   $('#addrBody').outerHTML = `<div class="profile" style="padding-top:8px">${a.avatar ? `<img src="${esc(a.avatar)}" alt="">` : ''}
-      <div style="display:grid;gap:8px"><div class="idbox"><code>${esc(a.address)}</code>${a.address !== 'treasury' ? `<button class="btn ghost" data-copy="${esc(a.address)}" style="padding:6px 10px">Copy</button>` : ''}</div>
+      <div style="display:grid;gap:8px"><div class="idbox"><code>${esc(a.address)}</code>${!['treasury', 'escrow'].includes(a.address) ? `<button class="btn ghost" data-copy="${esc(a.address)}" style="padding:6px 10px">Copy</button>` : ''}</div>
       <div class="note">${a.name ? `@${esc(a.name)} · ` : a.address !== 'treasury' ? 'X handle hidden by its owner · ' : ''}${a.joined ? `joined ${new Date(a.joined).toLocaleDateString()} · ` : ''}balance <b style="color:var(--cream)">${usd(a.balance)} $MCP</b>${a.transactions != null ? ` · ${a.transactions} transaction${a.transactions === 1 ? '' : 's'}` : ''}</div>
-      ${a.address !== 'treasury' ? '<div class="note">An MCP address is an account number inside MCP, not a Solana wallet: never send tokens to it.</div>' : '<div class="note">Market fees and mint payments.</div>'}</div></div>
+      ${a.address === 'treasury' ? '<div class="note">Market fees and mint payments of the MCP collection.</div>'
+        : a.address === 'escrow' ? '<div class="note">Mint money of launchpad collections, held at least 7 days per mint. It goes to the creator when the MCP team releases it, or back to the minters if a collection is frozen.</div>'
+        : '<div class="note">An MCP address is an account number inside MCP, not a Solana wallet: never send tokens to it.</div>'}</div></div>
     ${a.nfts.length ? `<h2 class="px" style="margin:18px 0 10px;font-size:18px">NFTs</h2><div class="grid" style="padding-bottom:20px">${a.nfts.map(card).join('')}</div>` : ''}
     <h2 class="px" style="margin:18px 0 10px;font-size:18px">Transactions</h2>
     ${txTable('addrTxs')}<div class="more"><button class="btn ghost" id="addrMore" hidden>Load more</button></div>`;
@@ -629,25 +847,28 @@ document.addEventListener('click', async (e) => {
 });
 $('#connectBtn').onclick = () => $('#connectDlg').showModal();
 $('#copyUrl').onclick = async (e) => { await navigator.clipboard?.writeText($('#mcpUrl').textContent).catch(() => {}); e.target.textContent = 'Copied'; };
-$('#nftDlg').addEventListener('close', () => { if (location.hash.startsWith('#/nft/')) history.replaceState(null, '', '#/'); });
 document.querySelectorAll('dialog').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
 
 async function route() {
   const h = location.hash.replace(/^#/, '') || '/';
+  const [pathPart, query] = h.split('?');
   let mm;
-  const inExplorer = /^\/(explorer|tx\/|a\/|u\/)/.test(h);
+  const section = /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer' : /^\/(collections|c\/|nft\/|launch|admin)/.test(pathPart) ? 'collections' : 'market';
   document.querySelectorAll('[data-nav]').forEach((a) => {
-    if ((a.dataset.nav === 'explorer') === inExplorer) a.setAttribute('aria-current', 'page');
+    if (a.dataset.nav === section) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
-  if (inExplorer) window.scrollTo(0, 0);
-  if (!h.startsWith('/nft/') && $('#nftDlg').open) $('#nftDlg').close(); // e.g. an owner link inside the NFT window
-  if ((mm = h.match(/^\/u\/(\w+)/))) return renderProfile(mm[1]);
-  if (h === '/explorer') return renderExplorer();
-  if ((mm = h.match(/^\/tx\/(\d+)/))) return renderTx(mm[1]);
-  if ((mm = h.match(/^\/a\/(mcp_[1-9A-HJ-NP-Za-km-z]{12}|treasury)\b/))) return renderAddress(mm[1]);
-  if (!$('#grid')) await renderMarket();
-  if ((mm = h.match(/^\/nft\/(\d+)/))) openNft(Number(mm[1]));
+  window.scrollTo(0, 0);
+  if ((mm = pathPart.match(/^\/u\/(\w+)/))) return renderProfile(mm[1]);
+  if (pathPart === '/explorer') return renderExplorer();
+  if ((mm = pathPart.match(/^\/tx\/(\d+)/))) return renderTx(mm[1]);
+  if ((mm = pathPart.match(/^\/a\/(mcp_[1-9A-HJ-NP-Za-km-z]{12}|treasury|escrow)\b/))) return renderAddress(mm[1]);
+  if (pathPart === '/launch') return window.MCP_LAUNCH.renderLaunch();
+  if (pathPart === '/admin') return window.MCP_LAUNCH.renderAdmin();
+  if (pathPart === '/collections') return renderCollections();
+  if ((mm = pathPart.match(/^\/c\/([a-z0-9-]{1,40})/))) return renderCollection(mm[1], query);
+  if ((mm = pathPart.match(/^\/nft\/(\d{1,9})/))) return renderNft(Number(mm[1]));
+  return renderMarket();
 }
 window.addEventListener('hashchange', route);
 loadStats().then(route);
