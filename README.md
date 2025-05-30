@@ -9,7 +9,7 @@ The website only shows the collection, prices and owners. Every action happens i
 
 This repository is the whole server, so you can read exactly what the connector does before you plug it in.
 
-> **Status: public test.** Sign in with X. Balances are in $MCP (1 $MCP = $1): free test $MCP from the faucet, or free devnet USDC deposited on Solana devnet. Nothing here is real money yet.
+> **Status: live on Solana mainnet, early launch.** Balances are real money: $MCP (1 $MCP = $1), topped up with USDC or USDT on Solana and withdrawn as USDC. Deposit only what you are ready to risk, and read [Honest risks](#honest-risks) first. Everything that happens is public in the [explorer](https://mcp.credit/#/explorer).
 
 ![Preview site](screens/market.png)
 
@@ -22,7 +22,7 @@ This repository is the whole server, so you can read exactly what the connector 
 - **Claude, by hand:** Customize → Connectors → *Add custom connector* → paste the URL → *Connect* → sign in.
 - **ChatGPT:** Settings → Apps & Connectors → add a connector with the same URL → sign in.
 
-Then ask for `faucet` to get test $MCP, or *"top up"* to get your deposit address, and start trading.
+Then say *"top up"* to get your personal Solana deposit address, send USDC or USDT to it, and start trading.
 
 ## What the connector can and can't do
 
@@ -30,7 +30,8 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 
 | Tool | What it does | Changes anything? |
 |---|---|---|
-| `account` | your handle, balance, NFTs, recent balance changes | no |
+| `account` | your MCP address, balance, deposit address, NFTs, recent balance changes, your page in the explorer | no |
+| `public_profile` | show or hide your X handle on public pages (hidden by default) | your profile's visibility |
 | `deposit` | your personal Solana address for USDC/USDT, and a check for new deposits | credits deposits that arrived |
 | `faucet` | free test $MCP once a day (test server only) | your balance |
 | `mint` | random NFT from the collection for 5 $MCP, max 5 per account | your balance, NFT owner |
@@ -116,7 +117,7 @@ Code: [`server/src/deposits.js`](server/src/deposits.js), [`server/src/solana.js
 
 ## Withdrawals
 
-*"Bind my withdrawal address 7xKX…"* once, then *"withdraw 50"*: 50 USDC arrive at that address, usually within a minute, and the chat shows the transaction. The fee is 0.5 $MCP on top; the minimum is 5 $MCP.
+Say *"withdraw"* (or *"withdraw 50"*) and the chat shows the withdrawal form. Paste your Solana wallet address and press *Bind* once, then enter the amount and press *Withdraw* → *Confirm*. The USDC arrive at that address, usually within a minute, and the form shows the transaction. The fee is 0.5 $MCP on top; the minimum is 5 $MCP. A newly bound address can receive 24 hours after binding.
 
 ```
 deposit addresses (offline phrase) ──npm run sweep, on the owner's computer──▶ hot wallet ──USDC──▶ user's bound address
@@ -149,9 +150,11 @@ Code: [`server/src/withdrawals.js`](server/src/withdrawals.js), [`server/src/tx.
 
 ```
 server/src/
-  app.js      HTTP routes: /mcp, OAuth, public API, Helius webhook, manual credit
-  mcp.js      the tools listed above
-  market.js   rules: balances, mint, listings, buys
+  app.js      HTTP routes: /mcp, OAuth, public API, explorer API, Helius webhook, manual credit
+  mcp.js      the tools listed above, and the withdrawal form as an MCP App
+  ui.js       builds the withdrawal form with the MCP Apps SDK built in (pinned by sha256)
+  market.js   rules: balances, mint, listings, buys, MCP addresses
+  explorer.js public explorer: hash chain, Solana anchors, proof of reserves
   withdrawals.js payouts: limits, hot wallet, never-twice sending, refunds
   tx.js       Solana transaction building and signing
   money.js    $MCP amounts <-> micro-units
@@ -161,9 +164,10 @@ server/src/
   auth.js     OAuth for the connector + X sign-in
   schema.js   database tables and one-time data migrations
   lambda.js   serverless entry (Netlify Functions)
-  cron.js     scheduled entry (deposit scan every 5 minutes)
+  cron.js     scheduled entry every 5 minutes: deposit scan, payouts, explorer
   index.js    plain Node entry (npm start)
-site/         the preview website
+server/ui/    the withdrawal form (HTML)
+site/         the preview website and the explorer
 collection/   NFT images and traits
 netlify/      Netlify function wrapper
 ```
@@ -212,6 +216,9 @@ Deposits start working once `HELIUS_API_KEY` and `DEPOSIT_POOL_KEY` are set (and
 - [x] Balances in $MCP, 1 $MCP = $1
 - [x] Deposits: USDC/USDT on Solana to personal addresses, Helius webhook + scheduled scan
 - [x] Withdrawals: hot wallet with limits, review queue, sweep script for the owner
+- [x] Withdrawal form inside the chat (MCP Apps): the user presses the buttons, not the AI
+- [x] Public explorer: MCP addresses, hash chain, anchors on Solana, proof of reserves
+- [x] Live on Solana mainnet at [mcp.credit](https://mcp.credit)
 - [ ] Final collection
 
 ## Honest risks
