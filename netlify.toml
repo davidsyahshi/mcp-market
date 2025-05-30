@@ -1,0 +1,45 @@
+# Netlify: the CDN serves the preview site and NFT images from dist/,
+# one function (netlify/functions/api.mjs) serves everything else.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  # NFT pictures go back to the chat inside tool results, so the function carries its own copy.
+  # The withdrawal form (an MCP App) is built from server/ui/withdraw.html plus the MCP Apps SDK file.
+  included_files = ["collection/collection.json", "collection/thumbs/**", "server/ui/**",
+    "node_modules/@modelcontextprotocol/ext-apps/dist/src/app-with-deps.js"]
+
+# Deposits: a scheduled run every 5 minutes (UTC cron) catches anything the Helius webhook missed.
+# Scheduled functions only run on the published deploy and can't be called by URL.
+[functions.deposits]
+  schedule = "*/5 * * * *"
+
+# Anything that is not a static file goes to the function: /mcp, /authorize, /token, /register,
+# /.well-known/*, /login*, /api/*, /hooks/*, /admin/*. Static files win because this rewrite is not forced.
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+
+[[headers]]
+  for = "/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/thumb/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
