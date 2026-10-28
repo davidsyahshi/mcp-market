@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MCP Market</title>
-<meta name="description" content="The first memecoin inside your AI. Browse the collection here, buy it in Claude or ChatGPT.">
+<meta name="description" content="The first NFT/token inside your AI. Browse the collection here, mint and trade it in Claude, ChatGPT or Grok.">
 <link rel="icon" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -100,15 +100,27 @@ select { background: var(--panel); color: var(--cream); border: 2px solid var(--
 .say { background: var(--bg); border-left: 3px solid var(--red); padding: 10px 14px; color: var(--dim); }
 .connect { padding-top: 28px; padding-bottom: 40px; display: grid; gap: 18px; }
 .connect h1 { margin: 0; font-size: clamp(28px, 5vw, 44px); }
-.connect .lead { margin: 0; color: var(--dim); max-width: 640px; }
-.connect .url { max-width: 640px; }
-.ai-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.ai { background: var(--panel); border: 2px solid var(--edge); padding: 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.ai h2 { margin: 0; font-size: 22px; }
-.ai ol { margin: 0; padding-left: 20px; display: grid; gap: 9px; font-size: 14px; line-height: 1.45; }
-.ai ol b { color: var(--cream); }
-.ai .acts { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
-@media (max-width: 900px) { .ai-grid { grid-template-columns: 1fr; } }
+.connect .lead { margin: 0; color: var(--dim); max-width: 680px; }
+.ai-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.ai { background: var(--panel); border: 2px solid var(--edge); padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ai-head { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 2px solid var(--edge); }
+.ai-logo { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 10px; background: #fff; object-fit: cover; display: grid; place-items: center; color: #111; font: 700 20px monospace; }
+.ai-head h2 { margin: 0; font-size: 22px; line-height: 1.1; }
+.ai-head .note { margin-top: 3px; }
+.ai .lbl { font: 11px Silkscreen, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+.ai .lbl::after { content: ''; flex: 1; height: 1px; background: var(--edge); }
+.ai-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: st; }
+.ai-steps li { counter-increment: st; display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 9px 0; border-top: 1px solid var(--edge); font-size: 13.5px; line-height: 1.55; }
+.ai-steps li:first-child { border-top: 0; padding-top: 2px; }
+.ai-steps li::before { content: counter(st); width: 24px; height: 24px; display: grid; place-items: center; background: var(--bg); border: 2px solid var(--line); font: 12px Silkscreen, monospace; color: var(--cream); }
+.k { display: inline-block; padding: 0 6px; margin: 1px 0; background: var(--cream); color: #111; font-weight: 700; white-space: nowrap; line-height: 1.6; }
+.v { color: #FFE600; font-weight: 700; white-space: nowrap; }
+.ai .hint { font-size: 12px; color: var(--dim); background: var(--bg); border-left: 3px solid var(--line); padding: 7px 10px; }
+.ai .url code { font-size: 13px; padding: 9px 10px; }
+.ai .quick { margin-top: auto; display: grid; gap: 8px; padding-top: 4px; }
+.btn.big { width: 100%; justify-content: space-between; padding: 14px 16px; font-size: 15px; }
+.btn.big .arr { font-size: 18px; line-height: 1; }
+@media (max-width: 960px) { .ai-grid { grid-template-columns: 1fr; } }
 .say b { color: var(--cream); font-weight: 400; }
 .profile { padding: 34px 0 6px; display: flex; gap: 16px; align-items: center; }
 .profile img { width: 64px; height: 64px; border: 2px solid var(--edge); }
@@ -258,7 +270,7 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
 
 <main id="app"></main>
 
-<footer><div class="wrap">MCP · the first memecoin inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="#/explorer">Explorer</a> · <a href="#/launch">Launch a collection</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
+<footer><div class="wrap">MCP · the first NFT/token inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="#/explorer">Explorer</a> · <a href="#/launch">Launch a collection</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
 
 <script src="/launch.js"></script>
 <script>
@@ -321,7 +333,7 @@ async function renderMarket() {
   app.innerHTML = `<div class="wrap">
     <section class="hero">
       <div>
-        <h1 class="px">The first memecoin<br><span>inside your AI.</span></h1>
+        <h1 class="px">The first NFT/token<br><span>inside your AI.</span></h1>
         <p>Browse here. Mint, buy and sell only by talking to Claude, ChatGPT or Grok. Your balance and NFTs live in your MCP account. 1 $MCP = $1: top it up with USDC or USDT on Solana.</p>
         <div class="cta">
           <a class="btn red" data-add-claude href="${addToClaude(stats?.mcp_url || location.origin + '/mcp')}" target="_blank" rel="noopener">Add to Claude</a>
@@ -393,7 +405,8 @@ async function loadGrid(more = false) {
   const html = rows.map(card).join('');
   if (more) $('#grid').insertAdjacentHTML('beforeend', html);
   else $('#grid').innerHTML = html || `<div class="empty">${state.status === 'listed'
-    ? 'Nothing for sale right now. Be first: mint one in Claude and list it.' : 'Nothing matches these filters.'}</div>`;
+    ? (stats?.trading_open === false ? 'Mint phase: MCP NFTs can be listed once all 5,000 are minted. Mint yours in your AI now.'
+      : 'Nothing for sale right now. Be first: mint one in your AI and list it.') : 'Nothing matches these filters.'}</div>`;
   $('#gridMore').hidden = gridOffset >= total;
 }
 
@@ -822,57 +835,66 @@ document.addEventListener('click', async (e) => {
   t.textContent = 'Copied';
 });
 
-// #/connect: how to plug MCP into Claude, ChatGPT and Grok
+// #/connect: how to plug MCP into Claude, ChatGPT and Grok. The logos are the apps' own icons, loaded from their sites.
 function renderConnect() {
   const url = stats?.mcp_url || location.origin + '/mcp';
-  const list = (items) => `<ol>${items.map((x) => `<li>${x}</li>`).join('')}</ol>`;
-  const copy = `<button class="btn ghost" data-copy="${esc(url)}">Copy URL</button>`;
-  const ext = (href, text, cls = 'red') => `<a class="btn ${cls}" href="${esc(href)}" target="_blank" rel="noopener">${text}</a>`;
+  const k = (t) => `<span class="k">${t}</span>`; // something to press
+  const v = (t) => `<span class="v">${t}</span>`; // something to type
+  const card = ({ name, logo, plan, steps, hint, href, button, after }) => `<section class="ai" aria-label="${name}">
+      <div class="ai-head"><img class="ai-logo" src="${logo}" alt="" width="44" height="44" referrerpolicy="no-referrer" loading="lazy"
+        onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'ai-logo', textContent: '${name[0]}' }))">
+        <div><h2 class="px">${name}</h2><div class="note">${plan}</div></div></div>
+      <div class="lbl">Manual setup</div>
+      <ol class="ai-steps">${steps.map((x) => `<li><div>${x}</div></li>`).join('')}</ol>
+      ${hint ? `<div class="hint">${hint}</div>` : ''}
+      <div class="quick"><div class="lbl">Your link</div>
+        <div class="url"><code>${esc(url)}</code><button class="btn" data-copy="${esc(url)}">Copy</button></div>
+        <div class="lbl">Quick add</div>
+        <a class="btn red big" href="${esc(href)}" target="_blank" rel="noopener"><span>${button}</span><span class="arr">→</span></a>
+        <div class="note">${after}</div></div>
+    </section>`;
   $('#app').innerHTML = `<div class="wrap connect">
     <h1 class="px">Connect to your AI</h1>
-    <p class="lead">MCP lives inside your AI chat. Add it once, sign in with X, then just talk to it. Pick your AI:</p>
-    <div class="url"><code>${esc(url)}</code><button class="btn" data-copy="${esc(url)}">Copy</button></div>
+    <p class="lead">MCP lives inside your AI chat. Add it once, sign in with X, then just talk to it. Pick your AI, follow the steps or use Quick add.</p>
     <div class="ai-grid">
-      <section class="ai" aria-label="Claude">
-        <h2 class="px">Claude</h2>
-        <p class="note">Any plan, free too. Works on web, desktop and phone.</p>
-        ${list([
-          'Press <b>Add to Claude</b>. The name and URL are already filled in.',
-          'Press <b>Continue</b>, then <b>Add</b>.',
-          'Press <b>Connect</b>, sign in with X, press <b>Authorize app</b>.',
-          'In a chat: <b>+</b> → <b>Connectors</b> → <b>MCP</b> on.',
-        ])}
-        <p class="note">Free plan: one custom connector.</p>
-        <div class="acts">${ext(addToClaude(url), 'Add to Claude')}${ext(claudeLink('Mint me an MCP NFT'), 'Try it', 'ghost')}</div>
-      </section>
-      <section class="ai" aria-label="ChatGPT">
-        <h2 class="px">ChatGPT</h2>
-        <p class="note">Set it up on a computer at chatgpt.com.</p>
-        ${list([
-          'Press <b>Add to ChatGPT</b>: it opens <b>Plugins</b>.',
-          '<b>Add</b> (top right) → <b>Add custom MCP server</b>.',
-          'Name: <b>MCP</b>. Paste the URL. Authentication: <b>OAuth</b>.',
-          'Tick <b>I understand…</b> → <b>Create</b>, then sign in with X.',
-          'In a chat: <b>+</b> → pick <b>MCP</b>. Confirm actions when ChatGPT asks.',
-        ])}
-        <p class="note">No “Add custom MCP server”? Settings → Security and login → Developer mode on.</p>
-        <div class="acts">${ext('https://chatgpt.com/plugins', 'Add to ChatGPT')}${copy}</div>
-      </section>
-      <section class="ai" aria-label="Grok">
-        <h2 class="px">Grok</h2>
-        <p class="note">Set it up on the web at grok.com.</p>
-        ${list([
-          'Press <b>Add to Grok</b>: it opens <b>Connectors</b>.',
-          '<b>New connector</b> → <b>Custom</b>.',
-          'Paste the URL and save.',
-          'Sign in with X when it asks.',
-          'In a chat: turn the <b>MCP</b> connector on.',
-        ])}
-        <div class="acts">${ext('https://grok.com/connectors', 'Add to Grok')}${copy}</div>
-      </section>
+      ${card({
+        name: 'Claude', logo: 'https://claude.ai/apple-touch-icon.png', plan: 'Any plan, free too · web, desktop, phone',
+        steps: [
+          `In Claude open ${k('Customize')} → ${k('Connectors')}.`,
+          `Press ${k('+ Add')} → ${k('Add custom connector')}.`,
+          `Name: ${v('MCP')}. Paste your link. Press ${k('Continue')} → ${k('Add')}.`,
+          `Press ${k('Connect')}, sign in with X, press ${k('Authorize app')}.`,
+          `In a chat: ${k('+')} → ${k('Connectors')} → turn ${k('MCP')} on.`,
+        ],
+        hint: 'Free plan: one custom connector.',
+        href: addToClaude(url), button: 'Add to Claude', after: 'Fills in the name and link: you do steps 3–5.',
+      })}
+      ${card({
+        name: 'ChatGPT', logo: 'https://chatgpt.com/favicon.ico', plan: 'Set it up on a computer at chatgpt.com',
+        steps: [
+          `Open ${k('Plugins')} in the left menu.`,
+          `Press ${k('Add')} (top right) → ${k('Add custom MCP server')}.`,
+          `Name: ${v('MCP')}. Paste your link. Authentication: ${k('OAuth')}.`,
+          `Tick ${k('I understand and want to continue')} → ${k('Create as a plugin')}, sign in with X.`,
+          `In a chat: ${k('+')} → pick ${k('MCP')}. Press ${k('Confirm')} when ChatGPT asks.`,
+        ],
+        hint: `No ${k('Add custom MCP server')}? ${k('Settings')} → ${k('Security and login')} → ${k('Developer mode')} on.`,
+        href: 'https://chatgpt.com/plugins', button: 'Add to ChatGPT', after: 'Opens the Plugins page: you do steps 2–5.',
+      })}
+      ${card({
+        name: 'Grok', logo: 'https://grok.com/images/apple-touch-icon.png', plan: 'Set it up on the web at grok.com',
+        steps: [
+          `Open ${k('Connectors')} at grok.com and sign in.`,
+          `Press ${k('New connector')} → ${k('Custom')}.`,
+          'Paste your link and save.',
+          'Sign in with X when Grok asks.',
+          `In a chat: turn the ${k('MCP')} connector on.`,
+        ],
+        href: 'https://grok.com/connectors', button: 'Add to Grok', after: 'Opens Grok Connectors: you do steps 2–5.',
+      })}
     </div>
     <div class="say">Then just say: <b>“mint me an MCP”</b>, <b>“top up my balance”</b>, <b>“what's on the market under 10?”</b>, <b>“buy MCP #42”</b>, <b>“withdraw 20”</b></div>
-    <p class="note">One X account = one MCP account; X accounts younger than 30 days can't sign in. MCP never sees your X password. Any other app that supports remote MCP with sign-in works with the same URL.</p>
+    <p class="note">One X account = one MCP account; X accounts younger than 30 days can't sign in. MCP never sees your X password. Any other app that supports remote MCP with sign-in works with the same link.</p>
   </div>`;
 }
 
