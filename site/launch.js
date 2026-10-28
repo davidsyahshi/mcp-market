@@ -264,7 +264,18 @@
         <td>${pill(c.status)}${c.review_note ? `<div class="note">${esc(c.review_note)}</div>` : ''}</td>
         <td class="hide-sm">${c.minted}/${c.supply}</td><td class="num">${money(c.earnings.held)}</td><td class="num">${money(c.earnings.releasable)}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap">${act(c)}</td></tr>`).join('') || '<tr><td colspan="7" class="note">Nothing yet.</td></tr>'}
-      </tbody></table><div style="height:60px"></div></div>`;
+      </tbody></table>
+      <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Database backups</h2>
+        <p>Made every 2 hours and kept in Netlify, apart from the database. Download one now and then and keep it somewhere else too.</p></div>
+        <button class="btn red" id="bkNow" style="margin-left:auto">Back up now</button></div>
+      <div id="bk" class="note">Loading…</div><div style="height:60px"></div></div>`;
+    loadBackups();
+    $('#bkNow').onclick = async (e) => {
+      e.target.disabled = true;
+      try { await send('POST', '/admin/backups'); } catch (err) { alert(err.message); }
+      e.target.disabled = false;
+      loadBackups();
+    };
     app.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => {
       const a = b.dataset.act;
       let note = '';
@@ -275,6 +286,24 @@
       b.disabled = true;
       try { await send('POST', `/admin/collections/${b.dataset.id}/${a}`, { note }); renderAdmin(); } catch (e) { alert(e.message); b.disabled = false; }
     });
+  }
+
+  async function loadBackups() {
+    const el = $('#bk');
+    if (!el) return;
+    let b;
+    try { b = await send('GET', '/admin/backups'); } catch (e) { el.textContent = e.message; return; }
+    const last = b.last;
+    const kb = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+    const state = !last ? 'No backup yet.'
+      : last.ok ? `Last backup <b>${esc(new Date(last.at).toLocaleString())}</b> · ${kb(last.bytes)} · ${Number(last.counts?.users || 0)} accounts, ${Number(last.counts?.ledger || 0)} ledger rows`
+      : `<span style="color:var(--red)">Last backup failed ${esc(new Date(last.at).toLocaleString())}: ${esc(last.error)}</span>`;
+    el.innerHTML = `<p style="margin:0 0 10px">${state}</p>
+      <table class="txs"><thead><tr><th>Backup</th><th></th></tr></thead><tbody>
+      ${b.items.slice(0, 30).map((it) => `<tr><td>${esc(new Date(it.at).toLocaleString())}</td>
+        <td style="text-align:right"><a class="btn ghost" style="padding:4px 10px" download href="/api/admin/backups/file?key=${encodeURIComponent(it.key)}">Download</a></td></tr>`).join('')
+        || '<tr><td colspan="2" class="note">None stored yet.</td></tr>'}
+      </tbody></table>`;
   }
 
   window.MCP_LAUNCH = { renderLaunch, renderAdmin, readCollection, unzip };
