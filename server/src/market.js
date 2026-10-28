@@ -407,7 +407,11 @@ export async function stats(db, { collection, anyStatus = false } = {}) {
     (select count(*)::int from sales s join nfts n on n.id = s.nft_id where n.${only}) as sales,
     (select count(distinct owner_id)::int from nfts where ${only} and owner_id is not null) as holders`, p);
   const own = c || await getCollection(db, OWN_COLLECTION);
-  return { ...s, mint_price: own ? Number(own.mint_price) : CONFIG.mintPrice, mint_limit: own ? own.mint_limit : CONFIG.mintLimit, fee_bps: CONFIG.feeBps };
+  // trading_open: false while the collection (MCP without one) is in its mint phase
+  const left = own?.trade_after_sold_out
+    ? (await db.query('select exists (select 1 from nfts where collection_id = $1 and minted_at is null) as left', [own.id]))[0].left : false;
+  return { ...s, mint_price: own ? Number(own.mint_price) : CONFIG.mintPrice, mint_limit: own ? own.mint_limit : CONFIG.mintLimit, fee_bps: CONFIG.feeBps,
+    trading_open: !left };
 }
 
 // the collections people can see, with their numbers
