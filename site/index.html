@@ -113,8 +113,7 @@ select { background: var(--panel); color: var(--cream); border: 2px solid var(--
 .ai-steps li { counter-increment: st; display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 9px 0; border-top: 1px solid var(--edge); font-size: 13.5px; line-height: 1.55; }
 .ai-steps li:first-child { border-top: 0; padding-top: 2px; }
 .ai-steps li::before { content: counter(st); width: 24px; height: 24px; display: grid; place-items: center; background: var(--bg); border: 2px solid var(--line); font: 12px Silkscreen, monospace; color: var(--cream); }
-.k { display: inline-block; padding: 0 6px; margin: 1px 0; background: var(--cream); color: #111; font-weight: 700; white-space: nowrap; line-height: 1.6; }
-.v { color: #FFE600; font-weight: 700; white-space: nowrap; }
+.ai-steps b { color: var(--cream); font-weight: 700; }
 .ai .hint { font-size: 12px; color: var(--dim); background: var(--bg); border-left: 3px solid var(--line); padding: 7px 10px; }
 .ai .url code { font-size: 13px; padding: 9px 10px; }
 .ai .quick { margin-top: auto; display: grid; gap: 8px; padding-top: 4px; }
@@ -261,16 +260,16 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
 <div class="testbar" id="testbar" hidden><b>TEST SERVER</b> · balances are free test $MCP from the faucet and Solana devnet, nothing here is real money</div>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#/"><img class="pix" src="/logo.png" alt=""><b class="px">MCP</b></a>
-    <nav class="main" aria-label="Main"><a href="#/" data-nav="market">Market</a><a href="#/collections" data-nav="collections">Collections</a><a href="#/explorer" data-nav="explorer">Explorer</a></nav>
+    <a class="brand" href="/"><img class="pix" src="/logo.png" alt=""><b class="px">MCP</b></a>
+    <nav class="main" aria-label="Main"><a href="/" data-nav="market">Market</a><a href="/collections" data-nav="collections">Collections</a><a href="/explorer" data-nav="explorer">Explorer</a></nav>
     <span class="spacer"></span>
-    <a class="btn red" id="connectBtn" href="#/connect"><span class="long">Connect to your AI</span><span class="short">Connect</span></a>
+    <a class="btn red" id="connectBtn" href="/connect"><span class="long">Connect to your AI</span><span class="short">Connect</span></a>
   </div>
 </header>
 
 <main id="app"></main>
 
-<footer><div class="wrap">MCP · the first NFT/token inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="#/explorer">Explorer</a> · <a href="#/launch">Launch a collection</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
+<footer><div class="wrap">MCP · the first NFT/token inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="/explorer">Explorer</a> · <a href="/launch">Launch a collection</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
 
 <script src="/launch.js"></script>
 <script>
@@ -287,9 +286,9 @@ const setAddLinks = (url) => document.querySelectorAll('[data-add-claude]').forE
 const gptLink = (q) => 'https://chatgpt.com/?q=' + encodeURIComponent(q);
 // accounts are shown by MCP address; an X handle only when its owner chose to show it
 const label = (addr, name) => (name ? '@' + name : addr);
-const who = (addr, name) => (!addr ? '—' : addr === 'treasury' ? '<a class="addr tre" href="#/a/treasury">treasury</a>'
-  : addr === 'escrow' ? '<a class="addr tre" href="#/a/escrow">escrow</a>'
-  : `<a class="addr" href="#/a/${esc(addr)}">${esc(label(addr, name))}</a>`);
+const who = (addr, name) => (!addr ? '—' : addr === 'treasury' ? '<a class="addr tre" href="/a/treasury">treasury</a>'
+  : addr === 'escrow' ? '<a class="addr tre" href="/a/escrow">escrow</a>'
+  : `<a class="addr" href="/a/${esc(addr)}">${esc(label(addr, name))}</a>`);
 const shortSig = (sig) => `${sig.slice(0, 6)}…${sig.slice(-4)}`;
 const ago = (iso) => {
   const sec = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -318,7 +317,7 @@ const nftRef = (n) => (n.collection && n.collection !== 'mcp' ? `${n.name} (NFT 
 function card(n) {
   const price = n.price != null ? `<div class="price">${fmt(n.price)} <small style="color:var(--dim)">$MCP</small></div>`
     : `<div class="price na">${minted(n) ? 'not for sale' : 'mintable'}</div>`;
-  return `<a class="card" href="#/nft/${n.id}">
+  return `<a class="card" href="/nft/${n.id}">
     ${pic(n)}
     <div class="meta">
       <div class="name">${esc(n.name)}</div>
@@ -338,8 +337,8 @@ async function renderMarket() {
         <div class="cta">
           <a class="btn red" data-add-claude href="${addToClaude(stats?.mcp_url || location.origin + '/mcp')}" target="_blank" rel="noopener">Add to Claude</a>
           <a class="btn ghost" href="${claudeLink('Mint me an MCP NFT')}" target="_blank" rel="noopener">Mint in Claude</a>
-          <a class="btn ghost" href="#/c/mcp">The collection</a>
-          <a class="btn ghost" href="#/connect">ChatGPT, Grok &amp; more</a>
+          <a class="btn ghost" href="/c/mcp">The collection</a>
+          <a class="btn ghost" href="/connect">ChatGPT, Grok &amp; more</a>
         </div>
       </div>
       <div class="stats" id="stats"></div>
@@ -410,11 +409,11 @@ async function loadGrid(more = false) {
   $('#gridMore').hidden = gridOffset >= total;
 }
 
-// #/u/<handle>: only accounts that show their handle can be found by it; they live at their MCP address
+// /u/<handle>: only accounts that show their handle can be found by it; they live at their MCP address
 async function renderProfile(handle) {
   try {
     const u = await api('/users/' + encodeURIComponent(handle));
-    location.replace('#/a/' + u.public_id);
+    go('/a/' + u.public_id, { replace: true });
   } catch {
     $('#app').innerHTML = `<div class="wrap"><div class="empty">No public MCP account @${esc(handle)}. Accounts are shown by their MCP address unless the owner shows their X handle.</div></div>`;
   }
@@ -425,10 +424,10 @@ async function renderCollections() {
   const app = $('#app');
   app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Collections</h1>
     <p>Every collection on MCP. Mint and trade them by talking to Claude or ChatGPT.</p></div>
-    <a class="btn red" href="#/launch" style="margin-left:auto">Launch your collection</a></div>
+    <a class="btn red" href="/launch" style="margin-left:auto">Launch your collection</a></div>
     <div class="cols" id="cols"><div class="note">Loading…</div></div></div>`;
   const list = await api('/collections');
-  $('#cols').innerHTML = list.map((c) => `<a class="col" href="#/c/${esc(c.slug)}">
+  $('#cols').innerHTML = list.map((c) => `<a class="col" href="/c/${esc(c.slug)}">
     <img class="pix" src="${esc(c.cover)}" alt="${esc(c.name)}" loading="lazy">
     <div class="body"><h2 class="px">${esc(c.name)}</h2><p>${esc(c.description || '')}</p>
       <div class="progress" title="${c.minted} of ${c.supply} minted"><i style="width:${Math.min(100, (c.minted / c.supply) * 100).toFixed(2)}%"></i></div>
@@ -446,7 +445,7 @@ async function renderCollection(slug, query) {
   let c;
   try { c = await api('/collections/' + encodeURIComponent(slug)); } catch { app.innerHTML = '<div class="wrap"><div class="empty">No such collection.</div></div>'; return; }
   if (cState.slug !== c.slug) Object.assign(cState, { slug: c.slug, status: 'all', sort: 'id', traits: new Set() });
-  // #/c/mcp?t=Chassis:Bunny opens the collection filtered by that trait
+  // /c/mcp?t=Chassis:Bunny opens the collection filtered by that trait
   const t = new URLSearchParams(query || '').getAll('t');
   if (t.length) cState.traits = new Set(t);
   const mintQ = c.slug === 'mcp' ? 'Mint me an MCP NFT' : `Mint me an NFT from the ${c.name} collection (${c.slug})`;
@@ -461,7 +460,7 @@ async function renderCollection(slug, query) {
   const locked = c.trading_open === false && c.status !== 'frozen'
     ? `Trading opens after the sell-out: ${c.minted.toLocaleString('en-US')} of ${c.supply.toLocaleString('en-US')} minted. Until then NFTs can only be minted, not listed or bought.` : '';
   app.innerHTML = `<div class="wrap">
-    <div class="crumbs"><a href="#/collections">Collections</a> / ${esc(c.name)}</div>
+    <div class="crumbs"><a href="/collections">Collections</a> / ${esc(c.name)}</div>
     ${banner ? `<div class="panel" style="margin-top:14px;border-color:${c.status === 'frozen' || c.status === 'rejected' ? 'var(--red-d)' : 'var(--line)'}">${esc(banner)}</div>` : ''}
     ${locked ? `<div class="panel" style="margin-top:14px;border-color:#6b5f00"><span class="pill wait">Mint phase</span> ${esc(locked)}</div>` : ''}
     <section class="c-head"><img class="${c.cover_pixel === false ? 'smooth' : 'pix'}" src="${esc(c.cover)}" alt="">
@@ -548,31 +547,31 @@ async function renderNft(id) {
        <a class="btn ghost" href="${gptLink(q)}" target="_blank" rel="noopener">Mint in ChatGPT</a></div>`
       : `<div class="big" style="font-size:18px">Not for sale</div><div style="color:var(--dim);font-size:12px">Owned by ${who(n.owner_addr, n.owner_name)}.</div>`;
   const act = (a) => a.type === 'mint'
-    ? `<tr><td><span class="type mint">mint</span></td><td>${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="#/tx/${a.tx}">#${a.tx}</a></td></tr>`
-    : `<tr><td><span class="type buy">sale</span></td><td>${who(a.from_addr, a.from_name)} → ${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="#/tx/${a.tx}">#${a.tx}</a></td></tr>`;
+    ? `<tr><td><span class="type mint">mint</span></td><td>${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`
+    : `<tr><td><span class="type buy">sale</span></td><td>${who(a.from_addr, a.from_name)} → ${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`;
   app.innerHTML = `<div class="wrap">
-    <div class="crumbs"><a href="#/collections">Collections</a> / <a href="#/c/${esc(n.collection)}">${esc(n.collection_name)}</a> / ${esc(n.name)}</div>
+    <div class="crumbs"><a href="/collections">Collections</a> / <a href="/c/${esc(n.collection)}">${esc(n.collection_name)}</a> / ${esc(n.name)}</div>
     <div class="nftpage">
       <div class="art">${pic(n, true).replace(' loading="lazy" width="256" height="256"', '')}</div>
       <div class="info">
         <div>${n.rarity ? `<span class="rar ${rarClass(n.rarity)}">${esc(n.rarity)}</span>` : ''}<h1 class="px">${esc(n.name)}</h1>
-          <div style="color:var(--dim)"><a href="#/c/${esc(n.collection)}">${esc(n.collection_name)}</a> · ${n.owner_addr ? `owned by ${who(n.owner_addr, n.owner_name)}` : 'not minted yet'}</div></div>
+          <div style="color:var(--dim)"><a href="/c/${esc(n.collection)}">${esc(n.collection_name)}</a> · ${n.owner_addr ? `owned by ${who(n.owner_addr, n.owner_name)}` : 'not minted yet'}</div></div>
         <div class="pricebox">${action}
           <div class="cmd">or type <code>${esc(q)}</code><button class="btn ghost" data-copy="${esc(q)}" style="padding:4px 8px">Copy</button></div></div>
-        <div class="ttable">${n.attributes.map((a) => `<a href="#/c/${esc(n.collection)}?t=${encodeURIComponent(a.trait_type + ':' + a.value)}" title="All with ${esc(a.trait_type)}: ${esc(a.value)}">
+        <div class="ttable">${n.attributes.map((a) => `<a href="/c/${esc(n.collection)}?t=${encodeURIComponent(a.trait_type + ':' + a.value)}" title="All with ${esc(a.trait_type)}: ${esc(a.value)}">
           <span class="k">${esc(a.trait_type)}</span><span>${esc(a.value)}</span>${a.percent != null ? `<span class="p">${a.count} have it · ${a.percent}%</span>` : ''}</a>`).join('')}</div>
       </div>
     </div>
     <h2 class="px" style="margin:6px 0 10px;font-size:18px">Activity</h2>
     <table class="txs"><thead><tr><th>Event</th><th>Who</th><th style="text-align:right">Price</th><th class="hide-sm">When</th><th>Tx</th></tr></thead>
       <tbody>${n.activity.map(act).join('') || '<tr><td colspan="5" class="note">Not minted yet.</td></tr>'}</tbody></table>
-    <p class="note" style="padding:12px 0 40px">Every mint and sale is a transaction in the <a href="#/explorer">explorer</a>, part of the hash chain anchored on Solana.</p></div>`;
+    <p class="note" style="padding:12px 0 40px">Every mint and sale is a transaction in the <a href="/explorer">explorer</a>, part of the hash chain anchored on Solana.</p></div>`;
 }
 
 // ---------- the explorer ----------
 let exNet = 'mainnet';
 const solscan = (kind, id) => `https://solscan.io/${kind}/${id}${exNet === 'mainnet' ? '' : '?cluster=' + exNet}`;
-const nftLink = (n) => (n ? `<a class="nftl" href="#/nft/${n.id}">${n.thumb ? `<img class="${n.pixel ? 'pix' : 'smooth'}" src="${n.pixel ? n.image : n.thumb}" alt="" loading="lazy">` : ''}${esc(n.name)}</a>` : 'an NFT');
+const nftLink = (n) => (n ? `<a class="nftl" href="/nft/${n.id}">${n.thumb ? `<img class="${n.pixel ? 'pix' : 'smooth'}" src="${n.pixel ? n.image : n.thumb}" alt="" loading="lazy">` : ''}${esc(n.name)}</a>` : 'an NFT');
 const usd = (n) => fmt(Math.round(Number(n) * 100) / 100);
 const micro = (s) => Number(s) / 1e6;
 
@@ -588,7 +587,7 @@ function txSummary(t) {
     return { what: `${who(b.account, b.name)} bought ${nftLink(t.nft)} from ${se ? who(se.account, se.name) : '—'}`, amount: usd(-b.amount), unit: '$MCP' };
   }
   if (t.type === 'mint') { const mn = find('mint'); return { what: `${who(mn.account, mn.name)} minted ${nftLink(t.nft)}${find('hold', false) ? ' · held for the creator' : ''}`, amount: usd(-mn.amount), unit: '$MCP' }; }
-  if (t.type === 'payout') { const e = find('payout'); return { what: `escrow → ${who(e.account, e.name)}, creator of ${t.collection ? `<a href="#/c/${esc(t.collection.slug)}">${esc(t.collection.name)}</a>` : 'a collection'}`, amount: `+${usd(e.amount)}`, unit: '$MCP', cls: 'plus' }; }
+  if (t.type === 'payout') { const e = find('payout'); return { what: `escrow → ${who(e.account, e.name)}, creator of ${t.collection ? `<a href="/c/${esc(t.collection.slug)}">${esc(t.collection.name)}</a>` : 'a collection'}`, amount: `+${usd(e.amount)}`, unit: '$MCP', cls: 'plus' }; }
   if (t.type === 'refund' && t.refunds) return { what: `${t.refunds} mints refunded to their holders (collection frozen)`, amount: `+${usd(t.refunded)}`, unit: '$MCP', cls: 'plus' };
   if (t.type === 'refund' && find('mint_refund')) { const e = find('mint_refund'); return { what: `mint of ${nftLink(t.nft)} refunded → ${who(e.account, e.name)} (collection frozen)`, amount: `+${usd(e.amount)}`, unit: '$MCP', cls: 'plus' }; }
   if (t.type === 'refund') return { what: `withdrawal #${t.withdrawal?.id ?? '?'} rejected → ${who(user.account, user.name)}`, amount: `+${usd(user.amount)}`, unit: '$MCP', cls: 'plus' };
@@ -599,7 +598,7 @@ function txRow(t) {
   const s = txSummary(t);
   const chainCell = t.solana ? `<a href="${esc(t.solana.url)}" target="_blank" rel="noopener">${shortSig(t.solana.tx)} ↗</a>`
     : t.withdrawal ? `<span class="pill wait">${esc(t.withdrawal.status || 'pending')}</span>` : t.manual ? '<span class="note">support</span>' : '<span class="note">inside MCP</span>';
-  return `<tr><td><a class="tx" href="#/tx/${t.id}">#${t.id}</a></td><td class="hide-sm note">${ago(t.at)}</td>
+  return `<tr><td><a class="tx" href="/tx/${t.id}">#${t.id}</a></td><td class="hide-sm note">${ago(t.at)}</td>
     <td><span class="type ${esc(t.type)}">${esc(t.type)}</span></td><td>${s.what}</td>
     <td class="num ${s.cls || ''}">${s.amount} <small style="color:var(--dim)">${esc(s.unit)}</small></td><td class="hide-sm">${chainCell}</td></tr>`;
 }
@@ -634,10 +633,10 @@ function wireSearch() {
     e.preventDefault();
     const q = $('#exQ').value.trim();
     let mm;
-    if (/^mcp_[1-9A-HJ-NP-Za-km-z]{12}$/.test(q) || q === 'treasury' || q === 'escrow') location.hash = '#/a/' + q;
-    else if ((mm = /^(?:mcp|nft)\s*#?\s*(\d{1,9})$/i.exec(q))) location.hash = '#/nft/' + mm[1];
-    else if (/^#?\d+$/.test(q)) location.hash = '#/tx/' + q.replace('#', '');
-    else if (/^@?\w{1,15}$/.test(q)) location.hash = '#/u/' + q.replace('@', '');
+    if (/^mcp_[1-9A-HJ-NP-Za-km-z]{12}$/.test(q) || q === 'treasury' || q === 'escrow') go('/a/' + q);
+    else if ((mm = /^(?:mcp|nft)\s*#?\s*(\d{1,9})$/i.exec(q))) go('/nft/' + mm[1]);
+    else if (/^#?\d+$/.test(q)) go('/tx/' + q.replace('#', ''));
+    else if (/^@?\w{1,15}$/.test(q)) go('/u/' + q.replace('@', ''));
     else $('#exQ').value = '';
   };
 }
@@ -835,11 +834,10 @@ document.addEventListener('click', async (e) => {
   t.textContent = 'Copied';
 });
 
-// #/connect: how to plug MCP into Claude, ChatGPT and Grok. The logos are the apps' own icons, loaded from their sites.
+// /connect: how to plug MCP into Claude, ChatGPT and Grok. The logos are the apps' own icons, loaded from their sites.
 function renderConnect() {
   const url = stats?.mcp_url || location.origin + '/mcp';
-  const k = (t) => `<span class="k">${t}</span>`; // something to press
-  const v = (t) => `<span class="v">${t}</span>`; // something to type
+  const k = (t) => `<b>${t}</b>`; // something to press or type
   const card = ({ name, logo, plan, steps, hint, href, button, after }) => `<section class="ai" aria-label="${name}">
       <div class="ai-head"><img class="ai-logo" src="${logo}" alt="" width="44" height="44" referrerpolicy="no-referrer" loading="lazy"
         onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'ai-logo', textContent: '${name[0]}' }))">
@@ -862,7 +860,7 @@ function renderConnect() {
         steps: [
           `In Claude open ${k('Customize')} → ${k('Connectors')}.`,
           `Press ${k('+ Add')} → ${k('Add custom connector')}.`,
-          `Name: ${v('MCP')}. Paste your link. Press ${k('Continue')} → ${k('Add')}.`,
+          `Name: ${k('MCP')}. Paste your link. Press ${k('Continue')} → ${k('Add')}.`,
           `Press ${k('Connect')}, sign in with X, press ${k('Authorize app')}.`,
           `In a chat: ${k('+')} → ${k('Connectors')} → turn ${k('MCP')} on.`,
         ],
@@ -874,7 +872,7 @@ function renderConnect() {
         steps: [
           `Open ${k('Plugins')} in the left menu.`,
           `Press ${k('Add')} (top right) → ${k('Add custom MCP server')}.`,
-          `Name: ${v('MCP')}. Paste your link. Authentication: ${k('OAuth')}.`,
+          `Name: ${k('MCP')}. Paste your link. Authentication: ${k('OAuth')}.`,
           `Tick ${k('I understand and want to continue')} → ${k('Create as a plugin')}, sign in with X.`,
           `In a chat: ${k('+')} → pick ${k('MCP')}. Press ${k('Confirm')} when ChatGPT asks.`,
         ],
@@ -899,8 +897,8 @@ function renderConnect() {
 }
 
 async function route() {
-  const h = location.hash.replace(/^#/, '') || '/';
-  const [pathPart, query] = h.split('?');
+  const pathPart = location.pathname.replace(/\/+$/, '') || '/';
+  const query = location.search.slice(1);
   let mm;
   const section = pathPart === '/connect' ? '' : /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer' : /^\/(collections|c\/|nft\/|launch|admin)/.test(pathPart) ? 'collections' : 'market';
   document.querySelectorAll('[data-nav]').forEach((a) => {
@@ -920,7 +918,26 @@ async function route() {
   if ((mm = pathPart.match(/^\/nft\/(\d{1,9})/))) return renderNft(Number(mm[1]));
   return renderMarket();
 }
-window.addEventListener('hashchange', route);
+// Pages have plain addresses (/c/mcp, /nft/42, /explorer): Netlify serves index.html for them (netlify.toml) and the
+// page draws itself. Links inside the site change the address without reloading.
+const SITE_PATH = /^\/($|collections$|connect$|explorer$|launch$|admin$|(c|nft|tx|a|u)\/[^/?#]+)/;
+function go(path, { replace = false } = {}) {
+  if (replace) history.replaceState(null, '', path); else history.pushState(null, '', path);
+  route();
+}
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[href]');
+  if (!a || a.target || a.hasAttribute('download') || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const href = a.getAttribute('href');
+  if (!href.startsWith('/') || href.startsWith('//') || !SITE_PATH.test(href)) return;
+  e.preventDefault();
+  if (href !== location.pathname + location.search) go(href);
+});
+window.addEventListener('popstate', route);
+// old links (mcp.credit/#/nft/42) keep working: the address becomes /nft/42
+const fromHash = () => { if (location.hash.startsWith('#/')) history.replaceState(null, '', location.hash.slice(1)); };
+window.addEventListener('hashchange', () => { fromHash(); route(); });
+fromHash();
 loadStats().then(route);
 </script>
 </body>

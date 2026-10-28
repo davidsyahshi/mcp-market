@@ -1,4 +1,4 @@
-// The launchpad pages (#/launch) and the owner's review page (#/admin). Loaded by index.html, uses its helpers
+// The launchpad pages (/launch) and the owner's review page (/admin). Loaded by index.html, uses its helpers
 // ($, esc, fmt, api, rarClass). Pictures are read in the browser (a folder or a .zip), thumbnails are made here
 // with a canvas, and everything is uploaded in small batches.
 (() => {
@@ -104,7 +104,7 @@
     fr.readAsDataURL(blob);
   });
 
-  // ---------- #/launch ----------
+  // ---------- /launch ----------
 
   async function renderLaunch() {
     const app = $('#app');
@@ -119,19 +119,19 @@
         <span>Trading</span><span>2.5% of each sale to the market</span></div>
       <p class="note">Mint money is held for at least 7 days after each mint and paid out after a check, so people can trust a new collection: if a collection turns out to be a scam, it is frozen and every minter whose money is still held gets their full mint price back. Upload only art you own. Stolen art, other people's characters and brands, and anything illegal are rejected.</p></div>`;
     if (!who) {
-      app.innerHTML = `<div class="wrap"><div class="crumbs"><a href="#/collections">Collections</a> / Launch</div>
+      app.innerHTML = `<div class="wrap"><div class="crumbs"><a href="/collections">Collections</a> / Launch</div>
         <div class="ex-head"><div><h1 class="px">Launch your collection</h1>
         <p>Put your NFT collection on MCP: people mint and trade it by talking to Claude or ChatGPT.</p></div></div>
-        ${rules}<a class="btn red" href="${signIn('/#/launch')}">Sign in with X to start</a><div style="height:60px"></div></div>`;
+        ${rules}<a class="btn red" href="${signIn('/launch')}">Sign in with X to start</a><div style="height:60px"></div></div>`;
       return;
     }
     const mine = await send('GET', '/launch/mine');
-    app.innerHTML = `<div class="wrap"><div class="crumbs"><a href="#/collections">Collections</a> / Launch</div>
+    app.innerHTML = `<div class="wrap"><div class="crumbs"><a href="/collections">Collections</a> / Launch</div>
       <div class="ex-head"><div><h1 class="px">Launch your collection</h1>
-      <p>Signed in as @${esc(who.handle)} (${esc(who.public_id)}). ${who.admin ? '<a href="#/admin">Review queue →</a>' : ''}</p></div></div>
+      <p>Signed in as @${esc(who.handle)} (${esc(who.public_id)}). ${who.admin ? '<a href="/admin">Review queue →</a>' : ''}</p></div></div>
       ${mine.length ? `<h2 class="px" style="font-size:18px;margin:18px 0 10px">Your collections</h2>
         <table class="txs"><thead><tr><th>Collection</th><th>Status</th><th class="hide-sm">NFTs</th><th style="text-align:right">Held</th><th style="text-align:right" class="hide-sm">Ready</th><th style="text-align:right">Paid</th><th></th></tr></thead><tbody>
-        ${mine.map((c) => `<tr><td><a href="#/c/${esc(c.slug)}">${esc(c.name)}</a><div class="note">${esc(c.slug)}</div></td><td>${pill(c.status)}${c.review_note ? `<div class="note">${esc(c.review_note)}</div>` : ''}</td>
+        ${mine.map((c) => `<tr><td><a href="/c/${esc(c.slug)}">${esc(c.name)}</a><div class="note">${esc(c.slug)}</div></td><td>${pill(c.status)}${c.review_note ? `<div class="note">${esc(c.review_note)}</div>` : ''}</td>
           <td class="hide-sm">${c.status === 'draft' ? `${c.uploaded}/${c.supply} uploaded` : `${c.minted}/${c.supply} minted`}</td>
           <td class="num">${money(c.earnings.held)}</td><td class="num hide-sm">${money(c.earnings.releasable)}</td><td class="num">${money(c.earnings.paid)}</td>
           <td>${c.status === 'draft' ? `<button class="btn ghost" data-continue="${c.id}" style="padding:4px 8px">Continue</button>` : ''}
@@ -239,13 +239,13 @@
     };
   }
 
-  // ---------- #/admin: the owner's review queue ----------
+  // ---------- /admin: the owner's review queue ----------
 
   async function renderAdmin() {
     const app = $('#app');
     const who = await me();
     if (!who?.admin) {
-      app.innerHTML = `<div class="wrap"><div class="empty">${who ? `Only the market's owner can see this page.<br><span class="note">Your X id: <code>${esc(who.x_id)}</code> (the owner's goes in ADMIN_X_IDS)</span>` : `<a class="btn red" href="${signIn('/#/admin')}">Sign in with X</a>`}</div></div>`;
+      app.innerHTML = `<div class="wrap"><div class="empty">${who ? `Only the market's owner can see this page.<br><span class="note">Your X id: <code>${esc(who.x_id)}</code> (the owner's goes in ADMIN_X_IDS)</span>` : `<a class="btn red" href="${signIn('/admin')}">Sign in with X</a>`}</div></div>`;
       return;
     }
     const list = await send('GET', '/admin/collections');
@@ -259,8 +259,8 @@
     app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Review queue</h1>
       <p>Open a collection to look through every picture before approving it. Pay-outs include only mints older than the hold.</p></div></div>
       <table class="txs"><thead><tr><th>Collection</th><th>Creator</th><th>Status</th><th class="hide-sm">NFTs</th><th style="text-align:right">Held</th><th style="text-align:right">Ready</th><th></th></tr></thead><tbody>
-      ${list.map((c) => `<tr><td><a href="#/c/${esc(c.slug)}">${esc(c.name)}</a><div class="note">${esc(c.slug)} · ${fmt(c.mint_price)} $MCP · ${c.mint_limit}/account</div></td>
-        <td>${who.admin ? `<a class="addr" href="#/a/${esc(c.creator_addr)}">@${esc(c.creator_handle)}</a>` : ''}</td>
+      ${list.map((c) => `<tr><td><a href="/c/${esc(c.slug)}">${esc(c.name)}</a><div class="note">${esc(c.slug)} · ${fmt(c.mint_price)} $MCP · ${c.mint_limit}/account</div></td>
+        <td>${who.admin ? `<a class="addr" href="/a/${esc(c.creator_addr)}">@${esc(c.creator_handle)}</a>` : ''}</td>
         <td>${pill(c.status)}${c.review_note ? `<div class="note">${esc(c.review_note)}</div>` : ''}</td>
         <td class="hide-sm">${c.minted}/${c.supply}</td><td class="num">${money(c.earnings.held)}</td><td class="num">${money(c.earnings.releasable)}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap">${act(c)}</td></tr>`).join('') || '<tr><td colspan="7" class="note">Nothing yet.</td></tr>'}
