@@ -25,7 +25,7 @@ create table if not exists users (
 -- Collections. The market's own collection (MCP) has no creator: its mint money goes to the treasury.
 create table if not exists collections (
   id serial primary key,
-  slug text not null unique,            -- the collection's address on the site: /#/c/<slug>
+  slug text not null unique,            -- the collection's address on the site: /c/<slug>
   name text not null,
   description text,
   creator_id int references users(id),  -- null = the market's own collection

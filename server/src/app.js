@@ -25,6 +25,9 @@ const sameSecret = (given, key) => {
   return crypto.timingSafeEqual(a, b);
 };
 
+// the website's own pages: index.html draws them (site/index.html, route()); keep in step with netlify.toml
+export const SITE_PAGES = /^\/(collections|connect|explorer|launch|admin|(c|nft|tx|a|u)\/[A-Za-z0-9_-]{1,64})\/?$/;
+
 export async function createApp(opts) {
   const { db } = opts;
   if (!db) throw new Error('createApp needs a db');
@@ -325,6 +328,8 @@ export async function createApp(opts) {
     app.use('/img', express.static(path.join(collectionDir, 'images'), { maxAge: '1d' }));
     app.use('/thumb', express.static(thumbsDir, { maxAge: '1d' }));
     app.use(express.static(path.join(root, 'site')));
+    // the site's pages (/c/mcp, /nft/42, ...) are all index.html; on Netlify netlify.toml does the same
+    app.get(SITE_PAGES, (req, res) => res.sendFile(path.join(root, 'site', 'index.html')));
   }
   // pictures of launchpad collections (the market's own come from the CDN, or from the folders above locally)
   app.get(/^\/(img|thumb)\/(\d{1,9})\.png$/, async (req, res) => {

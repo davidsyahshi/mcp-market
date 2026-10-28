@@ -17,8 +17,9 @@ const ACCESS_TTL = 7 * 24 * 3600;
 const REFRESH_TTL = 180 * 24 * 3600;
 const SITE_TTL = 30 * 24 * 3600;
 const SITE_COOKIE = 'mcp_site';
-// where a sign-in on the site may go back to: a page of this site, nothing else
-const SITE_RETURN = /^\/(#\/[A-Za-z0-9_\-/?=&%.:]{0,120})?$/;
+// where a sign-in on the site may go back to: a page of this site, nothing else ("/launch"; old "/#/launch" too).
+// Never "//host" or "/\host", which a browser would read as another site.
+const SITE_RETURN = /^\/(?:#\/)?(?![/\\])[A-Za-z0-9_\-/?=&%.:]{0,120}$/;
 const LOGIN_TTL_MIN = 15;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const REQ_ID = /^[A-Za-z0-9_-]{16,64}$/;

@@ -34,7 +34,7 @@ const mcpIn = (what) => z.number().positive().describe(`${what} in $MCP (1 $MCP 
 export function buildMcpServer(db, userId, opts) {
   const { publicUrl, thumbsDir, deposits, withdrawals } = opts;
   const server = new McpServer({ name: 'mcp-market', version: '0.3.0' }, { instructions: INSTRUCTIONS });
-  const link = (id) => `${publicUrl}/#/nft/${id}`;
+  const link = (id) => `${publicUrl}/nft/${id}`;
   // the NFT picture as image content, so the chat shows it inline. Read from disk; if the file isn't
   // bundled with this instance, fetch it from the site's CDN.
   const image = async (id) => {
@@ -85,7 +85,7 @@ export function buildMcpServer(db, userId, opts) {
     if (!u.public_id) { await m.ensurePublicIds(db); u = await m.getUser(db, userId); }
     return u;
   };
-  const addrLink = (addr) => `${publicUrl}/#/a/${addr}`;
+  const addrLink = (addr) => `${publicUrl}/a/${addr}`;
 
   tool('account', { title: 'My account', description: 'Who is signed in, their MCP address, $MCP balance, NFTs they own and recent balance changes.', annotations: read }, async () => {
     const u = await me();
@@ -175,7 +175,7 @@ export function buildMcpServer(db, userId, opts) {
     if (!list.length) return ok(text('No collections are open yet.'));
     return ok(text(list.map((c) => `${c.name} (collection: ${c.slug}) · ${c.minted}/${c.supply} minted · mint ${m.fmt(c.mint_price)}, up to ${c.mint_limit} per account` +
       ` · floor ${c.floor != null ? m.fmt(c.floor) : '-'}${c.creator_addr ? ` · by ${m.label(c.creator_addr, c.creator_name)}` : ''}` +
-      `${c.trade_after_sold_out && c.minted < c.supply ? ' · trading opens after the sell-out' : ''}\n${publicUrl}/#/c/${c.slug}`).join('\n\n')));
+      `${c.trade_after_sold_out && c.minted < c.supply ? ' · trading opens after the sell-out' : ''}\n${publicUrl}/c/${c.slug}`).join('\n\n')));
   });
 
   tool('mint', {
