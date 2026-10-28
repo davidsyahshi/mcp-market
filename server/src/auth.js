@@ -23,7 +23,9 @@ const LOGIN_TTL_MIN = 15;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const REQ_ID = /^[A-Za-z0-9_-]{16,64}$/;
 // where the official AI apps send the user back after sign-in
-const KNOWN_APP_HOSTS = ['claude.ai', 'claude.com', 'chatgpt.com', 'chat.openai.com', 'localhost', '127.0.0.1'];
+// AI apps whose sign-in callbacks need no warning: these domains and their subdomains (Grok: grok.com, x.ai)
+const KNOWN_APP_HOSTS = ['claude.ai', 'claude.com', 'chatgpt.com', 'chat.openai.com', 'openai.com', 'grok.com', 'x.ai', 'localhost', '127.0.0.1'];
+export const knownApp = (host) => KNOWN_APP_HOSTS.some((h) => host === h || host.endsWith('.' + h));
 
 export function createAuth(db, { publicUrl, xClientId, xClientSecret, devLogin }) {
   const secureCookie = publicUrl.startsWith('https://');
@@ -158,9 +160,9 @@ export function createAuth(db, { publicUrl, xClientId, xClientSecret, devLogin }
     if (!startedHere(req, id)) return foreign(res);
     let host = '?';
     try { host = new URL(p.params.redirectUri).hostname; } catch {}
-    const known = p.params.site || KNOWN_APP_HOSTS.includes(host);
+    const known = p.params.site || knownApp(host);
     if (p.params.site) host = 'this website';
-    const warn = known ? '' : `<p class="warn">⚠ Access goes to <b>${esc(host)}</b>, which is not Claude or ChatGPT. Only continue if you set this up yourself.</p>`;
+    const warn = known ? '' : `<p class="warn">⚠ Access goes to <b>${esc(host)}</b>, which is not Claude, ChatGPT or Grok. Only continue if you set this up yourself.</p>`;
     const x = xClientId ? `<a class="btn" href="/login/x?req=${id}">Sign in with X</a>` : '';
     const dev = devLogin ? `<form method="post" action="/login/dev"><input type="hidden" name="req" value="${id}">
       <input name="handle" placeholder="test handle, e.g. artem" required pattern="[A-Za-z0-9_]{1,15}" maxlength="15" autocomplete="off">
