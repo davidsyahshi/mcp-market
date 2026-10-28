@@ -41,6 +41,7 @@
 
 **Database** — [`server/src/schema.js`](server/src/schema.js)
 - Only the server talks to Postgres. Supabase's auto-generated REST API is turned off for this project, and as a second layer every table has row level security with no policies, so the public API roles can't read anything even if it's switched on.
+- Backups ([`server/src/backup.js`](server/src/backup.js)) hold every account, so only the owner (`ADMIN_X_IDS`) can list or download them, downloads are never cached, and file names are checked against a fixed pattern. They hold no keys or seed phrases (the database has none) and no sign-in sessions. A restore refuses a database that already has data and checks balances against the ledger and the hash chain after loading, so a tampered file shows up.
 
 **Deposits** — [`server/src/deposits.js`](server/src/deposits.js)
 - Each user deposits to their own Solana address from a pool made offline on the owner's computer (`npm run deposit-pool`). The seed phrase stays on paper; the server holds only public addresses and has no key that can move deposited funds.

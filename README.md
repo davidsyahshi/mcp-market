@@ -186,12 +186,25 @@ server/src/
   schema.js   database tables and one-time data migrations
   lambda.js   serverless entry (Netlify Functions)
   cron.js     scheduled entry every 5 minutes: deposit scan, payouts, explorer
+  backup.js   database backups every 2 hours into Netlify Blobs, and the restore
   index.js    plain Node entry (npm start)
 server/ui/    the withdrawal form (HTML)
 site/         the preview website and the explorer
 collection/   the MCP collection: metadata (collection.json) and picture archives
-netlify/      Netlify function wrapper
+netlify/      Netlify functions: api, deposits (every 5 minutes), backup (every 2 hours)
 ```
+
+## Backups
+
+The database runs on Supabase's free plan, which keeps no backups, so the market makes its own: every 2 hours a scheduled function ([`netlify/functions/backup.mjs`](netlify/functions/backup.mjs), [`server/src/backup.js`](server/src/backup.js)) copies every table that matters (accounts and balances, the whole ledger, NFTs and owners, sales, collections and the escrow, deposits, withdrawals, chain anchors, connected AI apps) into one gzipped file in Netlify Blobs, apart from the database. All tables are read in one consistent snapshot, and Postgres writes each row as JSON itself, so amounts and times are copied exactly. Kept: every copy of the last 48 hours, then the first copy of each day for 30 days. Sign-in sessions and logins in progress are not kept; there are no keys in the database to keep.
+
+The owner sees the last backup on `/admin`, can make one on the spot and download any of them (keep a copy somewhere else too). A failed backup shows there and logs an `ALERT`. To restore into a new, empty Postgres database:
+
+```bash
+RESTORE_DATABASE_URL='postgresql://…' node server/scripts/restore-backup.js mcp-backup-2026-10-28T12-17-00Z.json.gz
+```
+
+It creates the tables, loads every row, continues the id counters, then checks the money: every balance must equal the sum of its ledger rows, and the hash chain must verify (the explorer's own check). Then point `DATABASE_URL` at the new database and redeploy.
 
 ## Run it locally
 
