@@ -20,6 +20,58 @@
 [functions.deposits]
   schedule = "*/5 * * * *"
 
+# The website's own pages (/c/mcp, /nft/42, /explorer, ...) are all index.html, which draws them in the browser.
+# Keep in step with SITE_PAGES in server/src/app.js. /admin/* (the manual credit endpoint) still goes to the function.
+[[redirects]]
+  from = "/collections"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/connect"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/explorer"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/launch"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/c/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/nft/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/tx/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/a/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/u/*"
+  to = "/index.html"
+  status = 200
+
 # Anything that is not a static file goes to the function: /mcp, /authorize, /token, /register,
 # /.well-known/*, /login*, /api/*, /hooks/*, /admin/*. Static files win because this rewrite is not forced.
 [[redirects]]

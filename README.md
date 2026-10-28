@@ -9,7 +9,7 @@ The website only shows the collections, prices, traits and owners. Every action 
 
 This repository is the whole server, so you can read exactly what the connector does before you plug it in.
 
-> **Status: live on Solana mainnet, early launch.** Balances are real money: $MCP (1 $MCP = $1), topped up with USDC or USDT on Solana and withdrawn as USDC. Deposit only what you are ready to risk, and read [Honest risks](#honest-risks) first. Everything that happens is public in the [explorer](https://mcp.credit/#/explorer).
+> **Status: live on Solana mainnet, early launch.** Balances are real money: $MCP (1 $MCP = $1), topped up with USDC or USDT on Solana and withdrawn as USDC. Deposit only what you are ready to risk, and read [Honest risks](#honest-risks) first. Everything that happens is public in the [explorer](https://mcp.credit/explorer).
 
 ![Preview site](screens/market.png)
 
@@ -70,7 +70,7 @@ NFT images, site ──▶ CDN (static)
 
 ## The collection
 
-**MCP** is 5,000 pixel characters, each with 9 to 12 traits (Rarity, Render Engine, Chassis, Bloodline, Paint Job, Habitat, Trim, Lid, Optics, Fit, Bling, Side Quest). Rarity tiers: Common 2,750 · Rare 1,400 · Epic 600 · Legendary 200 · Ultra-Rare 50. Every NFT has its own page (`/#/nft/<number>`) with its traits, how many NFTs share each one, the owner and every mint and sale, each linked to its transaction in the explorer. The collection page (`/#/c/mcp`) filters by any combination of traits.
+**MCP** is 5,000 pixel characters, each with 9 to 12 traits (Rarity, Render Engine, Chassis, Bloodline, Paint Job, Habitat, Trim, Lid, Optics, Fit, Bling, Side Quest). Rarity tiers: Common 2,750 · Rare 1,400 · Epic 600 · Legendary 200 · Ultra-Rare 50. Every NFT has its own page (`/nft/<number>`) with its traits, how many NFTs share each one, the owner and every mint and sale, each linked to its transaction in the explorer. The collection page (`/c/mcp`) filters by any combination of traits.
 
 - **Minting** gives a random NFT nobody has minted yet, for 5 $MCP, at most 5 per account (`MINT_PRICE_USD`, `MINT_LIMIT_PER_USER`). Mint money goes to the treasury. **Mint phase:** MCP NFTs can't be listed or bought until all 5,000 are minted; trading opens by itself with the last mint (`MCP_TRADING=open` opens it earlier).
 - **Metadata** is [`collection/collection.json`](collection/collection.json): every NFT's traits, public before anyone mints. The server loads it into the database on its first start.
@@ -78,9 +78,9 @@ NFT images, site ──▶ CDN (static)
 
 ## Launchpad
 
-Anyone signed in with X can launch a collection on MCP at [`/#/launch`](https://mcp.credit/#/launch): name, id, mint price, mints per account, and a folder or .zip with the pictures and the usual generator metadata (`1.png`, `2.png`, … with `1.json`, … or one `_metadata.json`). The browser reads them, makes the thumbnails and uploads them in batches; nothing goes public before the market's owner reviews it. Code: [`server/src/launchpad.js`](server/src/launchpad.js), [`site/launch.js`](site/launch.js).
+Anyone signed in with X can launch a collection on MCP at [`/launch`](https://mcp.credit/launch): name, id, mint price, mints per account, and a folder or .zip with the pictures and the usual generator metadata (`1.png`, `2.png`, … with `1.json`, … or one `_metadata.json`). The browser reads them, makes the thumbnails and uploads them in batches; nothing goes public before the market's owner reviews it. Code: [`server/src/launchpad.js`](server/src/launchpad.js), [`site/launch.js`](site/launch.js).
 
-- **Review.** A collection goes live only after the owner approves it (`ADMIN_X_IDS`, their X account ids; the page is `/#/admin`). Until then its page and pictures show only to its creator and the owner.
+- **Review.** A collection goes live only after the owner approves it (`ADMIN_X_IDS`, their X account ids; the page is `/admin`). Until then its page and pictures show only to its creator and the owner.
 - **Mint money.** Each mint: 10% to the market (`LAUNCH_FEE_BPS`), the rest into the **escrow**, an account of its own in the ledger and the explorer. It is held at least 7 days per mint (`HOLD_DAYS`) and goes to the creator's balance only when the owner releases it. The creator withdraws it like any balance.
 - **Frozen.** If a collection turns out to be a scam, the owner freezes it: minting and trading stop, and every mint still in the escrow is refunded in full (the market's fee too) to whoever minted it.
 - **Counted as owed.** The escrow is part of what the market owes in the proof of reserves, and the explorer checks it against the open holds.
@@ -89,7 +89,7 @@ Anyone signed in with X can launch a collection on MCP at [`/#/launch`](https://
 
 ## Explorer
 
-Everything that happens in the market is public at [`/#/explorer`](https://mcp.credit/#/explorer): deposits, mints, buys, withdrawals, fees. Code: [`server/src/explorer.js`](server/src/explorer.js).
+Everything that happens in the market is public at [`/explorer`](https://mcp.credit/explorer): deposits, mints, buys, withdrawals, fees. Code: [`server/src/explorer.js`](server/src/explorer.js).
 
 - **MCP addresses, not X handles.** Every account has a public MCP address like `mcp_7Hq2kPzX9aBc`. It is an account number inside MCP, not a Solana wallet (the underscore makes sure it can't be pasted as one). Public pages and other users see the address; the X handle only if its owner turns it on (`public_profile` in the chat). That is not full anonymity: deposits and withdrawals are Solana transactions, so the wallets they come from and go to are public there.
 - **The chain.** Every ledger row gets a number and a hash: `sha256(previous hash, number, row id, MCP address, amount, kind, reference, time)`, so changing, removing or inserting any past row breaks every hash after it. The database also refuses to change or delete ledger rows (trigger). The explorer page downloads the whole chain and recomputes every hash in your browser (*Verify the whole chain*); [`/api/explorer/chain`](https://mcp.credit/api/explorer/chain) is the raw data.
@@ -228,7 +228,7 @@ npm test                  # end-to-end tests: real OAuth, real MCP client, two u
 | `WITHDRAW_ADDRESS_DELAY_HOURS`, `WITHDRAWALS_PAUSED` | optional: hours before a new address can receive (24; 0 on the test server), `1` stops payouts |
 | `RESERVE_WALLETS` | optional: your cold wallets holding swept deposits (public addresses, comma-separated), so the explorer counts them as reserves |
 | `ANCHOR_EVERY_MINUTES`, `ANCHORS_OFF`, `RESERVES_EVERY_MINUTES` | optional: how often the chain's hash goes to Solana (60), `1` stops anchors, how often reserves are read (10) |
-| `ADMIN_X_IDS` | the X account ids (numbers, not handles: a handle can change hands) of the market's owner(s), comma-separated: they review launchpad collections at `/#/admin` and release payouts. Sign in on the site and open `/api/me` to see yours (`x_id`) |
+| `ADMIN_X_IDS` | the X account ids (numbers, not handles: a handle can change hands) of the market's owner(s), comma-separated: they review launchpad collections at `/admin` and release payouts. Sign in on the site and open `/api/me` to see yours (`x_id`) |
 | `LAUNCH_FEE_BPS`, `HOLD_DAYS`, `LAUNCH_MAX_SUPPLY` | optional: the market's share of launchpad mints in basis points (1000 = 10%), the hold in days (7), the largest collection (10,000) |
 
 Deposits start working once `HELIUS_API_KEY` and `DEPOSIT_POOL_KEY` are set (and deployed) and the pool CSV is imported; the scheduled function registers the Helius webhook within 5 minutes of the first address handed out.
