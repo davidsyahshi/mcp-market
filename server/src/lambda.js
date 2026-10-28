@@ -13,7 +13,7 @@ export function createHandler(opts = {}) {
     await migrate(db);
     const { app } = await createApp({ serveStatic: false, ...opts, db });
     return serverless(app, {
-      binary: ['image/*'],
+      binary: ['image/*', 'application/gzip'], // pictures and database backups (/admin)
       // serverless-http fills req.headers but not req.rawHeaders; the MCP SDK builds its Web Request
       // from rawHeaders, so without this every MCP call loses its Content-Type and gets a 415
       request(req) {

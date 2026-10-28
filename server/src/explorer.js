@@ -33,6 +33,19 @@ export function publicRef(kind, ref) {
 export const entryText = (prev, e) => [prev, e.seq, e.id, e.account, e.delta, e.kind, e.ref, e.at].join('\n');
 export const entryHash = (prev, e) => sha256(entryText(prev, e));
 
+// a ledger row (joined with its account's public_id) as the public sees it and as it is hashed
+export const ledgerEntry = (r) => ({
+  seq: r.seq == null ? null : Number(r.seq),
+  id: Number(r.id),
+  // the market's two accounts: the escrow (launchpad mint money on hold) and the treasury (everything else)
+  account: r.user_id == null ? (isEscrowKind(r.kind) ? 'escrow' : 'treasury') : r.public_id,
+  delta: String(r.delta),
+  kind: r.kind,
+  ref: publicRef(r.kind, r.ref),
+  at: new Date(r.created_at).toISOString(),
+  hash: r.hash || null,
+});
+
 export function explorerConfig(env = process.env) {
   return {
     anchorEveryMs: Number(env.ANCHOR_EVERY_MINUTES || 60) * 60e3,
@@ -61,17 +74,7 @@ export function createExplorer(db, opts = {}) {
   });
   const txUrl = (sig) => explorerTx(sig, network);
 
-  const entry = (r) => ({
-    seq: r.seq == null ? null : Number(r.seq),
-    id: Number(r.id),
-    // the market's two accounts: the escrow (launchpad mint money on hold) and the treasury (everything else)
-    account: r.user_id == null ? (isEscrowKind(r.kind) ? 'escrow' : 'treasury') : r.public_id,
-    delta: String(r.delta),
-    kind: r.kind,
-    ref: publicRef(r.kind, r.ref),
-    at: new Date(r.created_at).toISOString(),
-    hash: r.hash || null,
-  });
+  const entry = ledgerEntry;
   const ROW = `select l.id, l.user_id, l.delta, l.kind, l.ref, l.created_at, l.xact, l.seq, l.hash, u.public_id,
     case when u.show_handle then u.handle end as name from ledger l left join users u on u.id = l.user_id`;
 

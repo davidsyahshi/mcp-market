@@ -84,3 +84,59 @@ export function sniffImage(buf) {
   if (b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
   return null;
 }
+
+// ---------- database backups (backup.js): their own store, keys b/<time>.json.gz ----------
+const BACKUP_STORE = 'db-backups';
+const BACKUP_KEY = /^b\/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z\.json\.gz$/;
+const checkBackupKey = (key) => {
+  if (!BACKUP_KEY.test(key)) throw new Error(`bad backup key "${key}"`);
+  return key;
+};
+
+export function memoryBackupStore() {
+  const m = new Map();
+  return {
+    kind: 'memory',
+    async put(key, data) { m.set(checkBackupKey(key), Buffer.from(data)); },
+    async get(key) { return m.get(checkBackupKey(key)) || null; },
+    async list() { return [...m.keys()].sort(); },
+    async del(key) { m.delete(checkBackupKey(key)); },
+  };
+}
+
+export function folderBackupStore(dir) {
+  const file = (key) => path.join(dir, checkBackupKey(key).slice(2));
+  return {
+    kind: 'folder',
+    async put(key, data) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(file(key), Buffer.from(data)); },
+    async get(key) { try { return fs.readFileSync(file(key)); } catch { return null; } },
+    async list() { try { return fs.readdirSync(dir).map((f) => `b/${f}`).filter((k) => BACKUP_KEY.test(k)).sort(); } catch { return []; } },
+    async del(key) { fs.rmSync(file(key), { force: true }); },
+  };
+}
+
+export async function netlifyBackupStore() {
+  const { getStore } = await import('@netlify/blobs');
+  const store = () => getStore({ name: BACKUP_STORE });
+  return {
+    kind: 'netlify',
+    async put(key, data) {
+      const buf = Buffer.from(data);
+      await store().set(checkBackupKey(key), buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    },
+    async get(key) {
+      const r = await store().get(checkBackupKey(key), { type: 'arrayBuffer' });
+      return r ? Buffer.from(r) : null;
+    },
+    async list() {
+      const { blobs } = await store().list({ prefix: 'b/' });
+      return blobs.map((b) => b.key).filter((k) => BACKUP_KEY.test(k)).sort();
+    },
+    async del(key) { await store().delete(checkBackupKey(key)); },
+  };
+}
+
+export async function defaultBackupStore() {
+  if (process.env.NETLIFY || process.env.NETLIFY_BLOBS_CONTEXT || process.env.LAMBDA_TASK_ROOT) return netlifyBackupStore();
+  return folderBackupStore(process.env.BACKUP_DIR || path.join(process.cwd(), 'data', 'backups'));
+}

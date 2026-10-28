@@ -16,7 +16,8 @@ import { createWithdrawals } from './withdrawals.js';
 import { withdrawUi } from './ui.js';
 import { createExplorer } from './explorer.js';
 import * as lp from './launchpad.js';
-import { defaultStorage, sniffImage } from './storage.js';
+import { defaultStorage, defaultBackupStore, sniffImage } from './storage.js';
+import { runBackup, lastBackup, keyTime, KEY_RE } from './backup.js';
 
 const sameSecret = (given, key) => {
   if (!key || typeof given !== 'string') return false;
@@ -40,6 +41,8 @@ export async function createApp(opts) {
   const withdrawals = opts.withdrawals || createWithdrawals(db, { rpc: opts.rpc, config: opts.withdrawConfig });
   const explorer = opts.explorer || createExplorer(db, { deposits, withdrawals, rpc: opts.rpc, config: opts.explorerConfig });
   const storage = opts.storage || await defaultStorage();
+  // database backups (backup.js): made every 2 hours by netlify/functions/backup.mjs, downloaded from /admin
+  const backups = opts.backupStore || await defaultBackupStore();
   // the market's owner(s), by X account id (it never changes, unlike a handle someone else could take later):
   // they review collections and release payouts. /api/me shows a signed-in account its own id.
   const admins = new Set(String(opts.adminXIds ?? process.env.ADMIN_X_IDS ?? '').split(',').map((h) => h.trim()).filter(Boolean));
@@ -247,6 +250,24 @@ export async function createApp(opts) {
   admin.post('/collections/:id/resume', wrap(async (req) => draftView(await lp.setPaused(db, idOf(req), false))));
   admin.post('/collections/:id/release', wrap(async (req) => lp.release(db, idOf(req))));
   admin.post('/collections/:id/freeze', wrap(async (req) => lp.freeze(db, idOf(req), req.body?.note)));
+  // database backups: the list, one more now, and a download (the file holds every account: owner only)
+  admin.get('/backups', wrap(async () => ({
+    last: await lastBackup(db),
+    items: (await backups.list()).reverse().map((key) => ({ key, at: new Date(keyTime(key)).toISOString() })),
+  })));
+  admin.post('/backups', wrap(async () => runBackup(db, backups)));
+  admin.get('/backups/file', async (req, res) => {
+    const key = String(req.query.key || '');
+    if (!KEY_RE.test(key)) return res.status(400).json({ error: 'bad key' });
+    try {
+      const data = await backups.get(key);
+      if (!data) return res.status(404).json({ error: 'no such backup' });
+      res.set({ 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="mcp-backup-${key.slice(2)}"`, 'Cache-Control': 'no-store' });
+      res.send(data);
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
   api.use('/admin', admin);
 
   // only accounts that chose to show their X handle can be found by it
