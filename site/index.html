@@ -81,8 +81,6 @@ select { background: var(--panel); color: var(--cream); border: 2px solid var(--
 .rar.legendary { color: var(--r-legendary); } .rar.ultra-rare { color: var(--r-ultra); }
 .empty { color: var(--dim); padding: 40px 0; grid-column: 1 / -1; text-align: center; }
 
-dialog { border: 2px solid var(--edge); background: var(--panel); color: var(--cream); padding: 0; max-width: min(920px, calc(100vw - 32px)); width: 100%; }
-dialog::backdrop { background: rgba(0,0,0,.75); }
 .detail { display: grid; grid-template-columns: 1fr 1fr; }
 .detail img { width: 100%; aspect-ratio: 1; }
 .detail .info { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
@@ -97,13 +95,20 @@ dialog::backdrop { background: rgba(0,0,0,.75); }
 .cmd code { flex: 1; background: var(--bg); padding: 6px 8px; color: var(--cream); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hist { font-size: 12px; color: var(--dim); }
 .hist div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--edge); padding: 5px 0; }
-.close { position: absolute; top: 10px; right: 10px; background: var(--bg); color: var(--cream); border: 2px solid var(--edge); width: 36px; height: 36px; font: 700 16px monospace; cursor: pointer; }
-.steps { padding: 26px; display: grid; gap: 16px; }
-.steps h2 { margin: 0; }
-.steps ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
 .url { display: flex; gap: 8px; }
 .url code { flex: 1; background: var(--bg); border: 2px solid var(--edge); padding: 10px; font-size: 13px; overflow-x: auto; white-space: nowrap; }
 .say { background: var(--bg); border-left: 3px solid var(--red); padding: 10px 14px; color: var(--dim); }
+.connect { padding-top: 28px; padding-bottom: 40px; display: grid; gap: 18px; }
+.connect h1 { margin: 0; font-size: clamp(28px, 5vw, 44px); }
+.connect .lead { margin: 0; color: var(--dim); max-width: 640px; }
+.connect .url { max-width: 640px; }
+.ai-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.ai { background: var(--panel); border: 2px solid var(--edge); padding: 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ai h2 { margin: 0; font-size: 22px; }
+.ai ol { margin: 0; padding-left: 20px; display: grid; gap: 9px; font-size: 14px; line-height: 1.45; }
+.ai ol b { color: var(--cream); }
+.ai .acts { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+@media (max-width: 900px) { .ai-grid { grid-template-columns: 1fr; } }
 .say b { color: var(--cream); font-weight: 400; }
 .profile { padding: 34px 0 6px; display: flex; gap: 16px; align-items: center; }
 .profile img { width: 64px; height: 64px; border: 2px solid var(--edge); }
@@ -223,8 +228,11 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
   nav.main { overflow-x: auto; scrollbar-width: none; }
   nav.main a { padding: 8px 7px; white-space: nowrap; }
 }
+#connectBtn .short { display: none; }
 @media (max-width: 640px) {
-  #connectBtn { display: none; }
+  #connectBtn { padding: 8px 10px; flex-shrink: 0; }
+  #connectBtn .long { display: none; }
+  #connectBtn .short { display: inline; }
 }
 @media (max-width: 440px) {
   .brand b { display: none; }
@@ -244,36 +252,11 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
     <a class="brand" href="#/"><img class="pix" src="/logo.png" alt=""><b class="px">MCP</b></a>
     <nav class="main" aria-label="Main"><a href="#/" data-nav="market">Market</a><a href="#/collections" data-nav="collections">Collections</a><a href="#/explorer" data-nav="explorer">Explorer</a></nav>
     <span class="spacer"></span>
-    <button class="btn red" id="connectBtn">Connect to your AI</button>
+    <a class="btn red" id="connectBtn" href="#/connect"><span class="long">Connect to your AI</span><span class="short">Connect</span></a>
   </div>
 </header>
 
 <main id="app"></main>
-
-<dialog id="connectDlg" aria-label="Connect MCP">
-  <button class="close" data-close aria-label="Close">×</button>
-  <div class="steps">
-    <h2 class="px">Plug MCP into your AI</h2>
-    <div>
-      <div style="color:var(--dim);margin-bottom:6px">Connector URL</div>
-      <div class="url"><code id="mcpUrl">…</code><button class="btn" id="copyUrl">Copy</button></div>
-    </div>
-    <div>
-      <b>Claude</b>
-      <div style="margin:8px 0"><a class="btn red" data-add-claude href="https://claude.ai/customize/connectors?modal=add-custom-connector&amp;connectorName=MCP&amp;connectorUrl=https%3A%2F%2Fmcp.credit%2Fmcp" target="_blank" rel="noopener">Add to Claude</a></div>
-      <ol>
-        <li>Press <b>Add to Claude</b>, check the URL, press <b>Continue</b> and <b>Add</b></li>
-        <li>Press <b>Connect</b> and sign in with X. One X account = one MCP account.</li>
-      </ol>
-      <div style="color:var(--dim);font-size:12px;margin-top:6px">Works on every Claude plan; the free plan allows one custom connector.</div>
-    </div>
-    <div>
-      <b>ChatGPT</b>
-      <ol><li>Settings → Apps &amp; Connectors → add a connector with the same URL, then sign in with X.</li></ol>
-    </div>
-    <div class="say">Then just talk to it: <b>"mint me an MCP"</b>, <b>"what's on the market under 10?"</b>, <b>"buy MCP #42"</b>, <b>"list MCP #42 for 9"</b>, <b>"top up my balance"</b></div>
-  </div>
-</dialog>
 
 <footer><div class="wrap">MCP · the first memecoin inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="#/explorer">Explorer</a> · <a href="#/launch">Launch a collection</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
 
@@ -339,12 +322,12 @@ async function renderMarket() {
     <section class="hero">
       <div>
         <h1 class="px">The first memecoin<br><span>inside your AI.</span></h1>
-        <p>Browse here. Mint, buy and sell only by talking to Claude or ChatGPT. Your balance and NFTs live in your MCP account. 1 $MCP = $1: top it up with USDC or USDT on Solana.</p>
+        <p>Browse here. Mint, buy and sell only by talking to Claude, ChatGPT or Grok. Your balance and NFTs live in your MCP account. 1 $MCP = $1: top it up with USDC or USDT on Solana.</p>
         <div class="cta">
           <a class="btn red" data-add-claude href="${addToClaude(stats?.mcp_url || location.origin + '/mcp')}" target="_blank" rel="noopener">Add to Claude</a>
           <a class="btn ghost" href="${claudeLink('Mint me an MCP NFT')}" target="_blank" rel="noopener">Mint in Claude</a>
           <a class="btn ghost" href="#/c/mcp">The collection</a>
-          <button class="btn ghost" data-connect>ChatGPT &amp; other AI</button>
+          <a class="btn ghost" href="#/connect">ChatGPT, Grok &amp; more</a>
         </div>
       </div>
       <div class="stats" id="stats"></div>
@@ -375,7 +358,6 @@ async function loadStats() {
   stats = await api('/stats');
   exNet = stats.withdrawals?.network || (stats.deposits?.network === 'solana' ? 'mainnet' : 'devnet');
   $('#testbar').hidden = !stats.test_mode;
-  $('#mcpUrl').textContent = stats.mcp_url;
   setAddLinks(stats.mcp_url);
   const el = $('#stats');
   if (!el) return;
@@ -834,26 +816,71 @@ async function renderAddress(addr) {
 }
 
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('[data-close],[data-connect],[data-copy]');
+  const t = e.target.closest('[data-copy]');
   if (!t) return;
-  if (t.dataset.copy !== undefined) {
-    await navigator.clipboard?.writeText(t.dataset.copy).catch(() => {});
-    t.textContent = 'Copied';
-  } else if (t.hasAttribute('data-connect')) {
-    $('#connectDlg').showModal();
-  } else {
-    t.closest('dialog').close();
-  }
+  await navigator.clipboard?.writeText(t.dataset.copy).catch(() => {});
+  t.textContent = 'Copied';
 });
-$('#connectBtn').onclick = () => $('#connectDlg').showModal();
-$('#copyUrl').onclick = async (e) => { await navigator.clipboard?.writeText($('#mcpUrl').textContent).catch(() => {}); e.target.textContent = 'Copied'; };
-document.querySelectorAll('dialog').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
+
+// #/connect: how to plug MCP into Claude, ChatGPT and Grok
+function renderConnect() {
+  const url = stats?.mcp_url || location.origin + '/mcp';
+  const list = (items) => `<ol>${items.map((x) => `<li>${x}</li>`).join('')}</ol>`;
+  const copy = `<button class="btn ghost" data-copy="${esc(url)}">Copy URL</button>`;
+  const ext = (href, text, cls = 'red') => `<a class="btn ${cls}" href="${esc(href)}" target="_blank" rel="noopener">${text}</a>`;
+  $('#app').innerHTML = `<div class="wrap connect">
+    <h1 class="px">Connect to your AI</h1>
+    <p class="lead">MCP lives inside your AI chat. Add it once, sign in with X, then just talk to it. Pick your AI:</p>
+    <div class="url"><code>${esc(url)}</code><button class="btn" data-copy="${esc(url)}">Copy</button></div>
+    <div class="ai-grid">
+      <section class="ai" aria-label="Claude">
+        <h2 class="px">Claude</h2>
+        <p class="note">Any plan, free too. Works on web, desktop and phone.</p>
+        ${list([
+          'Press <b>Add to Claude</b>. The name and URL are already filled in.',
+          'Press <b>Continue</b>, then <b>Add</b>.',
+          'Press <b>Connect</b>, sign in with X, press <b>Authorize app</b>.',
+          'In a chat: <b>+</b> → <b>Connectors</b> → <b>MCP</b> on.',
+        ])}
+        <p class="note">Free plan: one custom connector.</p>
+        <div class="acts">${ext(addToClaude(url), 'Add to Claude')}${ext(claudeLink('Mint me an MCP NFT'), 'Try it', 'ghost')}</div>
+      </section>
+      <section class="ai" aria-label="ChatGPT">
+        <h2 class="px">ChatGPT</h2>
+        <p class="note">Set it up on a computer at chatgpt.com.</p>
+        ${list([
+          'Press <b>Add to ChatGPT</b>: it opens <b>Plugins</b>.',
+          '<b>Add</b> (top right) → <b>Add custom MCP server</b>.',
+          'Name: <b>MCP</b>. Paste the URL. Authentication: <b>OAuth</b>.',
+          'Tick <b>I understand…</b> → <b>Create</b>, then sign in with X.',
+          'In a chat: <b>+</b> → pick <b>MCP</b>. Confirm actions when ChatGPT asks.',
+        ])}
+        <p class="note">No “Add custom MCP server”? Settings → Security and login → Developer mode on.</p>
+        <div class="acts">${ext('https://chatgpt.com/plugins', 'Add to ChatGPT')}${copy}</div>
+      </section>
+      <section class="ai" aria-label="Grok">
+        <h2 class="px">Grok</h2>
+        <p class="note">Set it up on the web at grok.com.</p>
+        ${list([
+          'Press <b>Add to Grok</b>: it opens <b>Connectors</b>.',
+          '<b>New connector</b> → <b>Custom</b>.',
+          'Paste the URL and save.',
+          'Sign in with X when it asks.',
+          'In a chat: turn the <b>MCP</b> connector on.',
+        ])}
+        <div class="acts">${ext('https://grok.com/connectors', 'Add to Grok')}${copy}</div>
+      </section>
+    </div>
+    <div class="say">Then just say: <b>“mint me an MCP”</b>, <b>“top up my balance”</b>, <b>“what's on the market under 10?”</b>, <b>“buy MCP #42”</b>, <b>“withdraw 20”</b></div>
+    <p class="note">One X account = one MCP account; X accounts younger than 30 days can't sign in. MCP never sees your X password. Any other app that supports remote MCP with sign-in works with the same URL.</p>
+  </div>`;
+}
 
 async function route() {
   const h = location.hash.replace(/^#/, '') || '/';
   const [pathPart, query] = h.split('?');
   let mm;
-  const section = /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer' : /^\/(collections|c\/|nft\/|launch|admin)/.test(pathPart) ? 'collections' : 'market';
+  const section = pathPart === '/connect' ? '' : /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer' : /^\/(collections|c\/|nft\/|launch|admin)/.test(pathPart) ? 'collections' : 'market';
   document.querySelectorAll('[data-nav]').forEach((a) => {
     if (a.dataset.nav === section) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -863,6 +890,7 @@ async function route() {
   if (pathPart === '/explorer') return renderExplorer();
   if ((mm = pathPart.match(/^\/tx\/(\d+)/))) return renderTx(mm[1]);
   if ((mm = pathPart.match(/^\/a\/(mcp_[1-9A-HJ-NP-Za-km-z]{12}|treasury|escrow)\b/))) return renderAddress(mm[1]);
+  if (pathPart === '/connect') return renderConnect();
   if (pathPart === '/launch') return window.MCP_LAUNCH.renderLaunch();
   if (pathPart === '/admin') return window.MCP_LAUNCH.renderAdmin();
   if (pathPart === '/collections') return renderCollections();
