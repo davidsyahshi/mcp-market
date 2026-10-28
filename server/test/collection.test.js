@@ -277,9 +277,11 @@ test('mint phase: MCP NFTs can be minted but not listed or bought until all 5,00
     const page = (await get('/api/collections/mcp')).body;
     assert.equal(page.trading_open, false);
     assert.equal((await get('/api/collections')).body.find((c) => c.slug === 'mcp').trading_open, false);
+    assert.equal((await get('/api/stats')).body.trading_open, false, 'the home page knows it is the mint phase');
     // the last NFT minted: trading opens by itself, no restart needed
     await db.query("update nfts set owner_id = $1, minted_by = $1, minted_at = now() where collection_id = (select id from collections where slug = 'mcp') and minted_at is null", [buyer.id]);
     assert.equal((await get('/api/collections/mcp')).body.trading_open, true);
+    assert.equal((await get('/api/stats')).body.trading_open, true);
     assert.equal((await call('sell', { nft_id: nft.id, price: 50 })).isError, undefined);
     assert.equal((await m.buy(db, buyer.id, nft.id, 50e6)).price, 50e6);
   } finally {
