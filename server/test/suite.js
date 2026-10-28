@@ -96,14 +96,20 @@ export function runSuite(setup) {
     assert.equal((await fetch(s.loginUrl, { headers: { cookie: s.cookie } })).status, 200);
   });
 
-  test('sign-in page warns when access goes somewhere other than Claude or ChatGPT', async () => {
+  test('sign-in page warns when access goes somewhere other than Claude, ChatGPT or Grok', async () => {
+    const warned = async (cb) => {
+      const s = await startLogin(cb);
+      return /not Claude, ChatGPT or Grok/.test(await fetch(s.loginUrl, { headers: { cookie: s.cookie } }).then((r) => r.text()));
+    };
     const s = await startLogin('https://evil.example/cb');
     const page = await fetch(s.loginUrl, { headers: { cookie: s.cookie } }).then((r) => r.text());
     assert.match(page, /evil\.example/);
-    assert.match(page, /not Claude or ChatGPT/);
-    const ok = await startLogin('https://claude.ai/api/mcp/auth_callback');
-    const page2 = await fetch(ok.loginUrl, { headers: { cookie: ok.cookie } }).then((r) => r.text());
-    assert.doesNotMatch(page2, /not Claude or ChatGPT/);
+    assert.match(page, /not Claude, ChatGPT or Grok/);
+    assert.equal(await warned('https://grok.com/connectors/oauth/callback'), false);
+    // the rule itself, without registering more clients (the SDK allows 20 registrations an hour)
+    const { knownApp } = await import('../src/auth.js');
+    for (const h of ['claude.ai', 'chatgpt.com', 'grok.com', 'api.x.ai', 'x.ai']) assert.equal(knownApp(h), true, h);
+    for (const h of ['evil.example', 'grok.com.evil.example', 'notgrok.com', 'x.ai.evil.example', 'fakeclaude.ai']) assert.equal(knownApp(h), false, h);
   });
 
   test('full market flow between two users', async () => {
