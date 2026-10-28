@@ -58,13 +58,18 @@ async function browser(handle) {
   const cookie = () => [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
   const raw = (path, opts = {}) => fetch(base + path, { redirect: 'manual', ...opts, headers: { cookie: cookie(), ...(opts.headers || {}) } }).then(keep);
   // /login/site starts a sign-in and sends the browser to the sign-in page
-  const start = await raw('/login/site?return=%2F%23%2Flaunch');
+  // only pages of this site: never another host
+  for (const bad of ['//evil.com', '/\\evil.com', 'https://evil.com', '/#//evil.com', '/#/\\evil.com']) {
+    assert.equal((await raw('/login/site?return=' + encodeURIComponent(bad))).status, 400, bad);
+  }
+  assert.equal((await raw('/login/site?return=' + encodeURIComponent('/#/launch'))).status, 302, 'old links with # still work');
+  const start = await raw('/login/site?return=%2Flaunch');
   assert.equal(start.status, 302);
   const loc = start.headers.get('location');
   const id = new URL(loc, base).searchParams.get('req');
   const done = await raw('/login/dev', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: `req=${id}&handle=${handle}` });
   assert.equal(done.status, 302);
-  assert.equal(done.headers.get('location'), '/#/launch', 'back to where the sign-in started');
+  assert.equal(done.headers.get('location'), '/launch', 'back to where the sign-in started');
   const call = async (method, path, body, headers = { 'X-MCP-Site': '1', origin: 'http://localhost' }) => {
     const r = await raw('/api' + path, { method, headers: { 'content-type': 'application/json', ...headers }, body: body == null ? undefined : JSON.stringify(body) });
     return { status: r.status, body: await r.json().catch(() => null) };

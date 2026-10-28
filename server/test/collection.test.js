@@ -306,6 +306,30 @@ test('a collection that trades after its sell-out opens with the real last mint'
   assert.equal((await m.buy(db, b.id, first.id, 3e6)).price, 3e6);
 });
 
+test('the website pages have plain addresses: /c/mcp, /nft/1, /connect are the site page; the API stays the API', async () => {
+  for (const pg of ['/c/mcp', '/nft/1', '/connect', '/explorer', '/collections', '/launch', '/admin', '/tx/1', '/a/treasury', '/u/someone', '/c/mcp/']) {
+    const r = await fetch(base + pg);
+    assert.equal(r.status, 200, pg);
+    assert.match(await r.text(), /<main id="app">/, pg);
+  }
+  assert.equal((await fetch(base + '/api/collections/mcp')).headers.get('content-type').includes('json'), true);
+  assert.equal((await fetch(base + '/c/mcp/extra')).status, 404);
+  assert.notEqual((await fetch(base + '/admin/deposit', { method: 'POST' })).status, 200, 'the manual credit endpoint is not the page');
+  // links in chat answers use the plain addresses too
+  const u = await user();
+  const call = await chat(u.id);
+  assert.match((await call('collections')).text, /http:\/\/localhost\/c\/mcp/);
+  assert.doesNotMatch((await call('collections')).text, /#\//);
+});
+
+// the Netlify rules send the same pages to index.html
+test('netlify.toml rewrites exactly the site pages to index.html, before the catch-all to the function', () => {
+  const toml = fs.readFileSync(path.join(ROOT, 'netlify.toml'), 'utf8');
+  const froms = [...toml.matchAll(/from = "([^"]+)"\s*\n\s*to = "\/index\.html"/g)].map((x) => x[1]);
+  assert.deepEqual(froms.sort(), ['/a/*', '/admin', '/c/*', '/collections', '/connect', '/explorer', '/launch', '/nft/*', '/tx/*', '/u/*'].sort());
+  assert.ok(toml.indexOf('to = "/index.html"') < toml.indexOf('to = "/.netlify/functions/api/:splat"'));
+});
+
 // a minimal ustar writer for the test above
 function tarOf(entries) {
   const blocks = [];
