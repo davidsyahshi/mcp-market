@@ -7,6 +7,7 @@ import * as m from './market.js';
 import { toMicro, amount as plain, units, MoneyError } from './money.js';
 import { withdrawUi, UI_MIME } from './ui.js';
 import { sniffImage } from './storage.js';
+import { COMMANDS, INSTRUCTIONS_COMMANDS, toolHint, helpText, promptText } from './commands.js';
 
 const INSTRUCTIONS = `MCP is an NFT market that lives inside AI chats. The user has a $MCP balance in this account
 (1 $MCP = $1), topped up with USDC or USDT on Solana: 1 USDC or 1 USDT = 1 $MCP. They can mint NFTs from the collections,
@@ -26,7 +27,8 @@ Rules for you, the assistant:
 - Every account has a public MCP address (mcp_...). Public pages and other users see that address, not the X handle,
   unless the user turned their handle on with public_profile. An MCP address is not a Solana wallet: never suggest
   sending tokens to it; deposits go only to the Solana address from the deposit tool.
-- Show NFT images when a tool returns them, and give the preview link so the user can see it on the site.`;
+- Show NFT images when a tool returns them, and give the preview link so the user can see it on the site.
+${INSTRUCTIONS_COMMANDS}`;
 
 const mcpIn = (what) => z.number().positive().describe(`${what} in $MCP (1 $MCP = $1), e.g. 12.5`);
 
@@ -61,7 +63,8 @@ export function buildMcpServer(db, userId, opts) {
   const traitLines = (n) => (n.attributes || []).map((a) => `${a.trait_type}: ${a.value}${a.percent != null ? ` (${a.percent}% have it)` : ''}`).join('\n');
 
   // turn rule violations into a normal answer the assistant can relay, instead of a protocol error
-  const tool = (name, config, fn) => server.registerTool(name, config, async (args) => {
+  // the description also names the tool's chat command (commands.js)
+  const tool = (name, config, fn) => server.registerTool(name, { ...config, description: config.description + toolHint(name) }, async (args) => {
     try {
       return await fn(args || {});
     } catch (e) {
@@ -86,6 +89,23 @@ export function buildMcpServer(db, userId, opts) {
     return u;
   };
   const addrLink = (addr) => `${publicUrl}/a/${addr}`;
+
+  tool('help', {
+    title: 'Commands',
+    description: 'The list of MCP chat commands (/deposit-mcp, /mint-mcp, /buynft-mcp and the rest). Call it when the user asks for help, ' +
+      'what they can do here, or types a command you don\'t know.',
+    annotations: read,
+  }, async () => ok(text(helpText(publicUrl))));
+
+  // apps that support MCP prompts show the commands in their menu; picking one puts the command in the chat
+  for (const c of COMMANDS) {
+    const argsSchema = Object.fromEntries((c.args || []).map((a) => {
+      const s = z.string().max(60).describe(a.key ? a.name : `${a.name}, e.g. ${a.example}`);
+      return [a.key || a.name, a.optional ? s.optional() : s];
+    }));
+    server.registerPrompt(c.name, { title: `/${c.name}`, description: c.does, ...(c.args ? { argsSchema } : {}) },
+      (values) => ({ messages: [{ role: 'user', content: { type: 'text', text: promptText(c, values) } }] }));
+  }
 
   tool('account', { title: 'My account', description: 'Who is signed in, their MCP address, $MCP balance, NFTs they own and recent balance changes.', annotations: read }, async () => {
     const u = await me();
