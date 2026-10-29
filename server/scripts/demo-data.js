@@ -9,7 +9,7 @@ const m = await import('../src/market.js');
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const db = await openDb();
 await m.seedCollection(db, path.join(ROOT, 'collection', 'collection.json'));
-const handles = ['artem', 'degen_kim', 'solmaxi', 'pixelpunk', 'gm_anon', 'wagmi_lu', 'ser_chad', 'nft_nina'];
+const handles = ['mint_maxi', 'degen_kim', 'solmaxi', 'pixelpunk', 'gm_anon', 'wagmi_lu', 'ser_chad', 'nft_nina'];
 const users = [];
 for (const h of handles) {
   const u = await m.upsertUser(db, { xId: `dev:${h}`, handle: h });
