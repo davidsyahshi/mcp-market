@@ -993,6 +993,7 @@ document.addEventListener('click', async (e) => {
 
 // chat commands, same list as server/src/commands.js (a test checks they match)
 const CHAT_COMMANDS = [
+  ['/mcpcredit', '', 'Start here: your balance, the mint and all commands'],
   ['/help-mcp', '', 'All commands'],
   ['/balance-mcp', '', 'Balance, MCP address, your NFTs and recent activity'],
   ['/deposit-mcp', '', 'Your Solana address for USDC/USDT top-ups; run it again after sending to check'],
@@ -1076,7 +1077,7 @@ function renderConnect() {
     </div>
     <div class="say">Then just say: <b>“mint me an MCP”</b>, <b>“top up my balance”</b>, <b>“what's on the market under 10?”</b>, <b>“buy MCP #42”</b>, <b>“withdraw 20”</b></div>
     <h2 class="px cmds-title">Commands</h2>
-    <p class="lead">Or type a command: your AI does exactly that, no guessing. Tap one to copy it.</p>
+    <p class="lead">Or type a command: your AI does exactly that, no guessing. Start with <b>/mcpcredit</b>. Tap one to copy it.</p>
     <div class="cmds">${CHAT_COMMANDS.map(([cmd, args, does]) => `<div><button type="button" data-cmd="${esc(cmd)} ">${esc(cmd + (args ? ' ' + args : ''))}</button><span>${esc(does)}</span></div>`).join('')}</div>
     <p class="note">${k('&lt;…&gt;')} you fill in, ${k('[…]')} you can skip. Buying always asks you to confirm the name and price first.</p>
     <p class="note">One X account = one MCP account; X accounts younger than 30 days can't sign in. MCP never sees your X password. Any other app that supports remote MCP with sign-in works with the same link.</p>
