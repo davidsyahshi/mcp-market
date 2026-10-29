@@ -121,7 +121,7 @@ export function runSuite(setup) {
     assert.equal(plain.length, 0, 'no plain-text tokens in the database');
 
     const tools = (await alice.listTools()).tools.map((t) => t.name).sort();
-    assert.deepEqual(tools, ['account', 'buy', 'cancel_listing', 'collections', 'deposit', 'faucet', 'help', 'market', 'mint', 'my_nfts', 'nft', 'public_profile', 'sell',
+    assert.deepEqual(tools, ['account', 'buy', 'cancel_listing', 'collections', 'deposit', 'faucet', 'help', 'market', 'mcpcredit', 'mint', 'my_nfts', 'nft', 'public_profile', 'sell',
       'withdraw_form', 'withdraw_form_state', 'withdraw_form_bind', 'withdraw_form_submit', 'my_withdrawals'].sort());
 
     // no money yet

@@ -14,6 +14,9 @@ const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.j
 let db, c;
 before(async () => {
   db = await openDb({ url: process.env.TEST_DATABASE_URL || '' });
+  const { seedCollection } = await import('../src/market.js');
+  const { findRoot } = await import('../src/paths.js');
+  await seedCollection(db, (await import('node:path')).join(findRoot(), 'collection', 'collection.json'));
   const [u] = await db.query("insert into users (x_id, handle) values ('dev:cmd', 'cmd') returning id");
   const server = buildMcpServer(db, u.id, { publicUrl: 'https://mcp.example', thumbsDir: '/nonexistent', deposits: { enabled: false }, ui: null });
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -26,8 +29,8 @@ after(async () => { await db?.close(); });
 test('commands: unique, end in -mcp, each one points at a real tool that names it', async () => {
   const names = COMMANDS.map((x) => x.name);
   assert.equal(new Set(names).size, names.length);
-  for (const n of names) assert.match(n, /^[a-z]+-mcp$/, n);
-  for (const n of ['deposit-mcp', 'withdraw-mcp', 'mint-mcp', 'buynft-mcp', 'sellnft-mcp', 'help-mcp']) assert.ok(names.includes(n), n);
+  for (const n of names) assert.match(n, /^([a-z]+-mcp|mcpcredit)$/, n);
+  for (const n of ['mcpcredit', 'deposit-mcp', 'withdraw-mcp', 'mint-mcp', 'buynft-mcp', 'sellnft-mcp', 'help-mcp']) assert.ok(names.includes(n), n);
   const tools = (await c.listTools()).tools;
   for (const x of COMMANDS) {
     const t = tools.find((y) => y.name === x.tool);
@@ -69,6 +72,21 @@ test('commands: offered as MCP prompts that put the command in the chat', async 
 
 test('commands: the /connect page shows the same list', () => {
   const site = fs.readFileSync(new URL('../../site/index.html', import.meta.url), 'utf8');
-  const listed = [...site.matchAll(/\['(\/[a-z]+-mcp)', '([^']*)', '([^']*)'\]/g)].map((x) => x.slice(1));
+  const listed = [...site.matchAll(/\['(\/(?:[a-z]+-mcp|mcpcredit))', '([^']*)', '([^']*)'\]/g)].map((x) => x.slice(1));
   assert.deepEqual(listed, COMMANDS.map((x) => [`/${x.name}`, usage(x).slice(x.name.length + 2), x.does]));
+});
+
+test('commands: /mcpcredit starts MCP: balance, the mint and the command list in one answer', async () => {
+  const r = await c.callTool({ name: 'mcpcredit', arguments: {} });
+  const t = r.content.map((x) => x.text).join('\n');
+  assert.match(t, /^MCP is on in this chat\. @cmd · mcp_/);
+  assert.match(t, /Balance: 0 \$MCP · NFTs: 0/);
+  assert.match(t, /Mint: 0 of 5,000 minted · 5 \$MCP each, up to 5 per account/);
+  assert.match(t, /To start, top up: \/deposit-mcp/);
+  for (const x of COMMANDS) assert.ok(t.includes(usage(x)), x.name);
+  const tools = (await c.listTools()).tools;
+  const start = tools.find((x) => x.name === 'mcpcredit');
+  assert.match(start.description, /\/mcpcredit/);
+  assert.equal(start.annotations.readOnlyHint, true);
+  assert.match(c.getInstructions(), /\/mcpcredit, the start command/);
 });
