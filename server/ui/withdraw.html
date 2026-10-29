@@ -315,7 +315,9 @@ function setState(s) {
   code.append(hl(s.address.slice(0, 4)), s.address.slice(4, -4), hl(s.address.slice(-4)));
   const last = s.recent?.[0];
   const lastText = last ? ` Last withdrawal: #${last.id}, ${fmt(last.amount)} USDC, ${{ review: 'waiting for a check', pending: 'queued', sending: 'on its way', sent: 'sent', rejected: 'rejected', refunded: 'refunded' }[last.status] || last.status}.` : '';
-  $('limits').textContent = `Minimum ${fmt(s.min)} $MCP. Sent automatically up to ${fmt(s.auto_max)} at once and ${fmt(s.user_daily)} a day; more waits for a manual check (usually within 24 hours).${lastText}`;
+  $('limits').textContent = s.auto_max == null
+    ? `Minimum ${fmt(s.min)} $MCP. Sent right away.${lastText}`
+    : `Minimum ${fmt(s.min)} $MCP. Sent automatically up to ${fmt(s.auto_max)} at once and ${fmt(s.user_daily)} a day; more waits for a manual check (usually within 24 hours).${lastText}`;
   if (s.opens_at && new Date(s.opens_at) > new Date()) {
     $('opens').textContent = `For safety, withdrawals to a newly bound address open at ${new Date(s.opens_at).toLocaleString()}.`;
     show('opens', true);
@@ -375,7 +377,7 @@ function renderResult() {
     sent: [`Sent ${amt}`, 'ok', `Arrived at ${to}. Fee ${fmt(w.fee)} $MCP.`],
     sending: [`${amt} on its way`, 'live', `Confirming on the network, usually under a minute. To ${to}.`],
     pending: [`${amt} queued`, 'live', `Goes out automatically within a few minutes. To ${to}.`],
-    review: [`${amt} waits for a check`, '', 'Above the automatic limit, so it is checked by hand, usually within 24 hours. The amount is reserved from your balance.'],
+    review: [`${amt} waits for a check`, '', 'It is checked by hand, usually within 24 hours. The amount is reserved from your balance.'],
     rejected: [`${amt} rejected`, '', 'The amount and fee are on their way back to your balance.'],
     refunded: [`${amt} refunded`, '', 'Rejected; the amount and fee are back on your balance.'],
   };
