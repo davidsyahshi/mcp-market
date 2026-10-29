@@ -262,6 +262,7 @@ npm test                  # end-to-end tests: real OAuth, real MCP client, two u
 | `MINT_PRICE_USD`, `MIN_DEPOSIT_USD`, `FAUCET_USD` | optional, in $MCP (= USD), defaults 5, 0.01, 20 |
 | `MCP_TRADING` | `after_sold_out` (default): MCP NFTs trade only once all of them are minted; `open`: right away |
 | `MIN_WITHDRAW_USD`, `WITHDRAW_FEE`, `WITHDRAW_AUTO_MAX`, `WITHDRAW_USER_DAILY`, `WITHDRAW_DAILY`, `WITHDRAW_HARD_DAILY` | optional, defaults 5, 0.5, 100, 300, 1000, 2000 |
+| `WITHDRAW_LIMITS` | `off`: no limits and no manual check, every withdrawal goes out right away; then only the hot wallet's balance and `WITHDRAW_HARD_DAILY` (if set) cap payouts |
 | `WITHDRAW_ADDRESS_DELAY_HOURS`, `WITHDRAWALS_PAUSED` | optional: hours before a new address can receive (24; 0 on the test server), `1` stops payouts |
 | `RESERVE_WALLETS` | optional: your cold wallets holding swept deposits (public addresses, comma-separated), so the explorer counts them as reserves |
 | `ANCHOR_EVERY_MINUTES`, `ANCHORS_OFF`, `RESERVES_EVERY_MINUTES` | optional: how often the chain's hash goes to Solana (60), `1` stops anchors, how often reserves are read (10) |

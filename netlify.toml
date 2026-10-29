@@ -23,6 +23,11 @@
 # The website's own pages (/c/mcp, /nft/42, /explorer, ...) are all index.html, which draws them in the browser.
 # Keep in step with SITE_PAGES in server/src/app.js. /admin/* (the manual credit endpoint) still goes to the function.
 [[redirects]]
+  from = "/market"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
   from = "/collections"
   to = "/index.html"
   status = 200
