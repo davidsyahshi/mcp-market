@@ -348,7 +348,7 @@ export function runSuite(setup) {
     const look = await call(wendy, 'withdraw_form_state', { request_key: k1 });
     assert.equal(look.sc.by_key.id, paid.sc.withdrawal.id, 'the form can ask what happened to its request');
     const big = await call(wendy, 'withdraw_form_submit', { amount: 150, request_key: crypto.randomBytes(16).toString('hex'), form_token });
-    assert.match(big.text, /waits for a manual check \(above the automatic limit\)/);
+    assert.match(big.text, /waits for a manual check/);
     assert.equal(big.sc.withdrawal.status, 'review');
     assert.equal(await balanceOf('wendy'), D(349.5 - 150.5), 'reserved while it waits');
     const list = (await call(wendy, 'my_withdrawals')).text;

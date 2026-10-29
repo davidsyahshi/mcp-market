@@ -643,3 +643,69 @@ test('transactions: signed by the hot wallet only, the exact amount to the bound
   assert.equal(t.instructions[4].data.toString(), `mcp:w:devnet:${r.id}`);
   assert.equal(chain.executed.at(-1).transfers[0].amount, 12_345_678n);
 });
+
+test('WITHDRAW_LIMITS=off: no limits and no check queue, everything goes out right away; a hard cap only if set', async () => {
+  const off = withdrawConfig({ WITHDRAW_LIMITS: 'off' });
+  assert.equal(off.limitsOff, true);
+  assert.deepEqual([off.autoMax, off.userDaily, off.daily, off.hardDaily], [null, null, null, null]);
+  assert.equal(withdrawConfig({ WITHDRAW_LIMITS: ' OFF ', WITHDRAW_HARD_DAILY: '10000' }).hardDaily, D(10000));
+  assert.equal(withdrawConfig({ WITHDRAW_LIMITS: 'on' }).autoMax, D(100), 'anything but "off" keeps the limits');
+  assert.equal(withdrawConfig({ WITHDRAW_LIMITS: 'off', WITHDRAW_AUTO_MAX: '50' }).autoMax, null, 'off wins over single limits');
+
+  const nolimit = { limitsOff: true, autoMax: null, userDaily: null, daily: null, hardDaily: null };
+  const { w, user, row, received, ledgerOk } = await setup({ hotUsdc: 12000, config: nolimit });
+  const a = await user('whale', 15000);
+  const b = await user('whale2', 3000);
+  // far above the old limits (100 at once, 300 a day per user, 1000 a day in all, 2000 hard)
+  const r1 = await w.request(a.id, D(5000));
+  const r2 = await w.request(a.id, D(4000));
+  const r3 = await w.request(b.id, D(2500));
+  for (const r of [r1, r2, r3]) assert.equal(r.status, 'pending', 'no manual check');
+  await w.tick();
+  for (const r of [r1, r2, r3]) assert.equal((await row(r.id)).status, 'sent');
+  assert.equal(received(a.address), D(9000));
+  assert.equal(received(b.address), D(2500));
+  await ledgerOk();
+  // the public settings say there is no limit
+  assert.equal(w.config.autoMax, null);
+  assert.equal(w.config.limitsOff, true);
+
+  // the hot wallet is still the real cap: more than it holds waits, it is never paid in part
+  const r4 = await w.request(a.id, D(5900));
+  const s4 = await w.send(r4.id);
+  assert.notEqual((await row(r4.id)).status, 'sent');
+  assert.ok(s4.waiting || (await row(r4.id)).status === 'pending');
+  assert.equal(received(a.address), D(9000));
+});
+
+test('WITHDRAW_LIMITS=off with WITHDRAW_HARD_DAILY: the fuse still holds', async () => {
+  const { w, user, row, received } = await setup({ hotUsdc: 5000, config: { limitsOff: true, autoMax: null, userDaily: null, daily: null, hardDaily: D(1000) } });
+  const u = await user('fuse', 3000);
+  const big = await w.request(u.id, D(900));
+  assert.equal(big.status, 'pending');
+  await w.tick();
+  assert.equal((await row(big.id)).status, 'sent');
+  const more = await w.request(u.id, D(200));
+  assert.equal(more.status, 'pending', 'no check queue');
+  const r = await w.send(more.id);
+  assert.equal(r.waiting, true);
+  assert.match((await row(more.id)).error, /daily payout cap/);
+  assert.equal(received(u.address), D(900));
+});
+
+test('WITHDRAW_LIMITS=off: one withdrawal bigger than the hot wallet does not hold up the smaller ones behind it', async () => {
+  const { w, user, row, received } = await setup({ hotUsdc: 300, config: { limitsOff: true, autoMax: null, userDaily: null, daily: null, hardDaily: null } });
+  const whale = await user('big', 5000);
+  const small = await user('small', 100);
+  const big = await w.request(whale.id, D(1000));
+  const s1 = await w.request(small.id, D(20));
+  const s2 = await w.request(small.id, D(30));
+  const r = await w.tick();
+  assert.equal((await row(big.id)).status, 'pending', 'waits for a top-up');
+  assert.match((await row(big.id)).error, /topped up/);
+  assert.equal((await row(s1.id)).status, 'sent');
+  assert.equal((await row(s2.id)).status, 'sent');
+  assert.equal(received(small.address), D(50));
+  assert.equal(received(whale.address), 0);
+  assert.equal(r.waiting, 1);
+});
