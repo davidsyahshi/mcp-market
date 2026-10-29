@@ -209,6 +209,55 @@ export async function mint(db, userId, { collection = OWN_COLLECTION } = {}) {
   });
 }
 
+// The owner's free mint of the market's own collection (the team's share, giveaways): random unminted NFTs to one
+// account, no payment and outside the per-account mint limit (minted_by stays empty). Each NFT gets a zero-amount
+// "team_mint" ledger row, so the explorer and the NFT's history show it as a team mint like any other transaction.
+// At most TEAM_MINT_CHUNK per database transaction (one explorer transaction each).
+export const TEAM_MINT_CHUNK = 50;
+export const TEAM_MINT_MAX = 500; // per call; the admin page repeats calls for more
+export async function teamMint(db, userId, count) {
+  if (!Number.isInteger(count) || count < 1 || count > TEAM_MINT_MAX) fail(`Mint 1 to ${TEAM_MINT_MAX} at a time.`);
+  const minted = [];
+  let left = null;
+  let stopped = null;
+  while (minted.length < count) {
+    let r;
+    try {
+      r = await db.tx(async (t) => {
+        // the same lock order as a paid mint: the collection (shared), then the account
+        const [c] = await t.query('select * from collections where slug = $1 for share', [OWN_COLLECTION]);
+        if (!c) fail(`There is no collection "${OWN_COLLECTION}".`);
+        if (c.status !== 'live') fail(`${c.name} is not open for minting.`);
+        const [u] = await t.query('select id from users where id = $1 for update', [userId]);
+        if (!u) fail('There is no such account.');
+        const n = Math.min(TEAM_MINT_CHUNK, count - minted.length);
+        // pick unminted NFTs once (locked, skipping any a paid mint is taking right now), and re-check on update
+        const rows = await t.query(`with pick as materialized (
+            select id from nfts where collection_id = $2 and minted_at is null order by random() limit $3 for update skip locked)
+          update nfts set owner_id = $1, minted_at = now() where id in (select id from pick) and minted_at is null
+          returning id, name, rarity`, [userId, c.id, n]);
+        if (rows.length) {
+          await t.query(`insert into ledger (user_id, delta, kind, ref) select $1, 0, 'team_mint', x::text from unnest($2::int[]) as x order by x`,
+            [userId, rows.map((x) => Number(x.id))]);
+        }
+        const [{ n: rest }] = await t.query('select count(*)::int as n from nfts where collection_id = $1 and minted_at is null', [c.id]);
+        return { rows, rest };
+      });
+    } catch (e) {
+      // the chunks before this one are minted and stay minted: report them with the reason it stopped
+      if (!minted.length) throw e;
+      stopped = e instanceof MoneyError ? e.message : 'Stopped by an error; try again for the rest.';
+      if (!(e instanceof MoneyError)) console.error('team mint', e.message);
+      break;
+    }
+    minted.push(...r.rows);
+    left = r.rest;
+    if (!r.rows.length) break; // sold out, or the last free ones are being minted right now
+  }
+  if (!minted.length) fail(left ? 'The last free NFTs are being minted right now; try again in a moment.' : `${OWN_COLLECTION.toUpperCase()} is sold out: every NFT is minted.`);
+  return { minted: minted.map((x) => ({ id: Number(x.id), name: x.name, rarity: x.rarity })), left, ...(stopped ? { stopped } : {}) };
+}
+
 // Trading locks in one order everywhere: the collection (shared), then the NFT, then the accounts by id. A freeze
 // locks the collection first too, so a listing or a sale either finishes before it or sees it.
 async function lockCollectionOf(t, nftId) {
@@ -321,13 +370,14 @@ export async function getNft(db, id, { anyStatus = false } = {}) {
 // the NFT's own transactions from the ledger (mint and sales), newest first; tx = the explorer's transaction number
 export async function activity(db, id) {
   const rows = await db.query(`select l.id, l.xact, l.kind, l.delta, l.created_at, ${PUBLIC_NAME('u', 'user')}
-    from ledger l join users u on u.id = l.user_id where l.ref = $1 and l.kind in ('mint', 'buy', 'sale') order by l.id`, [String(id)]);
+    from ledger l join users u on u.id = l.user_id where l.ref = $1 and l.kind in ('mint', 'team_mint', 'buy', 'sale') order by l.id`, [String(id)]);
   const byX = new Map();
   for (const r of rows) {
     const key = String(r.xact);
     if (!byX.has(key)) byX.set(key, { tx: Number(r.id), at: r.created_at });
     const a = byX.get(key);
     if (r.kind === 'mint') Object.assign(a, { type: 'mint', to_addr: r.user_addr, to_name: r.user_name, price: -Number(r.delta) });
+    if (r.kind === 'team_mint') Object.assign(a, { type: 'mint', team: true, to_addr: r.user_addr, to_name: r.user_name, price: 0 });
     if (r.kind === 'buy') Object.assign(a, { type: 'sale', to_addr: r.user_addr, to_name: r.user_name, price: -Number(r.delta) });
     if (r.kind === 'sale') Object.assign(a, { from_addr: r.user_addr, from_name: r.user_name });
   }
@@ -426,6 +476,21 @@ export async function collections(db, { statuses = ['live', 'paused'] } = {}) {
       (select count(*)::int from nfts where collection_id = c.id and price is not null) as listed,
       (select coalesce(sum(s.price), 0) from sales s join nfts n on n.id = s.nft_id where n.collection_id = c.id) as volume
     from collections c left join users cu on cu.id = c.creator_id where c.status = any($1) order by c.creator_id nulls first, c.id`, [statuses]);
+}
+
+// The mint page: a collection's minted NFTs, newest mint first. cursor "<microseconds>:<id>" is exact (a team mint
+// gives many NFTs the same time), so paging never skips or repeats one.
+export async function mintFeed(db, { collection = OWN_COLLECTION, cursor = null, limit = 48 } = {}) {
+  const n = Math.min(Math.max(Number(limit) || 48, 1), 120);
+  const at = `(extract(epoch from n.minted_at) * 1000000)::bigint`;
+  const p = [String(collection).toLowerCase(), n];
+  const cur = /^(\d{1,17}):(\d{1,9})$/.exec(String(cursor || ''));
+  if (cur) p.push(cur[1], Number(cur[2]));
+  const rows = await db.query(`select n.id, n.name, n.rarity, n.pixel, n.minted_at, ${at}::text as us from nfts n
+      join collections c on c.id = n.collection_id
+    where c.slug = $1 and n.minted_at is not null ${cur ? `and (${at}, n.id) < ($3::bigint, $4::int)` : ''}
+    order by n.minted_at desc, n.id desc limit $2`, p);
+  return rows.map((r) => ({ id: Number(r.id), name: r.name, rarity: r.rarity, pixel: r.pixel, at: r.minted_at, cursor: `${r.us}:${r.id}` }));
 }
 
 export async function recentLedger(db, userId, limit = 8) {

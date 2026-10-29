@@ -111,7 +111,7 @@ export function buildMcpServer(db, userId, opts) {
     const u = await me();
     const mine = await m.browse(db, { ownerId: userId });
     const ledger = await m.recentLedger(db, userId);
-    const lines = ledger.map((l) => `${l.delta > 0 ? '+' : ''}${m.fmt(l.delta)} ${l.kind}${refText(l)}`);
+    const lines = ledger.map((l) => (l.kind === 'team_mint' ? `team mint${refText(l)} (free)` : `${l.delta > 0 ? '+' : ''}${m.fmt(l.delta)} ${l.kind}${refText(l)}`));
     const depositAddress = deposits?.enabled ? await deposits.currentAddress(userId) : null;
     return ok(text(`@${u.handle}\nMCP address: ${u.public_id} (public pages show this${u.show_handle ? ' together with @' + u.handle : '; the X handle is hidden'})\n` +
       `Balance: ${m.fmt(u.balance)}\nNFTs: ${mine.length}${mine.length ? ' (' + mine.map((n) => n.name).join(', ') + ')' : ''}\n` +
@@ -239,7 +239,7 @@ export function buildMcpServer(db, userId, opts) {
     const s = await m.stats(db, { collection: collection || m.OWN_COLLECTION });
     if (!s) return ok(text(`There is no collection "${collection}". Ask for the list of collections.`));
     const head = `${collection || m.OWN_COLLECTION}: floor ${s.floor != null ? m.fmt(s.floor) : '-'} · ${s.listed} listed · ${s.minted}/${s.supply} minted · mint price ${m.fmt(s.mint_price)}`;
-    return ok(text(rows.length ? `${head}\n\n${rows.map(describe).join('\n')}\n\nFull market: ${publicUrl}` : `${head}\n\nNothing for sale matches right now.`));
+    return ok(text(rows.length ? `${head}\n\n${rows.map(describe).join('\n')}\n\nFull market: ${publicUrl}/market` : `${head}\n\nNothing for sale matches right now.`));
   });
 
   tool('nft', {
@@ -351,8 +351,9 @@ export function buildMcpServer(db, userId, opts) {
       opens_at: opensAt && opensAt > new Date() ? opensAt.toISOString() : null,
       fee: wc ? units(wc.fee) : null,
       min: wc ? units(wc.min) : null,
-      auto_max: wc ? units(wc.autoMax) : null,
-      user_daily: wc ? units(wc.userDaily) : null,
+      // null: no limit, every withdrawal goes out right away (WITHDRAW_LIMITS=off)
+      auto_max: wc?.autoMax != null ? units(wc.autoMax) : null,
+      user_daily: wc?.userDaily != null ? units(wc.userDaily) : null,
       recent,
       prefill: { amount: prefill.amount ?? null },
       issued_at: Date.now(),
@@ -463,7 +464,7 @@ export function buildMcpServer(db, userId, opts) {
         sent: `Sent: ${plain(w.amount)} USDC to ${w.address} on ${net}. Transaction: ${w.tx && withdrawals.explorer(w.tx)}`,
         sending: `${plain(w.amount)} USDC is on its way to ${w.address} on ${net}, confirming now. Transaction: ${w.tx && withdrawals.explorer(w.tx)}`,
         pending: `Withdrawal #${w.id}: ${plain(w.amount)} USDC to ${w.address} is queued and goes out within a few minutes.`,
-        review: `Withdrawal #${w.id}: ${plain(w.amount)} USDC to ${w.address} waits for a manual check (above the automatic limit).`,
+        review: `Withdrawal #${w.id}: ${plain(w.amount)} USDC to ${w.address} waits for a manual check, usually within 24 hours.`,
       }[w.status] || `Withdrawal #${w.id}: ${w.status}.`;
       return {
         content: [text(`${head}\nFee: ${m.fmt(w.fee)}.${state ? ` Balance: ${m.fmt(u2m(state.balance))}.` : ''}`)],
@@ -474,7 +475,7 @@ export function buildMcpServer(db, userId, opts) {
 
   const wLine = (w) => {
     const state = {
-      review: 'waiting for a manual check (above the automatic limit), usually within 24 hours',
+      review: 'waiting for a manual check, usually within 24 hours',
       pending: 'queued, goes out automatically within a few minutes',
       sending: 'sent to the network, confirming',
       sent: 'sent',
@@ -492,7 +493,8 @@ export function buildMcpServer(db, userId, opts) {
   }, async () => {
     const list = withdrawals ? await withdrawals.list(userId) : [];
     const u = await m.getUser(db, userId);
-    const limits = wc ? `\nMinimum ${m.fmt(wc.min)}, fee ${m.fmt(wc.fee)}. Automatic up to ${m.fmt(wc.autoMax)} at once and ${m.fmt(wc.userDaily)} a day; more waits for a manual check.` : '';
+    const limits = !wc ? '' : wc.autoMax == null ? `\nMinimum ${m.fmt(wc.min)}, fee ${m.fmt(wc.fee)}. Withdrawals go out right away${wc.hardDaily != null ? '' : ', no daily limit'}.`
+      : `\nMinimum ${m.fmt(wc.min)}, fee ${m.fmt(wc.fee)}. Automatic up to ${m.fmt(wc.autoMax)} at once and ${m.fmt(wc.userDaily)} a day; more waits for a manual check.`;
     return ok(text(`Withdrawal address: ${u.withdraw_address || 'not set'}${limits}\n\n${list.map(wLine).join('\n') || 'No withdrawals yet.'}`));
   });
 

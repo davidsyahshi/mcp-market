@@ -27,7 +27,7 @@ const sameSecret = (given, key) => {
 };
 
 // the website's own pages: index.html draws them (site/index.html, route()); keep in step with netlify.toml
-export const SITE_PAGES = /^\/(collections|connect|explorer|launch|admin|(c|nft|tx|a|u)\/[A-Za-z0-9_-]{1,64})\/?$/;
+export const SITE_PAGES = /^\/(market|collections|connect|explorer|launch|admin|(c|nft|tx|a|u)\/[A-Za-z0-9_-]{1,64})\/?$/;
 
 export async function createApp(opts) {
   const { db } = opts;
@@ -152,6 +152,29 @@ export async function createApp(opts) {
       withdrawals: withdrawals.enabled ? { network: withdrawals.cluster, form: formInfo() } : null,
     });
   });
+  // The mint page (the site's home): progress and the newest mints, polled every few seconds by every open page.
+  // One URL for everyone, cached a couple of seconds by the CDN, so the function runs about once per 2 s however
+  // many people watch. The browser itself does not cache it.
+  const cdn = (res, seconds) => res.set({
+    'Cache-Control': 'public, max-age=0, must-revalidate',
+    'Netlify-CDN-Cache-Control': `public, durable, s-maxage=${seconds}, stale-while-revalidate=${seconds * 5}`,
+  });
+  const feedItem = (n) => ({ ...n, image: `/img/${n.id}.png`, thumb: `/thumb/${n.id}.png` });
+  api.get('/mint/live', async (req, res) => {
+    const c = (await m.collections(db)).find((x) => x.slug === m.OWN_COLLECTION);
+    if (!c) return res.status(404).json({ error: 'not found' });
+    const recent = await m.mintFeed(db, { collection: c.slug, limit: 60 });
+    cdn(res, 2).json({
+      collection: c.slug, name: c.name, supply: c.supply, minted: c.minted, left: c.supply - c.minted,
+      mint_price: num(c.mint_price), mint_limit: c.mint_limit, status: c.status, trading_open: colView(c).trading_open,
+      recent: recent.map(feedItem),
+    });
+  });
+  // older mints, page by page, for scrolling down the mint page
+  api.get('/mint/feed', async (req, res) => {
+    const items = await m.mintFeed(db, { collection: m.OWN_COLLECTION, cursor: str(req.query.cursor), limit: intOr(req.query.limit, 48) });
+    cdn(res, 5).json(items.map(feedItem));
+  });
   api.get('/collections', async (req, res) => res.json((await m.collections(db)).map(colView)));
   api.get('/collections/:slug', async (req, res) => {
     const c = await visible(req, String(req.params.slug).toLowerCase());
@@ -250,6 +273,21 @@ export async function createApp(opts) {
   admin.post('/collections/:id/resume', wrap(async (req) => draftView(await lp.setPaused(db, idOf(req), false))));
   admin.post('/collections/:id/release', wrap(async (req) => lp.release(db, idOf(req))));
   admin.post('/collections/:id/freeze', wrap(async (req) => lp.freeze(db, idOf(req), req.body?.note)));
+  // free MCP NFTs for the team or a giveaway: to the owner's own account, or to the MCP address given
+  admin.post('/team-mint', wrap(async (req) => {
+    const count = Number(req.body?.count);
+    const to = String(req.body?.to || '').trim();
+    let userId = req.user.id;
+    if (to) {
+      if (!m.isPublicId(to)) throw new m.MarketError('That is not an MCP address (mcp_…).');
+      const [u] = await db.query('select id from users where public_id = $1', [to]);
+      if (!u) throw new m.MarketError(`No account has the address ${to}.`);
+      userId = u.id;
+    }
+    const r = await m.teamMint(db, userId, count);
+    const [u] = await db.query('select public_id from users where id = $1', [userId]);
+    return { ...r, to: u.public_id };
+  }));
   // database backups: the list, one more now, and a download (the file holds every account: owner only)
   admin.get('/backups', wrap(async () => ({
     last: await lastBackup(db),

@@ -56,7 +56,7 @@ export function explorerConfig(env = process.env) {
   };
 }
 
-const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', buy: 'buy', withdraw: 'withdrawal', withdraw_refund: 'refund', payout: 'payout', mint_refund: 'refund' };
+const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', team_mint: 'team mint', buy: 'buy', withdraw: 'withdrawal', withdraw_refund: 'refund', payout: 'payout', mint_refund: 'refund' };
 const ESCROW_SQL = `(${ESCROW_KINDS.map((k) => `'${k}'`).join(', ')})`;
 
 export function createExplorer(db, opts = {}) {
@@ -256,7 +256,7 @@ export function createExplorer(db, opts = {}) {
   // ---------- read side (the public API) ----------
 
   const typeOf = (kinds) => {
-    for (const k of ['deposit', 'withdraw', 'withdraw_refund', 'mint_refund', 'payout', 'buy', 'mint', 'faucet']) if (kinds.includes(k)) return KINDS[k];
+    for (const k of ['deposit', 'withdraw', 'withdraw_refund', 'mint_refund', 'payout', 'buy', 'mint', 'team_mint', 'faucet']) if (kinds.includes(k)) return KINDS[k];
     return kinds[0] || 'other';
   };
 
@@ -270,7 +270,7 @@ export function createExplorer(db, opts = {}) {
     const ws = wIds.length ? await db.query('select id, status, tx from withdrawals where id = any($1)', [wIds]) : [];
     const wById = new Map(ws.map((w) => [Number(w.id), w]));
     // NFT rows (mints, buys) carry the NFT's number: its name, picture and collection for the page
-    const nIds = [...new Set(rows.filter((r) => ['mint', 'buy', 'mint_refund'].includes(r.kind) && /^\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref)))];
+    const nIds = [...new Set(rows.filter((r) => ['mint', 'team_mint', 'buy', 'mint_refund'].includes(r.kind) && /^\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref)))];
     // payouts carry "c<collection id>"
     const cIds = [...new Set(rows.filter((r) => /^c\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref.slice(1))))];
     const cs = cIds.length ? await db.query('select id, slug, name from collections where id = any($1)', [cIds]) : [];
@@ -305,6 +305,13 @@ export function createExplorer(db, opts = {}) {
         // a freeze: every refunded mint of the collection in one transaction
         t.refunds = g.filter((r) => r.kind === 'mint_refund').length;
         t.refunded = g.filter((r) => r.kind === 'mint_refund').reduce((s, r) => s + Number(r.delta), 0) / 1e6;
+      } else if (type === KINDS.team_mint) {
+        // the owner's free mint: up to a chunk of NFTs to one account, all in one transaction
+        const team = g.filter((r) => r.kind === 'team_mint');
+        t.team = { count: team.length, account: team[0].public_id || null, name: team[0].name || null };
+        const n = nById.get(Number(team[0].ref));
+        if (n) t.nft = { id: Number(team[0].ref), name: n.name, rarity: n.rarity, collection: n.slug, collection_name: n.collection_name,
+          image: `/img/${Number(team[0].ref)}.png`, thumb: `/thumb/${Number(team[0].ref)}.png`, pixel: n.pixel };
       } else if (/^\d+$/.test(ref) && ['mint', 'buy', 'refund'].includes(type)) {
         const n = nById.get(Number(ref));
         t.nft = n ? { id: Number(ref), name: n.name, rarity: n.rarity, collection: n.slug, collection_name: n.collection_name,
@@ -318,7 +325,8 @@ export function createExplorer(db, opts = {}) {
     const n = Math.min(Math.max(Number(limit) || 30, 1), 100);
     // addr: only transactions touching that MCP address ("treasury": the market's own rows)
     // The newest rows by id (index), then their whole transactions. A transaction's rows have neighbouring ids,
-    // so a window of 4 rows per transaction is plenty; a page may come out a little short, never wrong.
+    // so a window of 4 rows per transaction is usually plenty. A big transaction (a team mint has 50 rows) can fill
+    // the window: then it is widened until the page is full or the window reaches the end of the ledger.
     let userId = null;
     if (addr && addr !== 'treasury' && addr !== 'escrow') {
       const [u] = await db.query('select id from users where public_id = $1', [addr]);
@@ -326,11 +334,19 @@ export function createExplorer(db, opts = {}) {
       userId = u.id;
     }
     const filter = addr === 'treasury' ? `and user_id is null and kind not in ${ESCROW_SQL}` : addr === 'escrow' ? `and user_id is null and kind in ${ESCROW_SQL}`
-      : userId != null ? 'and user_id = $3' : '';
-    const groups = await db.query(`select xact, min(id) as first from ledger where xact in (
-        select xact from ledger where ($1::bigint is null or id < $1) ${filter} order by id desc limit $2 * 4)
-      group by xact having ($1::bigint is null or min(id) < $1) order by first desc limit $2`,
-    userId != null ? [before ?? null, n, userId] : [before ?? null, n]);
+      : userId != null ? 'and user_id = $4' : '';
+    const params = (win) => (userId != null ? [before ?? null, n, win, userId] : [before ?? null, n, win]);
+    let groups = [];
+    for (let win = n * 4; ; win *= 8) {
+      groups = await db.query(`select xact, min(id) as first from ledger where xact in (
+          select xact from ledger where ($1::bigint is null or id < $1) ${filter} order by id desc limit $3)
+        group by xact having ($1::bigint is null or min(id) < $1) order by first desc limit $2`, params(win));
+      if (groups.length >= n || win >= 50_000) break;
+      // same parameters as above ($2 unused here, typed so Postgres accepts it)
+      const [{ c }] = await db.query(`select count(*)::int as c from (select 1 from ledger where ($1::bigint is null or id < $1) ${filter}
+        and $2::int is not null order by id desc limit $3) w`, params(win));
+      if (c < win) break; // the window already holds every older row
+    }
     const rows = groups.length ? await db.query(`${ROW} where l.xact = any($1) order by l.id`, [groups.map((g) => g.xact)]) : [];
     return decorate(rows);
   }

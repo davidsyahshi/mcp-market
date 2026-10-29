@@ -28,7 +28,8 @@
 // Rows and address bindings are HMAC-signed (key derived from DEPOSIT_POOL_KEY, or WITHDRAW_MAC_KEY), so a
 // row written or changed straight in the database is not paid, and rotating the hot wallet breaks nothing.
 // Someone with write access to the database can still inflate a balance and withdraw it through an account
-// of their own: that loss is capped by the hard daily payout cap and the hot wallet float.
+// of their own: that loss is capped by the hot wallet float and the hard daily payout cap (with
+// WITHDRAW_LIMITS=off there is one only if WITHDRAW_HARD_DAILY is set).
 import crypto from 'node:crypto';
 import * as sol from './solana.js';
 import { keypairFromSecret, signTransaction, ix } from './tx.js';
@@ -45,6 +46,10 @@ const LOCK = 727274002;
 export function withdrawConfig(env = process.env) {
   const testMode = env.TEST_MODE === '1';
   const cluster = String(env.SOLANA_CLUSTER || (testMode ? 'devnet' : 'mainnet')).toLowerCase();
+  // WITHDRAW_LIMITS=off: no per-withdrawal or daily limits and no manual check queue: every withdrawal goes out
+  // right away (null = no limit). What the hot wallet holds is then the only cap, plus WITHDRAW_HARD_DAILY if set.
+  const off = String(env.WITHDRAW_LIMITS || '').trim().toLowerCase() === 'off';
+  const limit = (v, fallback) => (off ? null : toMicro(v || fallback));
   return {
     testMode,
     cluster,
@@ -53,11 +58,13 @@ export function withdrawConfig(env = process.env) {
     rpcUrl: env.SOLANA_RPC_URL || (env.HELIUS_API_KEY ? sol.heliusRpcUrl(cluster, env.HELIUS_API_KEY) : ''),
     fee: toMicro(env.WITHDRAW_FEE || '0.5'),
     min: toMicro(env.MIN_WITHDRAW_USD || '5'),
-    autoMax: toMicro(env.WITHDRAW_AUTO_MAX || '100'),
-    userDaily: toMicro(env.WITHDRAW_USER_DAILY || '300'),
-    daily: toMicro(env.WITHDRAW_DAILY || '1000'),
-    // nothing pays out more than this per 24 hours, approved or not (default: twice the automatic daily total)
-    hardDaily: env.WITHDRAW_HARD_DAILY ? toMicro(env.WITHDRAW_HARD_DAILY) : 2 * toMicro(env.WITHDRAW_DAILY || '1000'),
+    limitsOff: off,
+    autoMax: limit(env.WITHDRAW_AUTO_MAX, '100'),
+    userDaily: limit(env.WITHDRAW_USER_DAILY, '300'),
+    daily: limit(env.WITHDRAW_DAILY, '1000'),
+    // nothing pays out more than this per 24 hours, approved or not (default: twice the automatic daily total;
+    // with the limits off, none unless WITHDRAW_HARD_DAILY is set)
+    hardDaily: env.WITHDRAW_HARD_DAILY ? toMicro(env.WITHDRAW_HARD_DAILY) : off ? null : 2 * toMicro(env.WITHDRAW_DAILY || '1000'),
     macKey: String(env.WITHDRAW_MAC_KEY || env.DEPOSIT_POOL_KEY || '').trim().toLowerCase(),
     addressDelayHours: Number(env.WITHDRAW_ADDRESS_DELAY_HOURS ?? (testMode ? 0 : 24)),
     paused: env.WITHDRAWALS_PAUSED === '1',
@@ -198,7 +205,9 @@ export function createWithdrawals(db, opts = {}) {
       const sums = async (oneUser) => Number((await t.query(`select coalesce(sum(amount), 0)::bigint as s from withdrawals
         where network = $1 and status in ('pending', 'sending', 'sent') and created_at > now() - interval '1 day' ${oneUser ? 'and user_id = $2' : ''}`,
       oneUser ? [network, userId] : [network]))[0].s);
-      const auto = !hold && amount <= cfg.autoMax && (await sums(true)) + amount <= cfg.userDaily && (await sums(false)) + amount <= cfg.daily;
+      // null = no limit (WITHDRAW_LIMITS=off); a withdrawal on hold always waits for the owner
+      const auto = !hold && (cfg.autoMax == null || amount <= cfg.autoMax) &&
+        (cfg.userDaily == null || (await sums(true)) + amount <= cfg.userDaily) && (cfg.daily == null || (await sums(false)) + amount <= cfg.daily);
       const [row] = await t.query(`insert into withdrawals (user_id, amount, fee, address, status, network, error, client_key, updated_at)
         values ($1, $2, $3, $4, $5, $6, $7, $8, now()) returning *`, [userId, amount, cfg.fee, u.withdraw_address, auto ? 'pending' : 'review', network, hold, clientKey]);
       row.mac = macOf(row);
@@ -332,19 +341,19 @@ export function createWithdrawals(db, opts = {}) {
     if (state.live) return move(w.id, 'pending', { status: 'sending' }, state.count); // an earlier transaction may still land
     // gives up after MAX_ATTEMPTS transactions; the owner can approve again with attempts = 0
     if (Number(w.attempts) >= MAX_ATTEMPTS) return move(w.id, 'pending', { status: 'review', error: `not paid after ${w.attempts} attempts: ${w.error || 'see logs'}` });
-    // a hard cap on everything paid out in 24 hours, approved by the owner or not
-    const [{ s: paid24 }] = await db.query(`select coalesce(sum(w.amount), 0)::bigint as s from withdrawals w where w.network = $1 and w.id <> $2
+    // a hard cap on everything paid out in 24 hours, approved by the owner or not (none if hardDaily is null)
+    const [{ s: paid24 }] = cfg.hardDaily == null ? [{ s: 0 }] : await db.query(`select coalesce(sum(w.amount), 0)::bigint as s from withdrawals w where w.network = $1 and w.id <> $2
       and exists (select 1 from withdrawal_attempts a where a.withdrawal_id = w.id and a.created_at > now() - interval '1 day')`, [network, w.id]);
-    if (BigInt(paid24) + BigInt(w.amount) > BigInt(cfg.hardDaily)) {
+    if (cfg.hardDaily != null && BigInt(paid24) + BigInt(w.amount) > BigInt(cfg.hardDaily)) {
       log(`ALERT: the 24-hour payout cap of ${mcp(cfg.hardDaily)} is reached; withdrawal #${w.id} waits`);
       await db.query("update withdrawals set error = $2, updated_at = now() where id = $1 and status = 'pending'", [w.id, 'waiting: the daily payout cap is reached']);
-      return { ...w, waiting: true };
+      return { ...w, waiting: true, reason: 'cap' };
     }
     const bal = budget || await hotBalances();
     if (bal.usdc < BigInt(w.amount) || bal.lamports < BigInt(MIN_SOL_LAMPORTS)) {
       log(`ALERT: hot wallet ${hot.publicKey} is low (${plain(bal.usdc)} USDC, ${Number(bal.lamports) / 1e9} SOL); withdrawal #${w.id} waits`);
       await db.query("update withdrawals set error = $2, updated_at = now() where id = $1 and status = 'pending'", [w.id, 'waiting for the payout wallet to be topped up']);
-      return { ...w, waiting: true };
+      return { ...w, waiting: true, reason: bal.lamports < BigInt(MIN_SOL_LAMPORTS) ? 'sol' : 'usdc' };
     }
 
     const to = sol.associatedTokenAddress(w.address, cfg.mint);
@@ -453,7 +462,7 @@ export function createWithdrawals(db, opts = {}) {
     cluster: network,
     hotWallet: hot?.publicKey ?? null,
     // public settings only: no keys, no RPC URL
-    config: { fee: cfg.fee, min: cfg.min, autoMax: cfg.autoMax, userDaily: cfg.userDaily, daily: cfg.daily, hardDaily: cfg.hardDaily, addressDelayHours: cfg.addressDelayHours, paused: cfg.paused },
+    config: { fee: cfg.fee, min: cfg.min, limitsOff: cfg.limitsOff, autoMax: cfg.autoMax, userDaily: cfg.userDaily, daily: cfg.daily, hardDaily: cfg.hardDaily, addressDelayHours: cfg.addressDelayHours, paused: cfg.paused },
     explorer: (sig) => explorerTx(sig, network),
     bindAddress,
     request,
@@ -505,7 +514,9 @@ export function createWithdrawals(db, opts = {}) {
             if (Date.now() - started > budgetMs) return 'stop';
             const r = await send(w.id, { waitMs, budget: bal });
             if (r?.status === 'sent') res.sent++;
-            if (r?.waiting) { res.waiting++; return 'stop'; }
+            // not enough USDC for this one: smaller ones behind it can still go out (with no limits, one big request
+            // must not hold up everyone). The daily cap or too little SOL stops the run.
+            if (r?.waiting) { res.waiting++; return r.reason === 'usdc' ? undefined : 'stop'; }
           });
         }
         const [c] = await db.query(`select count(*) filter (where status = 'review')::int as review,
