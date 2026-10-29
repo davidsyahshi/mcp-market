@@ -120,6 +120,15 @@ select { background: var(--panel); color: var(--cream); border: 2px solid var(--
 .btn.big { width: 100%; justify-content: space-between; padding: 14px 16px; font-size: 15px; }
 .btn.big .arr { font-size: 18px; line-height: 1; }
 @media (max-width: 960px) { .ai-grid { grid-template-columns: 1fr; } }
+.connect h2.cmds-title { margin: 10px 0 0; font-size: 24px; }
+.cmds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; background: var(--panel); border: 2px solid var(--edge); padding: 6px 18px; }
+.cmds div { display: grid; grid-template-columns: minmax(0, 19em) minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--edge); font-size: 13.5px; align-items: baseline; }
+.cmds div:nth-child(-n+2) { border-top: 0; }
+.cmds button { all: unset; cursor: pointer; color: var(--cream); font-weight: 700; overflow-wrap: anywhere; }
+.cmds button:hover { text-decoration: underline; }
+.cmds span { color: var(--dim); }
+@media (max-width: 960px) { .cmds { grid-template-columns: 1fr; } .cmds div:nth-child(2) { border-top: 1px solid var(--edge); } }
+@media (max-width: 600px) { .cmds div { grid-template-columns: 1fr; gap: 2px; } }
 .say b { color: var(--cream); font-weight: 400; }
 .profile { padding: 34px 0 6px; display: flex; gap: 16px; align-items: center; }
 .profile img { width: 64px; height: 64px; border: 2px solid var(--edge); }
@@ -834,6 +843,32 @@ document.addEventListener('click', async (e) => {
   t.textContent = 'Copied';
 });
 
+// chat commands, same list as server/src/commands.js (a test checks they match)
+const CHAT_COMMANDS = [
+  ['/help-mcp', '', 'All commands'],
+  ['/balance-mcp', '', 'Balance, MCP address, your NFTs and recent activity'],
+  ['/deposit-mcp', '', 'Your Solana address for USDC/USDT top-ups; run it again after sending to check'],
+  ['/withdraw-mcp', '[amount]', 'The withdrawal form'],
+  ['/withdrawals-mcp', '', 'Your withdrawals and their status'],
+  ['/collections-mcp', '', 'Collections, mint price, how many are minted'],
+  ['/mint-mcp', '[count] [collection]', 'Mint random NFTs (1 from MCP if you name nothing)'],
+  ['/market-mcp', '[filter]', 'NFTs for sale, cheapest first; filter by collection, rarity or trait'],
+  ['/nft-mcp', '<number>', 'One NFT: traits, owner, price, history'],
+  ['/mynft-mcp', '', 'The NFTs you own'],
+  ['/buynft-mcp', '<number>', 'Buy a listed NFT, after you confirm name and price'],
+  ['/sellnft-mcp', '<number> <price>', 'List your NFT for sale or change its price'],
+  ['/cancelnft-mcp', '<number>', 'Take your NFT off sale'],
+  ['/profile-mcp', '<on|off>', 'Show or hide your X handle on public pages'],
+];
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-cmd]');
+  if (!t) return;
+  const label = t.dataset.label || (t.dataset.label = t.textContent);
+  t.textContent = 'Copied';
+  setTimeout(() => { t.textContent = label; }, 900);
+  await navigator.clipboard?.writeText(t.dataset.cmd).catch(() => {});
+});
+
 // /connect: how to plug MCP into Claude, ChatGPT and Grok. The logos are the apps' own icons, loaded from their sites.
 function renderConnect() {
   const url = stats?.mcp_url || location.origin + '/mcp';
@@ -892,6 +927,10 @@ function renderConnect() {
       })}
     </div>
     <div class="say">Then just say: <b>“mint me an MCP”</b>, <b>“top up my balance”</b>, <b>“what's on the market under 10?”</b>, <b>“buy MCP #42”</b>, <b>“withdraw 20”</b></div>
+    <h2 class="px cmds-title">Commands</h2>
+    <p class="lead">Or type a command: your AI does exactly that, no guessing. Tap one to copy it.</p>
+    <div class="cmds">${CHAT_COMMANDS.map(([cmd, args, does]) => `<div><button type="button" data-cmd="${esc(cmd)} ">${esc(cmd + (args ? ' ' + args : ''))}</button><span>${esc(does)}</span></div>`).join('')}</div>
+    <p class="note">${k('&lt;…&gt;')} you fill in, ${k('[…]')} you can skip. Buying always asks you to confirm the name and price first.</p>
     <p class="note">One X account = one MCP account; X accounts younger than 30 days can't sign in. MCP never sees your X password. Any other app that supports remote MCP with sign-in works with the same link.</p>
   </div>`;
 }
