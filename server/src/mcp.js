@@ -90,6 +90,22 @@ export function buildMcpServer(db, userId, opts) {
   };
   const addrLink = (addr) => `${publicUrl}/a/${addr}`;
 
+  // the start command (/mcpcredit): one call that answers "is MCP on, what do I have, what can I do"
+  tool('mcpcredit', {
+    title: 'MCP: start',
+    description: 'Start here: MCP (mcp.credit), the NFT market and $MCP balance inside this chat. Call it first when the user types ' +
+      '/mcpcredit, mcpcredit or mcp.credit, opens MCP, or asks what MCP is or can do. Shows their balance, NFTs, the mint and every chat command.',
+    annotations: read,
+  }, async () => {
+    const u = await me();
+    const [{ n }] = await db.query('select count(*)::int as n from nfts where owner_id = $1', [userId]);
+    const own = (await m.collections(db)).find((c) => c.slug === m.OWN_COLLECTION);
+    const mint = own ? `\nMint: ${own.minted.toLocaleString('en-US')} of ${own.supply.toLocaleString('en-US')} minted · ${m.fmt(own.mint_price)} each, up to ${own.mint_limit} per account` +
+      (own.trade_after_sold_out && own.minted < own.supply ? ' · trading opens after the sell-out' : '') : '';
+    return ok(text(`MCP is on in this chat. @${u.handle} · ${u.public_id}\nBalance: ${m.fmt(u.balance)} · NFTs: ${n}${mint}\n` +
+      `${u.balance > 0 ? '' : 'To start, top up: /deposit-mcp\n'}\n${helpText(publicUrl)}`));
+  });
+
   tool('help', {
     title: 'Commands',
     description: 'The list of MCP chat commands (/deposit-mcp, /mint-mcp, /buynft-mcp and the rest). Call it when the user asks for help, ' +

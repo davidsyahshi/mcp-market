@@ -1,9 +1,12 @@
 // Slash commands people can type in the chat, e.g. "/deposit-mcp". One list for everything that shows them:
 // the assistant's instructions, the tool descriptions, the help tool, MCP prompts (apps that support them show
 // these in their menu) and the /connect page on the site (a test keeps the site in sync with this list).
-// "-mcp" at the end keeps them apart from the chat app's own commands.
+// "-mcp" at the end keeps them apart from the chat app's own commands. /mcpcredit (the site's name) is the start
+// command: one word nothing else uses, so the assistant reliably reaches for this connector when it sees it.
 
 export const COMMANDS = [
+  { name: 'mcpcredit', tool: 'mcpcredit', does: 'Start here: your balance, the mint and all commands',
+    how: 'call mcpcredit and show what it returns' },
   { name: 'help-mcp', tool: 'help', does: 'All commands',
     how: 'call help and show the list' },
   { name: 'balance-mcp', tool: 'account', does: 'Balance, MCP address, your NFTs and recent activity',
@@ -46,7 +49,8 @@ export const toolHint = (tool) => {
   return c ? ` Chat command: ${usage(c)}.` : '';
 };
 
-export const INSTRUCTIONS_COMMANDS = `Chat commands. The user may type a command: a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
+export const INSTRUCTIONS_COMMANDS = `Chat commands. The user may type a command: /mcpcredit, the start command (also written mcpcredit, /mcp.credit or
+mcp.credit on its own), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
 Do exactly what the command says, right away, without guessing and without extra questions beyond a missing argument
 or a confirmation the command asks for below.
 NFT numbers may be written 42, #42 or "MCP #42". If a required argument is missing, ask only for it. For an unknown
