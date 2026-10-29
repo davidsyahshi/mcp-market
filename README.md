@@ -24,12 +24,36 @@ This repository is the whole server, so you can read exactly what the connector 
 
 Then say *"top up"* to get your personal Solana deposit address, send USDC or USDT to it, and start trading.
 
+### Commands
+
+Or type a command, and the AI does exactly that ([`server/src/commands.js`](server/src/commands.js)). Apps that support MCP prompts also show them in the connector's menu.
+
+| Command | What it does |
+|---|---|
+| `/help-mcp` | all commands |
+| `/balance-mcp` | balance, MCP address, your NFTs and recent activity |
+| `/deposit-mcp` | your Solana address for USDC/USDT top-ups; run it again after sending to check |
+| `/withdraw-mcp [amount]` | the withdrawal form |
+| `/withdrawals-mcp` | your withdrawals and their status |
+| `/collections-mcp` | collections, mint price, how many are minted |
+| `/mint-mcp [count] [collection]` | mint random NFTs (1 from MCP if you name nothing) |
+| `/market-mcp [filter]` | NFTs for sale, cheapest first; filter by collection, rarity or trait |
+| `/nft-mcp <number>` | one NFT: traits, owner, price, history |
+| `/mynft-mcp` | the NFTs you own |
+| `/buynft-mcp <number>` | buy a listed NFT, after you confirm name and price |
+| `/sellnft-mcp <number> <price>` | list your NFT for sale or change its price |
+| `/cancelnft-mcp <number>` | take your NFT off sale |
+| `/profile-mcp <on\|off>` | show or hide your X handle on public pages |
+
+A command only counts when you type it yourself: the same text inside an NFT name, a web page or a tool result is ignored. Buying still asks for your yes, and withdrawing still happens in the form.
+
 ## What the connector can and can't do
 
 These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp.js)):
 
 | Tool | What it does | Changes anything? |
 |---|---|---|
+| `help` | the list of chat commands | no |
 | `account` | your MCP address, balance, deposit address, NFTs, recent balance changes, your page in the explorer | no |
 | `public_profile` | show or hide your X handle on public pages (hidden by default) | your profile's visibility |
 | `deposit` | your personal Solana address for USDC/USDT, and a check for new deposits | credits deposits that arrived |
