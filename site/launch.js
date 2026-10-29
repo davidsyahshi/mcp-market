@@ -256,7 +256,17 @@
       if (c.status === 'paused') return (c.earnings.releasable ? b('release', `Pay out ${money(c.earnings.releasable)}`, 'red') : '') + b('resume', 'Resume') + b('freeze', 'Freeze & refund');
       return '';
     };
-    app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Review queue</h1>
+    const field = (id, label, attrs = '') => `<label style="display:grid;gap:4px"><span class="note">${label}</span>
+      <input id="${id}" ${attrs} style="background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:9px 10px;font:inherit"></label>`;
+    app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Team mint</h1>
+      <p>Free MCP NFTs, picked at random, outside the per-account mint limit. In the explorer they show as <b>team mint</b>.</p></div></div>
+      <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end">
+        ${field('tmCount', 'How many', 'type="number" min="1" max="5000" step="1" value="10" inputmode="numeric"')}
+        ${field('tmTo', 'To (empty: your account)', `placeholder="${esc(who.public_id || 'mcp_…')}" maxlength="16" autocomplete="off" spellcheck="false"`)}
+        <button class="btn red" id="tmGo" style="justify-content:center;padding:12px">Mint free</button>
+      </div>
+      <div id="tmOut" class="note" aria-live="polite" style="margin-top:10px"></div>
+      <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Review queue</h2>
       <p>Open a collection to look through every picture before approving it. Pay-outs include only mints older than the hold.</p></div></div>
       <table class="txs"><thead><tr><th>Collection</th><th>Creator</th><th>Status</th><th class="hide-sm">NFTs</th><th style="text-align:right">Held</th><th style="text-align:right">Ready</th><th></th></tr></thead><tbody>
       ${list.map((c) => `<tr><td><a href="/c/${esc(c.slug)}">${esc(c.name)}</a><div class="note">${esc(c.slug)} · ${fmt(c.mint_price)} $MCP · ${c.mint_limit}/account</div></td>
@@ -270,6 +280,7 @@
         <button class="btn red" id="bkNow" style="margin-left:auto">Back up now</button></div>
       <div id="bk" class="note">Loading…</div><div style="height:60px"></div></div>`;
     loadBackups();
+    wireTeamMint(who);
     $('#bkNow').onclick = async (e) => {
       e.target.disabled = true;
       try { await send('POST', '/admin/backups'); } catch (err) { alert(err.message); }
@@ -286,6 +297,49 @@
       b.disabled = true;
       try { await send('POST', `/admin/collections/${b.dataset.id}/${a}`, { note }); renderAdmin(); } catch (e) { alert(e.message); b.disabled = false; }
     });
+  }
+
+  // the owner's free mint: a first press asks to confirm, the second mints in calls of up to 500
+  function wireTeamMint(who) {
+    const go = $('#tmGo');
+    const out = $('#tmOut');
+    const count = () => Math.floor(Number($('#tmCount').value));
+    const to = () => $('#tmTo').value.trim();
+    let armed = null;
+    const reset = () => { armed = null; go.textContent = 'Mint free'; };
+    $('#tmCount').oninput = reset;
+    $('#tmTo').oninput = reset;
+    go.onclick = async () => {
+      const n = count();
+      if (!(n >= 1 && n <= 5000)) { out.textContent = 'How many: 1 to 5,000.'; return; }
+      if (to() && !/^mcp_[1-9A-HJ-NP-Za-km-z]{12}$/.test(to())) { out.textContent = 'To: an MCP address like mcp_PSVnRvFqCe6u, or leave it empty.'; return; }
+      const key = `${n}|${to()}`;
+      if (armed !== key) {
+        armed = key;
+        go.textContent = `Confirm: ${n.toLocaleString('en-US')} to ${to() || 'you'}`;
+        out.textContent = '';
+        return;
+      }
+      armed = null;
+      go.disabled = true;
+      let done = 0;
+      let last = null;
+      try {
+        while (done < n) {
+          out.textContent = `Minting… ${done.toLocaleString('en-US')} of ${n.toLocaleString('en-US')}`;
+          last = await send('POST', '/admin/team-mint', { count: Math.min(500, n - done), to: to() || undefined });
+          done += last.minted.length;
+          if (!last.minted.length || last.left === 0 || last.stopped) break;
+        }
+        const why = last.stopped ? ` Stopped: ${esc(last.stopped)}` : done < n && last.left === 0 ? ' The collection is sold out.' : '';
+        out.innerHTML = `Minted <b>${done.toLocaleString('en-US')}</b> to <a class="addr" href="/a/${esc(last.to)}">${esc(last.to)}</a>. ` +
+          `Left in MCP: ${Number(last.left).toLocaleString('en-US')}.${why}`;
+      } catch (e) {
+        out.innerHTML = `${done ? `Minted ${done.toLocaleString('en-US')}, then: ` : ''}<span style="color:var(--red)">${esc(e.message)}</span>`;
+      }
+      go.disabled = false;
+      reset();
+    };
   }
 
   async function loadBackups() {

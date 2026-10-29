@@ -81,6 +81,46 @@ select { background: var(--panel); color: var(--cream); border: 2px solid var(--
 .rar.legendary { color: var(--r-legendary); } .rar.ultra-rare { color: var(--r-ultra); }
 .empty { color: var(--dim); padding: 40px 0; grid-column: 1 / -1; text-align: center; }
 
+/* the mint page (home) */
+.mint-top { padding: 44px 0 30px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 36px; align-items: center; }
+.mint-top h1 { margin: 0; font-size: clamp(30px, 5vw, 54px); line-height: 1.05; }
+.mint-top h1 span { color: var(--red); }
+.mint-top p { color: var(--dim); max-width: 540px; margin: 16px 0 0; }
+.mint-top p b { color: var(--cream); }
+.mint-top .cta { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+.mint-top .hint { margin-top: 14px; color: var(--dim); font-size: 13px; }
+.mint-top .hint code { color: var(--cream); font-weight: 700; }
+.mintbox { background: var(--panel); border: 2px solid var(--edge); padding: 22px; display: grid; gap: 14px; }
+.mintbox .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: 8px; }
+.mintbox .count { margin: 0; font-size: clamp(30px, 4.4vw, 44px); line-height: 1; color: var(--cream); }
+.mintbox .count small { font-size: .45em; color: var(--dim); }
+.blocks { display: flex; align-items: center; gap: 8px; }
+.blocks i { flex: 1; height: 34px; border-radius: 3px; background: var(--edge); position: relative; overflow: hidden; }
+.blocks i::after { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--f, 0%); background: var(--red); transition: width .6s ease; }
+.blocks .pct { flex: 0 0 auto; min-width: 4.2ch; text-align: right; font: 20px Silkscreen, monospace; color: var(--dim); }
+.mintbox .row2 { display: flex; justify-content: space-between; gap: 10px; color: var(--dim); font-size: 13px; flex-wrap: wrap; }
+.mintbox .row2 b { color: var(--cream); font-weight: 700; }
+.live { width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 0 rgba(255,42,31,.6); animation: pulse 1.6s infinite; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(255,42,31,0); } 100% { box-shadow: 0 0 0 0 rgba(255,42,31,0); } }
+.feed-head { display: flex; align-items: center; gap: 10px; padding: 8px 0 14px; border-top: 2px solid var(--edge); margin-top: 6px; }
+.feed-head h2 { margin: 14px 0 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+.feed-head .note { margin: 14px 0 0 auto; color: var(--dim); font-size: 12px; }
+.feed { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; padding-bottom: 30px; }
+.feed .card img { height: auto; }
+.feed .card .meta { padding: 7px 9px 9px; }
+.feed .card .name { font-size: 13px; }
+.feed .card.new { animation: pop .5s ease-out; border-color: var(--red); }
+@keyframes pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.feed-end { height: 40px; }
+@media (prefers-reduced-motion: reduce) { .feed .card.new, .live { animation: none; } .blocks i::after { transition: none; } }
+@media (max-width: 820px) {
+  .mint-top { grid-template-columns: 1fr; padding-top: 20px; gap: 22px; }
+  .mintbox { order: -1; } /* on a phone the progress comes first */
+  .blocks { gap: 5px; } .blocks i { height: 26px; } .blocks .pct { font-size: 16px; }
+  .feed { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+  .feed .card .meta { padding: 5px 7px 7px; } .feed .card .row2 { display: none; }
+}
+
 .detail { display: grid; grid-template-columns: 1fr 1fr; }
 .detail img { width: 100%; aspect-ratio: 1; }
 .detail .info { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
@@ -270,7 +310,7 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
 <header class="top">
   <div class="wrap">
     <a class="brand" href="/"><img class="pix" src="/logo.png" alt=""><b class="px">MCP</b></a>
-    <nav class="main" aria-label="Main"><a href="/" data-nav="market">Market</a><a href="/collections" data-nav="collections">Collections</a><a href="/explorer" data-nav="explorer">Explorer</a></nav>
+    <nav class="main" aria-label="Main"><a href="/" data-nav="mint">Mint</a><a href="/collections" data-nav="collections">Collections</a><a href="/explorer" data-nav="explorer">Explorer</a></nav>
     <span class="spacer"></span>
     <a class="btn red" id="connectBtn" href="/connect"><span class="long">Connect to your AI</span><span class="short">Connect</span></a>
   </div>
@@ -334,6 +374,113 @@ function card(n) {
       <div class="row2"><span>${n.owner_addr ? esc(label(n.owner_addr, n.owner_name)) : '—'}</span></div>
       ${price}
     </div></a>`;
+}
+
+// ---------- the mint page (home) ----------
+// Progress and the newest mints come from /api/mint/live, one URL for everyone (cached ~2 s by the CDN), polled
+// every 5 s while the page is open and visible. Older mints load as you scroll.
+const MINT_POLL_MS = 5000;
+const mintView = { timer: null, seen: new Set(), cursor: null, minted: null, loading: false, done: false, observer: null };
+function stopMintPage() {
+  clearTimeout(mintView.timer);
+  mintView.timer = null;
+  mintView.observer?.disconnect();
+  mintView.observer = null;
+}
+const pctText = (minted, supply) => {
+  const p = supply ? (minted / supply) * 100 : 0;
+  return p >= 100 ? '100%' : p > 0 && p < 1 ? `${p.toFixed(1)}%` : `${Math.floor(p)}%`;
+};
+function mintCard(n, isNew = false) {
+  return `<a class="card${isNew ? ' new' : ''}" href="/nft/${n.id}" data-id="${n.id}">${pic(n)}
+    <div class="meta"><div class="name">${esc(n.name)}</div><div class="row2"><span class="rar ${rarClass(n.rarity)}">${esc(n.rarity || '')}</span></div></div></a>`;
+}
+function paintMintStats(s) {
+  const blocks = $('#mBlocks');
+  if (!blocks) return;
+  const filled = s.supply ? (s.minted / s.supply) * 10 : 0;
+  blocks.querySelectorAll('i').forEach((b, i) => b.style.setProperty('--f', `${Math.max(0, Math.min(1, filled - i)) * 100}%`));
+  $('#mPct').textContent = pctText(s.minted, s.supply);
+  $('#mMinted').textContent = s.minted.toLocaleString('en-US');
+  $('#mSupply').textContent = '/' + s.supply.toLocaleString('en-US');
+  $('#mLeft').textContent = s.left.toLocaleString('en-US');
+  const soldOut = s.left === 0;
+  $('#mState').innerHTML = soldOut ? '<b>Sold out</b>' : '<span class="live"></span> Mint is live';
+  $('#mCta').innerHTML = soldOut
+    ? `<a class="btn red" href="/market">Trade on the market</a><a class="btn ghost" href="/c/${esc(s.collection)}">The collection</a>`
+    : `<a class="btn red" href="${claudeLink('/mint-mcp')}" target="_blank" rel="noopener">Mint in Claude</a>
+       <a class="btn ghost" href="${gptLink('/mint-mcp')}" target="_blank" rel="noopener">Mint in ChatGPT</a>
+       <a class="btn ghost" href="/connect">How to connect</a>`;
+}
+async function loadOlderMints() {
+  if (mintView.loading || mintView.done || !mintView.cursor) return;
+  mintView.loading = true;
+  try {
+    const rows = await api(`/mint/feed?limit=48&cursor=${encodeURIComponent(mintView.cursor)}`);
+    const fresh = rows.filter((n) => !mintView.seen.has(n.id));
+    fresh.forEach((n) => mintView.seen.add(n.id));
+    $('#feed')?.insertAdjacentHTML('beforeend', fresh.map((n) => mintCard(n)).join(''));
+    if (rows.length) mintView.cursor = rows.at(-1).cursor;
+    if (rows.length < 48) mintView.done = true;
+  } catch {}
+  mintView.loading = false;
+}
+function fillFeed(recent) {
+  mintView.seen = new Set(recent.map((n) => n.id));
+  mintView.cursor = recent.at(-1)?.cursor || null;
+  mintView.done = recent.length < 60;
+  $('#feed').innerHTML = recent.map((n) => mintCard(n)).join('') || '<div class="empty">Nothing minted yet. Be the first: ask your AI to mint an MCP.</div>';
+}
+async function pollMint(first = false) {
+  if (!$('#feed') || (mintView.polling && !first)) return;
+  mintView.polling = true;
+  try {
+    const s = await api('/mint/live');
+    if (!$('#feed')) return; // the page changed meanwhile
+    paintMintStats(s);
+    const fresh = s.recent.filter((n) => !mintView.seen.has(n.id));
+    const gap = mintView.minted != null && (s.minted < mintView.minted || (fresh.length === s.recent.length && s.minted - mintView.minted > fresh.length));
+    if (first || gap) {
+      fillFeed(s.recent);
+    } else if (fresh.length) {
+      $('#feed .empty')?.remove();
+      fresh.forEach((n) => mintView.seen.add(n.id));
+      $('#feed').insertAdjacentHTML('afterbegin', fresh.map((n) => mintCard(n, true)).join(''));
+    }
+    mintView.minted = s.minted;
+  } catch {}
+  mintView.polling = false;
+  clearTimeout(mintView.timer);
+  mintView.timer = setTimeout(() => (document.visibilityState === 'visible' ? pollMint() : null), MINT_POLL_MS);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && $('#feed') && !mintView.loading) pollMint(); });
+
+async function renderMint() {
+  const app = $('#app');
+  const price = stats?.mint_price ?? 5;
+  app.innerHTML = `<div class="wrap">
+    <section class="mint-top">
+      <div>
+        <h1 class="px">The first NFT/token<br><span>inside your AI.</span></h1>
+        <p><b>5,000 pixel characters</b> that live inside your AI. Mint one by just asking Claude, ChatGPT or Grok: <b>${fmt(price)} $MCP</b> each, up to ${stats?.mint_limit ?? 5} per account. 1 $MCP = $1, top up with USDC or USDT on Solana.</p>
+        <div class="cta" id="mCta"></div>
+        <div class="hint">or type <code>/mint-mcp</code> in a chat with MCP on · <a href="/c/mcp">see the collection</a></div>
+      </div>
+      <div class="mintbox" aria-live="polite">
+        <div class="k" id="mState"><span class="live"></span> Mint is live</div>
+        <div class="count"><b id="mMinted">—</b><small id="mSupply"></small></div>
+        <div class="blocks" id="mBlocks" role="img" aria-label="Mint progress">${'<i></i>'.repeat(10)}<span class="pct" id="mPct">0%</span></div>
+        <div class="row2"><span>Left: <b id="mLeft">—</b></span><span>Price: <b>${fmt(price)} $MCP</b></span></div>
+      </div>
+    </section>
+    <div class="feed-head"><h2 class="px"><span class="live"></span>Just minted</h2><span class="note">updates live</span></div>
+    <div class="feed" id="feed"><div class="empty">Loading…</div></div>
+    <div class="feed-end" id="feedEnd"></div>
+  </div>`;
+  Object.assign(mintView, { seen: new Set(), cursor: null, minted: null, loading: false, done: false, polling: false });
+  mintView.observer = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) loadOlderMints(); }, { rootMargin: '600px' });
+  mintView.observer.observe($('#feedEnd'));
+  await pollMint(true);
 }
 
 async function renderMarket() {
@@ -556,7 +703,7 @@ async function renderNft(id) {
        <a class="btn ghost" href="${gptLink(q)}" target="_blank" rel="noopener">Mint in ChatGPT</a></div>`
       : `<div class="big" style="font-size:18px">Not for sale</div><div style="color:var(--dim);font-size:12px">Owned by ${who(n.owner_addr, n.owner_name)}.</div>`;
   const act = (a) => a.type === 'mint'
-    ? `<tr><td><span class="type mint">mint</span></td><td>${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`
+    ? `<tr><td><span class="type mint">${a.team ? 'team mint' : 'mint'}</span></td><td>${who(a.to_addr, a.to_name)}</td><td class="num">${a.team ? 'free' : `${fmt(a.price)} <small style="color:var(--dim)">$MCP</small>`}</td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`
     : `<tr><td><span class="type buy">sale</span></td><td>${who(a.from_addr, a.from_name)} → ${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`;
   app.innerHTML = `<div class="wrap">
     <div class="crumbs"><a href="/collections">Collections</a> / <a href="/c/${esc(n.collection)}">${esc(n.collection_name)}</a> / ${esc(n.name)}</div>
@@ -595,6 +742,7 @@ function txSummary(t) {
     const se = find('sale');
     return { what: `${who(b.account, b.name)} bought ${nftLink(t.nft)} from ${se ? who(se.account, se.name) : '—'}`, amount: usd(-b.amount), unit: '$MCP' };
   }
+  if (t.type === 'team mint' && t.team) return { what: `team mint → ${who(t.team.account, t.team.name)}: ${t.team.count > 1 ? `${t.team.count} NFTs, first ` : ''}${nftLink(t.nft)}`, amount: 'free', unit: '' };
   if (t.type === 'mint') { const mn = find('mint'); return { what: `${who(mn.account, mn.name)} minted ${nftLink(t.nft)}${find('hold', false) ? ' · held for the creator' : ''}`, amount: usd(-mn.amount), unit: '$MCP' }; }
   if (t.type === 'payout') { const e = find('payout'); return { what: `escrow → ${who(e.account, e.name)}, creator of ${t.collection ? `<a href="/c/${esc(t.collection.slug)}">${esc(t.collection.name)}</a>` : 'a collection'}`, amount: `+${usd(e.amount)}`, unit: '$MCP', cls: 'plus' }; }
   if (t.type === 'refund' && t.refunds) return { what: `${t.refunds} mints refunded to their holders (collection frozen)`, amount: `+${usd(t.refunded)}`, unit: '$MCP', cls: 'plus' };
@@ -939,7 +1087,9 @@ async function route() {
   const pathPart = location.pathname.replace(/\/+$/, '') || '/';
   const query = location.search.slice(1);
   let mm;
-  const section = pathPart === '/connect' ? '' : /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer' : /^\/(collections|c\/|nft\/|launch|admin)/.test(pathPart) ? 'collections' : 'market';
+  const section = pathPart === '/connect' ? '' : /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer'
+    : /^\/(collections|c\/|nft\/|launch|admin|market)/.test(pathPart) ? 'collections' : 'mint';
+  stopMintPage();
   document.querySelectorAll('[data-nav]').forEach((a) => {
     if (a.dataset.nav === section) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -955,11 +1105,12 @@ async function route() {
   if (pathPart === '/collections') return renderCollections();
   if ((mm = pathPart.match(/^\/c\/([a-z0-9-]{1,40})/))) return renderCollection(mm[1], query);
   if ((mm = pathPart.match(/^\/nft\/(\d{1,9})/))) return renderNft(Number(mm[1]));
-  return renderMarket();
+  if (pathPart === '/market') return renderMarket();
+  return renderMint();
 }
 // Pages have plain addresses (/c/mcp, /nft/42, /explorer): Netlify serves index.html for them (netlify.toml) and the
 // page draws itself. Links inside the site change the address without reloading.
-const SITE_PATH = /^\/($|collections$|connect$|explorer$|launch$|admin$|(c|nft|tx|a|u)\/[^/?#]+)/;
+const SITE_PATH = /^\/($|market$|collections$|connect$|explorer$|launch$|admin$|(c|nft|tx|a|u)\/[^/?#]+)/;
 function go(path, { replace = false } = {}) {
   if (replace) history.replaceState(null, '', path); else history.pushState(null, '', path);
   route();
