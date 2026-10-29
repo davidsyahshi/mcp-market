@@ -166,7 +166,7 @@ export function createAuth(db, { publicUrl, xClientId, xClientSecret, devLogin }
     const warn = known ? '' : `<p class="warn">⚠ Access goes to <b>${esc(host)}</b>, which is not Claude, ChatGPT or Grok. Only continue if you set this up yourself.</p>`;
     const x = xClientId ? `<a class="btn" href="/login/x?req=${id}">Sign in with X</a>` : '';
     const dev = devLogin ? `<form method="post" action="/login/dev"><input type="hidden" name="req" value="${id}">
-      <input name="handle" placeholder="test handle, e.g. artem" required pattern="[A-Za-z0-9_]{1,15}" maxlength="15" autocomplete="off">
+      <input name="handle" placeholder="test handle, e.g. alice" required pattern="[A-Za-z0-9_]{1,15}" maxlength="15" autocomplete="off">
       <button class="btn ghost">Test sign-in</button></form>
       <p class="dim">Test server: any handle works, balances are test money and anyone can sign in as any handle.</p>` : '';
     const what = p.params.site ? 'Sign in to launch and manage your collections. This does not connect any AI app.'
