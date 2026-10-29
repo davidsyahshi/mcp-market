@@ -30,6 +30,7 @@ Or type a command, and the AI does exactly that ([`server/src/commands.js`](serv
 
 | Command | What it does |
 |---|---|
+| `/mcpcredit` | start here: your balance, the mint and all commands |
 | `/help-mcp` | all commands |
 | `/balance-mcp` | balance, MCP address, your NFTs and recent activity |
 | `/deposit-mcp` | your Solana address for USDC/USDT top-ups; run it again after sending to check |
@@ -53,6 +54,7 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 
 | Tool | What it does | Changes anything? |
 |---|---|---|
+| `mcpcredit` | the start command: balance, NFTs, the mint, all chat commands | no |
 | `help` | the list of chat commands | no |
 | `account` | your MCP address, balance, deposit address, NFTs, recent balance changes, your page in the explorer | no |
 | `public_profile` | show or hide your X handle on public pages (hidden by default) | your profile's visibility |
