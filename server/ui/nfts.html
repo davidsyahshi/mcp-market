@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MCP NFTs</title>
+<!--
+  NFTs shown inside the chat (an MCP App): the account's NFTs as a gallery (/showmynfts), or one NFT big (a mint, a free
+  mint, "/nft-mcp 42"). It only shows; it changes nothing. Pictures come with the tool result (data URLs in its _meta),
+  or else from the site, which the resource's CSP allows. The server inlines the MCP Apps SDK in place of the marker
+  in the script below (server/src/ui.js).
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --cherry: #FF2A1F;
+    --ink: #0B0B0B;
+    --fg: var(--color-text-primary, #141413);
+    --fg2: var(--color-text-secondary, #3D3D3A);
+    --fg3: var(--color-text-tertiary, #73726C);
+    --bg2: var(--color-background-secondary, #F5F4ED);
+    --line: var(--color-border-tertiary, rgba(31, 30, 29, .15));
+    --line2: var(--color-border-primary, rgba(31, 30, 29, .4));
+    --ring: var(--color-ring-primary, rgba(20, 20, 19, .7));
+    --warn: var(--color-text-warning, #5A4815);
+    --warn-bg: var(--color-background-warning, #F6EEDF);
+    --ok: var(--color-text-success, #265B19);
+    --ok-bg: var(--color-background-success, #E9F1DC);
+    --r: var(--border-radius-md, 8px);
+    --rl: var(--border-radius-lg, 10px);
+    --sans: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+    --mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    --r-common: #8A8A93; --r-rare: #3B9BFF; --r-epic: #A55BFF; --r-legendary: #E89A12; --r-ultra: #FF3EA5;
+    --pad-t: 16px; --pad-r: 16px; --pad-b: 16px; --pad-l: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fg: var(--color-text-primary, #FAF9F5);
+      --fg2: var(--color-text-secondary, #C2C0B6);
+      --fg3: var(--color-text-tertiary, #9C9A92);
+      --bg2: var(--color-background-secondary, #262624);
+      --line: var(--color-border-tertiary, rgba(222, 220, 209, .15));
+      --line2: var(--color-border-primary, rgba(222, 220, 209, .4));
+      --ring: var(--color-ring-primary, rgba(250, 249, 245, .7));
+      --warn: var(--color-text-warning, #D1A041);
+      --warn-bg: var(--color-background-warning, #483A0F);
+      --ok: var(--color-text-success, #7AB948);
+      --ok-bg: var(--color-background-success, #1B4614);
+      --r-legendary: #F5A623;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fg: var(--color-text-primary, #FAF9F5);
+    --fg2: var(--color-text-secondary, #C2C0B6);
+    --fg3: var(--color-text-tertiary, #9C9A92);
+    --bg2: var(--color-background-secondary, #262624);
+    --line: var(--color-border-tertiary, rgba(222, 220, 209, .15));
+    --line2: var(--color-border-primary, rgba(222, 220, 209, .4));
+    --ring: var(--color-ring-primary, rgba(250, 249, 245, .7));
+    --warn: var(--color-text-warning, #D1A041);
+    --warn-bg: var(--color-background-warning, #483A0F);
+    --ok: var(--color-text-success, #7AB948);
+    --ok-bg: var(--color-background-success, #1B4614);
+    --r-legendary: #F5A623;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body {
+    font-family: var(--sans);
+    font-size: var(--font-text-sm-size, 14px);
+    line-height: var(--font-text-sm-line-height, 1.4);
+    color: var(--fg);
+    padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+    -webkit-text-size-adjust: 100%;
+  }
+  main { display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+  [hidden] { display: none !important; }
+
+  header { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 38px; height: 32px; border-radius: var(--r); overflow: hidden; flex: none; display: block; }
+  .logo svg { width: 100%; height: 100%; display: block; }
+  .ttl { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .ttl b { font-size: var(--font-heading-sm-size, 14px); font-weight: var(--font-weight-semibold, 600); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ttl small { color: var(--fg3); font-size: var(--font-text-xs-size, 12px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--ink); background: var(--cherry); border-radius: var(--border-radius-full, 999px); padding: 3px 8px; flex: none; text-transform: uppercase; }
+
+  .pic { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; background: var(--bg2); border-radius: var(--r); }
+  .pic.px { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  /* one NFT */
+  .one { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .one .pic { max-width: 360px; border-radius: var(--rl); box-shadow: 0 0 0 1px var(--line); }
+  .one-head { display: flex; flex-direction: column; gap: 4px; }
+  .name { font-size: var(--font-heading-lg-size, 22px); font-weight: 700; letter-spacing: .01em; }
+  .sub { color: var(--fg3); font-size: 13px; }
+  .rar { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .rar.common { color: var(--r-common); } .rar.rare { color: var(--r-rare); } .rar.epic { color: var(--r-epic); }
+  .rar.legendary { color: var(--r-legendary); } .rar.ultra-rare { color: var(--r-ultra); }
+  .traits { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+  .trait { border: 1px solid var(--line); border-radius: var(--r); padding: 6px 8px; min-width: 0; }
+  .trait span { display: block; color: var(--fg3); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+  .trait b { display: block; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trait i { font-style: normal; color: var(--fg3); font-size: 11px; }
+  @media (min-width: 520px) {
+    .one { grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
+    .one .pic { max-width: none; }
+  }
+
+  /* many */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+  .tile { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; min-width: 0; }
+  .tile .pic { box-shadow: 0 0 0 1px var(--line); transition: transform .12s ease; }
+  .tile:hover .pic { transform: translateY(-2px); }
+  .tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: var(--r); }
+  .tile b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .row { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .tile small { color: var(--fg3); font-size: 10px; white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { .tile .pic { transition: none; } .tile:hover .pic { transform: none; } }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.primary, button.ghost { min-height: 40px; border-radius: var(--rl); font: inherit; font-weight: var(--font-weight-semibold, 600); font-size: 14px; cursor: pointer; padding: 0 14px; }
+  button.primary { border: 0; background: var(--cherry); color: var(--ink); }
+  button.ghost { border: 1px solid var(--line2); background: transparent; color: var(--fg); }
+  button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+  .note { margin: 0; padding: 10px 12px; border-radius: var(--r); font-size: 13px; }
+  .note.warn { background: var(--warn-bg); color: var(--warn); }
+  .note.ok { background: var(--ok-bg); color: var(--ok); }
+  .fine { margin: 0; color: var(--fg3); font-size: var(--font-text-xs-size, 12px); }
+  .sk { border-radius: var(--rl); background: var(--bg2); }
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite">
+  <header>
+    <span class="logo"><svg viewBox="0 0 19 16" shape-rendering="crispEdges" aria-hidden="true"><rect width="19" height="16" fill="#FF2A1F"/><path fill="#F5F1E8" d="M8 1h8v1h-8zM6 2h11v1h-11zM5 3h13v1h-13zM5 4h13v1h-13zM5 5h3v1h-3zM10 5h4v1h-4zM16 5h2v1h-2zM5 6h13v1h-13zM5 7h13v1h-13zM8 10h8v1h-8zM8 11h8v1h-8zM9 12h6v1h-6zM9 13h1v1h-1zM13 13h1v1h-1zM9 14h1v1h-1zM13 14h1v1h-1z"/><path fill="#B5B2AB" d="M17 2h1v1h-1zM18 3h1v1h-1zM18 4h1v1h-1zM18 5h1v1h-1zM18 6h1v1h-1zM18 7h1v1h-1zM6 8h12v1h-12zM10 13h1v1h-1zM14 13h1v1h-1zM10 14h1v1h-1zM14 14h1v1h-1z"/><path fill="#0B0B0B" d="M3 9h14v1h-14zM2 10h2v1h-2zM1 11h1v1h-1z"/><path fill="#363636" d="M17 9h1v1h-1zM2 11h1v1h-1z"/></svg></span>
+    <div class="ttl"><b id="title">MCP</b><small id="subtitle">Loading…</small></div>
+    <span class="badge" id="badge" hidden></span>
+  </header>
+  <div class="sk" id="loading" style="height:240px"></div>
+  <p class="note" id="note" hidden></p>
+  <section id="view"></section>
+  <p class="fine" id="foot" hidden></p>
+</main>
+
+<script type="module">
+/*MCP_APPS_SDK*/
+
+const $ = (id) => document.getElementById(id);
+const IMAGES = 'mcp-market/images';
+const textOf = (r) => (r?.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+const rarClass = (r) => String(r || '').toLowerCase().replace(/[^a-z]+/g, '-');
+const el = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+};
+const fmt = (n) => (Number.isInteger(Number(n)) ? Number(n).toLocaleString('en-US') : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }));
+
+let data = null;     // structuredContent.nfts from the tool result
+let pics = {};       // id -> data URL, from the result's _meta
+let opened = null;   // in a gallery: the NFT shown big
+
+const app = new McpApps.App({ name: 'MCP NFTs', version: '1.0.0' }, {}, { autoResize: true });
+
+function applyContext(ctx) {
+  if (!ctx) return;
+  if (ctx.theme) McpApps.applyDocumentTheme(ctx.theme);
+  if (ctx.styles?.variables) McpApps.applyHostStyleVariables(ctx.styles.variables);
+  if (ctx.styles?.css?.fonts) McpApps.applyHostFonts(ctx.styles.css.fonts);
+  const s = ctx.safeAreaInsets;
+  if (s) {
+    const r = document.documentElement.style;
+    r.setProperty('--pad-t', `${Math.max(16, s.top)}px`);
+    r.setProperty('--pad-r', `${Math.max(16, s.right)}px`);
+    r.setProperty('--pad-b', `${Math.max(16, s.bottom)}px`);
+    r.setProperty('--pad-l', `${Math.max(16, s.left)}px`);
+  }
+}
+
+function note(text, kind = 'warn') {
+  $('note').textContent = text || '';
+  $('note').className = `note ${kind}`;
+  $('note').hidden = !text;
+}
+
+// only our own site's pages and pictures, never a link that came from somewhere else
+const ours = (u) => {
+  try { const x = new URL(u); return x.protocol === 'https:' || x.hostname === 'localhost' ? x.href : null; } catch { return null; }
+};
+const picFor = (n) => {
+  const d = pics[String(n.id)];
+  if (typeof d === 'string' && /^data:image\/(png|webp|gif|jpeg);base64,[A-Za-z0-9+/=]+$/.test(d)) return d;
+  return ours(n.image_url) || '';
+};
+const img = (n, big) => el('img', { class: `pic${n.pixel ? ' px' : ''}`, src: picFor(n), alt: n.name, loading: big ? null : 'lazy', decoding: 'async', width: big ? 360 : 160, height: big ? 360 : 160 });
+
+async function open(url) {
+  const u = ours(url);
+  if (!u) return;
+  try {
+    const r = await app.openLink({ url: u });
+    if (r?.isError) note(u, 'ok');
+  } catch { note(u, 'ok'); }
+}
+
+function header(title, subtitle, badge) {
+  $('title').textContent = title;
+  $('subtitle').textContent = subtitle || '';
+  $('badge').textContent = badge || '';
+  $('badge').hidden = !badge;
+}
+
+function renderOne(n, { back } = {}) {
+  const traits = (n.traits || []).filter((t) => t.trait_type !== 'Rarity');
+  const view = $('view');
+  view.replaceChildren(el('div', { class: 'one' },
+    img(n, true),
+    el('div', { class: 'one-head' },
+      n.rarity ? el('span', { class: `rar ${rarClass(n.rarity)}`, text: n.rarity }) : null,
+      el('div', { class: 'name', text: n.name }),
+      el('div', { class: 'sub', text: [n.collection_name, n.price != null ? `listed at ${fmt(n.price)} $MCP` : null].filter(Boolean).join(' · ') }),
+      traits.length ? el('div', { class: 'traits', style: 'margin-top:10px' }, ...traits.map((t) => el('div', { class: 'trait' },
+        el('span', { text: t.trait_type }), el('b', { text: t.value, title: t.value }), t.percent != null ? el('i', { text: `${t.percent}% have it` }) : null))) : null,
+      el('div', { class: 'actions', style: 'margin-top:12px' },
+        back ? el('button', { class: 'ghost', type: 'button', text: '← All', onclick: back }) : null,
+        n.url ? el('button', { class: 'primary', type: 'button', text: 'Open on mcp.credit', onclick: () => open(n.url) }) : null))));
+}
+
+function renderGallery() {
+  const d = data;
+  const items = d.items || [];
+  header(d.title || 'My NFTs', d.subtitle || `${d.total} NFT${d.total === 1 ? '' : 's'}`, d.badge);
+  if (opened) {
+    const n = items.find((x) => x.id === opened);
+    if (n) { renderOne(n, { back: () => { opened = null; renderGallery(); } }); return; }
+    opened = null;
+  }
+  if (!items.length) {
+    $('view').replaceChildren(el('p', { class: 'note warn', text: d.empty || 'No NFTs yet. Mint one: /mcpmint' }));
+    return;
+  }
+  $('view').replaceChildren(el('div', { class: 'grid' }, ...items.map((n) => el('button', {
+    class: 'tile', type: 'button', title: n.name, 'aria-label': `${n.name}${n.rarity ? ', ' + n.rarity : ''}`,
+    onclick: () => { opened = n.id; renderGallery(); window.scrollTo?.(0, 0); },
+  }, img(n, false), el('div', { class: 'row' }, el('b', { text: n.name }), n.rarity ? el('small', { class: `rar ${rarClass(n.rarity)}`, text: n.rarity }) : null)))));
+}
+
+function render() {
+  $('loading').hidden = true;
+  const d = data;
+  if (d.note) note(d.note, d.note_kind || 'ok'); else note('');
+  if (d.view === 'one' && d.items?.[0]) {
+    const n = d.items[0];
+    header(d.title || n.name, d.subtitle || n.collection_name, d.badge);
+    renderOne(n);
+  } else {
+    renderGallery();
+  }
+  const foot = d.more_url && d.total > (d.items || []).length ? `Showing ${(d.items || []).length} of ${fmt(d.total)}.` : '';
+  $('foot').textContent = foot;
+  $('foot').hidden = !foot;
+}
+
+app.ontoolresult = (r) => {
+  const d = r?.structuredContent?.nfts;
+  if (d && d.v === 1) {
+    data = d;
+    pics = (r?._meta && typeof r._meta[IMAGES] === 'object' && r._meta[IMAGES]) || {};
+    render();
+  } else {
+    $('loading').hidden = true;
+    header('MCP', '');
+    note(textOf(r) || 'Nothing to show.', 'warn');
+  }
+};
+app.ontoolcancelled = () => { $('loading').hidden = true; note('Cancelled.', 'warn'); };
+app.onhostcontextchanged = applyContext;
+
+await app.connect();
+applyContext(app.getHostContext());
+</script>
+</body>
+</html>
