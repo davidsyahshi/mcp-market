@@ -31,7 +31,7 @@ Or type a command, and the AI does exactly that ([`server/src/commands.js`](serv
 | Command | What it does |
 |---|---|
 | `/mcpcredit [code]` | start here: your balance, the mint and all commands; with a code, your free mint |
-| `/code-mcp <code>` | redeem a code for a free mint |
+| `/mcpmint [code]` | with a code: your free mint (`/mcpmint with code EARLY`); without one: mint for 5 $MCP |
 | `/help-mcp` | all commands |
 | `/balance-mcp` | balance, MCP address, your NFTs and recent activity |
 | `/deposit-mcp` | your Solana address for USDC/USDT top-ups; run it again after sending to check |
