@@ -267,7 +267,7 @@
       </div>
       <div id="tmOut" class="note" aria-live="polite" style="margin-top:10px"></div>
       <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Promo codes</h2>
-      <p>Each account that types the code in its AI chat (<b>/mcpcredit CODE</b>) gets one free random MCP, until the uses run out. In the explorer they show as <b>free mint</b>.</p></div></div>
+      <p>Each account that types the code in its AI chat (<b>/mcpmint with code CODE</b>) gets one free random MCP, until the uses run out. In the explorer they show as <b>free mint</b>.</p></div></div>
       <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end">
         ${field('pcCode', 'Code', 'placeholder="FIRST200" maxlength="32" autocomplete="off" spellcheck="false"')}
         ${field('pcUses', 'Uses (accounts)', 'type="number" min="1" max="5000" step="1" value="200" inputmode="numeric"')}
@@ -360,7 +360,7 @@
     let list;
     try { list = await send('GET', '/admin/promo'); } catch (e) { el.textContent = e.message; return; }
     el.innerHTML = `<table class="txs"><thead><tr><th>Code</th><th style="text-align:right">Used</th><th>Status</th><th class="hide-sm">Last used</th><th></th></tr></thead><tbody>
-      ${list.map((p) => `<tr><td><code>${esc(p.code)}</code><div class="note">type: /mcpcredit ${esc(p.code)}</div></td>
+      ${list.map((p) => `<tr><td><code>${esc(p.code)}</code><div class="note">type: /mcpmint with code ${esc(p.code)}</div></td>
         <td class="num"><b>${Number(p.used).toLocaleString('en-US')}</b> / ${Number(p.max_uses).toLocaleString('en-US')}</td>
         <td>${pill(p.status === 'active' ? (p.used >= p.max_uses ? 'used up' : 'live') : 'paused')}</td>
         <td class="hide-sm note">${p.last_used_at ? esc(new Date(p.last_used_at).toLocaleString()) : '—'}</td>
@@ -395,7 +395,7 @@
       $('#pcGo').disabled = true;
       try {
         const p = await send('POST', '/admin/promo', { code, uses });
-        out.innerHTML = `Made <code>${esc(p.code)}</code> for ${Number(p.max_uses).toLocaleString('en-US')} accounts. In the chat: <code>/mcpcredit ${esc(p.code)}</code>`;
+        out.innerHTML = `Made <code>${esc(p.code)}</code> for ${Number(p.max_uses).toLocaleString('en-US')} accounts. In the chat: <code>/mcpmint with code ${esc(p.code)}</code>`;
         $('#pcCode').value = '';
         loadPromos();
       } catch (e) {
