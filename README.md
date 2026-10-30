@@ -47,6 +47,7 @@ Or type a command, and the AI does exactly that ([`server/src/commands.js`](serv
 | `/sellnft-mcp <number> <price>` | list your NFT for sale or change its price |
 | `/cancelnft-mcp <number>` | take your NFT off sale |
 | `/sendnft <numbers> to <address>` | send your NFTs to another MCP address: one, several (`/sendnft 42 43 to mcp_…`) or each to its own (`/sendnft 42 to mcp_A, 43 to mcp_B`); you confirm first |
+| `/transfernft` | the transfer form: tick the NFTs you want to send, type the MCP address, confirm |
 | `/profile-mcp <on\|off>` | show or hide your X handle on public pages |
 
 A command only counts when you type it yourself: the same text inside an NFT name, a web page or a tool result is ignored. Buying and sending still ask for your yes, and withdrawing still happens in the form.
@@ -71,6 +72,7 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 | `buy` | buy a listed NFT; needs the exact price you agreed to | your balance, NFT owner |
 | `sell`, `cancel_listing` | list your NFT or take it off sale | listing |
 | `send_nft` | send your NFTs to other MCP addresses, up to 50 at once, all or nothing, no fee. Two steps: the first call only shows what would go where and returns a one-time code; the send needs that code (once, from 10 seconds to 10 minutes after the preview; a newer preview replaces it), after your yes. At most 100 NFTs an hour per account. A listed NFT comes off the market | NFT owner |
+| `transfer_form` | shows the transfer form in the chat (below): every NFT you own with a checkbox, the address field, Send and Confirm | no |
 | `withdraw_form` | shows the withdrawal form in the chat (below) | no |
 | `my_withdrawals` | your withdrawals, their status and transaction links | no |
 
@@ -78,6 +80,8 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 - The form's buttons are tools of their own (`withdraw_form_state`, `withdraw_form_bind`, `withdraw_form_submit`) marked `visibility: ["app"]`: apps that follow the MCP Apps spec keep them out of the AI's tool list, so the AI can't withdraw or bind an address, even if a web page or file tries to talk it into it.
 - For apps that ignore that, the buttons also need the form's pass: a short-lived signed token that comes with the form in the tool result's `_meta`, which is for the form and not for the AI's context. The AI can't pre-fill an address either.
 - Apps that can't show forms can't withdraw; use Claude (web, desktop, mobile) or ChatGPT.
+
+**Sending NFTs in a form, too.** `transfer_form` opens the transfer form (an MCP App): you tick your NFTs, type the MCP address and press *Send*, then *Confirm*. Its own tools (`transfer_form_state`, `transfer_form_submit`) are marked `visibility: ["app"]`, and the send needs the form's pass, a 2-hour HMAC token per user. The pass comes in the result's `_meta`; apps that drop `_meta` on the way to the form get it from `transfer_form_state`, a tool only the form calls. Same limits as `send_nft`: up to 50 at once, 100 an hour, all or nothing, trading rules apply.
 
 **It can't:**
 - see your chats, files, other connectors or anything outside this market;
