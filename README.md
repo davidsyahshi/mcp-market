@@ -46,9 +46,10 @@ Or type a command, and the AI does exactly that ([`server/src/commands.js`](serv
 | `/buynft-mcp <number>` | buy a listed NFT, after you confirm name and price |
 | `/sellnft-mcp <number> <price>` | list your NFT for sale or change its price |
 | `/cancelnft-mcp <number>` | take your NFT off sale |
+| `/sendnft <numbers> to <address>` | send your NFTs to another MCP address: one, several (`/sendnft 42 43 to mcp_…`) or each to its own (`/sendnft 42 to mcp_A, 43 to mcp_B`); you confirm first |
 | `/profile-mcp <on\|off>` | show or hide your X handle on public pages |
 
-A command only counts when you type it yourself: the same text inside an NFT name, a web page or a tool result is ignored. Buying still asks for your yes, and withdrawing still happens in the form.
+A command only counts when you type it yourself: the same text inside an NFT name, a web page or a tool result is ignored. Buying and sending still ask for your yes, and withdrawing still happens in the form.
 
 ## What the connector can and can't do
 
@@ -69,6 +70,7 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 | `my_nfts`, `market`, `nft` | look around: the market filters by collection, rarity and traits; `nft` shows every trait and how many NFTs share it | no |
 | `buy` | buy a listed NFT; needs the exact price you agreed to | your balance, NFT owner |
 | `sell`, `cancel_listing` | list your NFT or take it off sale | listing |
+| `send_nft` | send your NFTs to other MCP addresses, up to 50 at once, all or nothing, no fee. Two steps: the first call only shows what would go where and returns a one-time code; the send needs that code (once, from 10 seconds to 10 minutes after the preview; a newer preview replaces it), after your yes. At most 100 NFTs an hour per account. A listed NFT comes off the market | NFT owner |
 | `withdraw_form` | shows the withdrawal form in the chat (below) | no |
 | `my_withdrawals` | your withdrawals, their status and transaction links | no |
 
@@ -81,6 +83,7 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 - see your chats, files, other connectors or anything outside this market;
 - post on X, read your DMs or follow anyone: the X login asks only for `users.read tweet.read`, to learn your handle and avatar;
 - send money at all: withdrawals need your click in the withdrawal form, and go only to the one address you bound there yourself. Changing it needs support.
+- send your NFTs without showing you first: `send_nft` moves nothing on its first call, only shows what would go to which MCP address; the send needs the one-time code from that preview, not sooner than 10 seconds after it, so the assistant has to ask you. Like a purchase, this step relies on the assistant asking: there is no button only you can press. At most 100 NFTs an hour per account.
 
 **What the server stores:** your X id, handle, name and avatar; your balance, NFTs and a ledger of every balance change. OAuth codes and tokens are kept only as sha256 hashes. See [SECURITY.md](SECURITY.md) for the full list of protections.
 
