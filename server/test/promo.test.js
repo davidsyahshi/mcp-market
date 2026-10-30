@@ -222,18 +222,20 @@ test('redeem: guessing is limited to a few wrong codes an hour per account', asy
   assert.equal((await g.redeem('LATE')).error, false);
 });
 
-test('commands: /mcpcredit <code> and /code-mcp <code> redeem; the tool names them', async () => {
-  const code = COMMANDS.find((x) => x.name === 'code-mcp');
+test('commands: /mcpcredit <code> and /mcpmint with code <code> redeem; the tool names them', async () => {
+  const code = COMMANDS.find((x) => x.name === 'mcpmint');
   assert.equal(code.tool, 'redeem_code');
-  assert.equal(usage(code), '/code-mcp <code>');
+  assert.equal(usage(code), '/mcpmint [code]');
+  for (const typed of ['early', 'EARLY', ' "Early" ', 'with code early', 'With code: EARLY', 'code EARLY', 'promo code "early"']) assert.equal(m.normCode(typed), 'EARLY', typed);
   assert.equal(usage(COMMANDS.find((x) => x.name === 'mcpcredit')), '/mcpcredit [code]');
   const c = (await chat('zed')).client;
   const t = (await c.listTools()).tools.find((x) => x.name === 'redeem_code');
-  assert.match(t.description, /Chat command: \/code-mcp <code>\./);
+  assert.match(t.description, /Chat command: \/mcpmint \[code\]\./);
   const start = (await c.listTools()).tools.find((x) => x.name === 'mcpcredit');
   assert.match(start.description, /If a code follows the command .* call redeem_code with that code instead/);
   assert.equal(t.annotations.readOnlyHint, false);
   const ins = c.getInstructions();
   assert.match(ins, /- \/mcpcredit \[code\]: .*redeem_code/);
+  assert.match(ins, /- \/mcpmint \[code\]: .*redeem_code with just the code/);
   assert.match(ins, /call redeem_code only with a code the user typed in their own message/);
 });
