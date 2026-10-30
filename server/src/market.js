@@ -553,19 +553,37 @@ export async function sendNfts(db, fromId, items, confirm) {
     if (p.age < SEND_CONFIRM_MIN_S) fail(`Too soon: show the user what will be sent and wait for their yes before sending. ${notSent}`);
     const items0 = typeof p.items === 'string' ? JSON.parse(p.items) : p.items;
     if (JSON.stringify(sendList(items0)) !== JSON.stringify(list)) fail(`This is not the list the user confirmed. ${again}`);
-    await sendQuota(t, fromId, list.length);
-    const rows = await checkSend(t, fromId, list, { lock: true });
-    const moved = await t.query(`update nfts n set owner_id = x.to_id, price = null, listed_at = null
-      from unnest($1::int[], $2::int[]) as x(id, to_id) where n.id = x.id and n.owner_id = $3 returning n.id`, [rows.map((r) => r.nft_id), rows.map((r) => r.to_id), fromId]);
-    if (moved.length !== rows.length) fail(`Some of these NFTs just changed hands. ${notSent}`);
-    // per NFT, in NFT order: the sender's "send", then the recipient's "receive"
-    const users = rows.flatMap((r) => [Number(fromId), r.to_id]);
-    const kinds = rows.flatMap(() => ['send', 'receive']);
-    const refs = rows.flatMap((r) => [String(r.nft_id), String(r.nft_id)]);
-    const ins = await t.query(`insert into ledger (user_id, delta, kind, ref)
-      select x.u, 0, x.k, x.r from unnest($1::int[], $2::text[], $3::text[]) with ordinality as x(u, k, r, o) order by x.o returning id`, [users, kinds, refs]);
-    return { sent: rows, tx: Math.min(...ins.map((r) => Number(r.id))) };
+    return moveSend(t, fromId, list);
   });
+}
+
+// The transfer form (an MCP App in the chat): the user picks the NFTs and types the address in the form and presses
+// its Confirm button themselves, so no preview code is needed. Only the form's own tool calls this (mcp.js).
+export async function sendNftsFromForm(db, fromId, items) {
+  const list = sendList(items);
+  return db.tx((t) => moveSend(t, fromId, list));
+}
+
+// the move itself, inside the caller's transaction: limit, checks under lock, owners, ledger
+async function moveSend(t, fromId, list) {
+  await sendQuota(t, fromId, list.length);
+  const rows = await checkSend(t, fromId, list, { lock: true });
+  const moved = await t.query(`update nfts n set owner_id = x.to_id, price = null, listed_at = null
+    from unnest($1::int[], $2::int[]) as x(id, to_id) where n.id = x.id and n.owner_id = $3 returning n.id`, [rows.map((r) => r.nft_id), rows.map((r) => r.to_id), fromId]);
+  if (moved.length !== rows.length) fail(`Some of these NFTs just changed hands. ${notSent}`);
+  // per NFT, in NFT order: the sender's "send", then the recipient's "receive"
+  const users = rows.flatMap((r) => [Number(fromId), r.to_id]);
+  const kinds = rows.flatMap(() => ['send', 'receive']);
+  const refs = rows.flatMap((r) => [String(r.nft_id), String(r.nft_id)]);
+  const ins = await t.query(`insert into ledger (user_id, delta, kind, ref)
+    select x.u, 0, x.k, x.r from unnest($1::int[], $2::text[], $3::text[]) with ordinality as x(u, k, r, o) order by x.o returning id`, [users, kinds, refs]);
+  return { sent: rows, tx: Math.min(...ins.map((r) => Number(r.id))) };
+}
+
+// how many NFTs the account may still send this hour (the transfer form shows it)
+export async function sendsLeft(db, fromId) {
+  const [{ sent }] = await db.query("select count(*)::int as sent from ledger where user_id = $1 and kind = 'send' and created_at > now() - interval '1 hour'", [fromId]);
+  return Math.max(0, SEND_PER_HOUR - sent);
 }
 
 // Withdrawals (binding the address, requests, payouts) live in withdrawals.js.

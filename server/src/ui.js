@@ -53,3 +53,5 @@ export function appPage(name, { root = findRoot() } = {}) {
 export const withdrawUi = (opts) => appPage('withdraw', opts);
 // NFTs shown in the chat: a gallery of the account's NFTs, or one NFT big
 export const nftsUi = (opts) => appPage('nfts', opts);
+// the NFT transfer form: tick NFTs, type an MCP address, confirm
+export const transferUi = (opts) => appPage('transfer', opts);
