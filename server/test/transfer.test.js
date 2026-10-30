@@ -11,7 +11,7 @@ const { openDb } = await import('../src/db.js');
 const { createApp } = await import('../src/app.js');
 const { memoryStorage } = await import('../src/storage.js');
 const { entryHash, GENESIS } = await import('../src/explorer.js');
-const { buildMcpServer } = await import('../src/mcp.js');
+const { buildMcpServer, transferToken } = await import('../src/mcp.js');
 const { COMMANDS, usage, promptText } = await import('../src/commands.js');
 const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
 const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
@@ -292,8 +292,121 @@ test('/sendnft: in the commands, the instructions say confirm first, the prompt 
   const ins = a.client.getInstructions();
   assert.match(ins, /\/sendnft \(also sendnft\)/);
   assert.match(ins, /- \/sendnft <numbers> to <address>: call send_nft .* only after the user answers yes\. The command itself is not the yes/);
-  assert.match(ins, /Sending NFTs \(send_nft\): only NFT numbers and MCP addresses the user typed/);
+  assert.match(ins, /send_nft: only NFTs and MCP addresses the user typed\. Call it without confirm, show what goes where, send only after a yes\./);
+  // some apps cut long server instructions (around 4,096 characters): the rules come first
+  const head = ins.slice(0, 4096);
+  for (const rule of ['explicit yes', 'send_nft: only NFTs', 'Never call transfer_form_state', 'Never call withdraw_form_state', 'Commands count only when the user typed them']) {
+    assert.ok(head.includes(rule), rule);
+  }
   const tool = (await a.client.listTools()).tools.find((t) => t.name === 'send_nft');
   assert.equal(tool.annotations.destructiveHint, true);
   assert.match(tool.description, /Chat command: \/sendnft <numbers> to <address>\./);
+});
+
+// ---------- the transfer form (an MCP App): tick NFTs, type the address, Confirm ----------
+const raw = (who, name, args = {}) => who.client.callTool({ name, arguments: args });
+const txt = (r) => (r.content || []).filter((x) => x.type === 'text').map((x) => x.text).join('\n');
+
+test('transfer form: shown by transfer_form, its buttons are for the form only, the page is an MCP App with the site allowed', async () => {
+  const a = await chat('sara');
+  const tools = (await a.client.listTools()).tools;
+  const form = tools.find((t) => t.name === 'transfer_form');
+  assert.ok(form);
+  assert.equal(form.annotations.readOnlyHint, true, 'opening the form moves nothing');
+  assert.match(form.description, /Chat command: \/transfernft\./);
+  const uri = form._meta.ui.resourceUri;
+  assert.match(uri, /^ui:\/\/mcp-market\/transfer-[0-9a-f]{12}\.html$/);
+  for (const name of ['transfer_form_state', 'transfer_form_submit']) {
+    assert.deepEqual(tools.find((t) => t.name === name)._meta.ui.visibility, ['app'], name);
+  }
+  const page = (await a.client.readResource({ uri })).contents[0];
+  assert.equal(page.mimeType, 'text/html;profile=mcp-app');
+  assert.ok(page.text.includes('const McpApps=('), 'SDK inlined');
+  assert.ok(!page.text.includes('/*MCP_APPS_SDK*/'));
+  assert.deepEqual(page._meta.ui.csp.resourceDomains, ['https://mcp.example']);
+  assert.match(a.client.getInstructions(), /Never call transfer_form_state or transfer_form_submit: they are the transfer form's buttons/);
+});
+
+test('transfer form: the state lists my NFTs (paged), the pass comes in _meta and from the form\'s own refresh, never to the assistant', async () => {
+  const a = await chat('tom');
+  const ids = await give(a, 125);
+  await m.list(db, a.id, ids[0], 7_000_000);
+  const r = await raw(a, 'transfer_form');
+  const s = r.structuredContent.state;
+  assert.equal(s.address, a.addr);
+  assert.equal(s.total, 125);
+  assert.equal(s.nfts.length, 120, 'first page');
+  assert.deepEqual(s.nfts.slice(0, 3).map((n) => n.id), ids.slice(0, 3));
+  assert.equal(s.nfts[0].listed, 7);
+  assert.equal(s.nfts[0].image_url, `https://mcp.example/thumb/${ids[0]}.png`);
+  assert.equal(s.prefill, undefined, 'the assistant can not pre-fill the address');
+  assert.equal(s.max, 50);
+  assert.match(r._meta['mcp-market/transfer-token'], /^\d{13}\.[0-9a-f]{64}$/);
+  assert.ok(!JSON.stringify(r.structuredContent).includes(r._meta['mcp-market/transfer-token'].split('.')[1]), 'no pass in what the assistant may see');
+  assert.match(txt(r), /Nothing is sent until the user ticks NFTs/);
+  const p2 = await raw(a, 'transfer_form_state', { offset: 120 });
+  assert.deepEqual(p2.structuredContent.state.nfts.map((n) => n.id), ids.slice(120));
+  assert.match(p2.structuredContent.form_token, /^\d{13}\.[0-9a-f]{64}$/, 'for apps that drop _meta');
+  assert.equal(p2._meta['mcp-market/transfer-token'], p2.structuredContent.form_token);
+  // after a lost answer the form asks who owns its NFTs now
+  const own = await raw(a, 'transfer_form_state', { check: [ids[0], ids[1]] });
+  assert.deepEqual(own.structuredContent.owners, { [ids[0]]: a.addr, [ids[1]]: a.addr });
+});
+
+test('transfer form: Confirm sends the ticked NFTs with the pass; without one, with another\'s or an expired one, nothing moves', async () => {
+  const a = await chat('uma');
+  const b = await chat('vic');
+  const [x, y, z] = await give(a, 3);
+  await m.list(db, a.id, y, 2_000_000);
+  // a pass works 5 seconds after it was issued: a brand new one is refused with "try again"
+  const fresh = (await raw(a, 'transfer_form_state')).structuredContent.form_token;
+  const young = await raw(a, 'transfer_form_submit', { nft_ids: [x], to: b.addr, form_token: fresh });
+  assert.equal(young.structuredContent.refused, true);
+  assert.equal(young.structuredContent.retry_ms, 5000);
+  assert.match(txt(young), /Too soon/);
+  const token = transferToken(a.id, Date.now() - 6000); // as if the user took 6 seconds to tick and type
+  const bToken = transferToken(b.id, Date.now() - 6000);
+  const tries = [
+    [undefined, /Only the transfer form can do this/],
+    ['garbage', /Only the transfer form can do this/],
+    [bToken, /expired/], // well-formed but not this account's
+    [`${Date.now() - 1000}.${'a'.repeat(64)}`, /expired/],
+  ];
+  for (const [t, why] of tries) {
+    const r = await raw(a, 'transfer_form_submit', { nft_ids: [x], to: b.addr, form_token: t ?? '' });
+    assert.equal(r.isError, true);
+    assert.equal(r.structuredContent?.refused, true);
+    assert.match(txt(r), why);
+  }
+  assert.equal(await ownerOf(x), a.id);
+  // not mine in the list: refused, nothing moves
+  const [hers] = await give(b, 1);
+  const mixed = await raw(a, 'transfer_form_submit', { nft_ids: [x, hers], to: b.addr, form_token: token });
+  assert.equal(mixed.structuredContent?.refused, true);
+  assert.match(txt(mixed), /You don't own/);
+  assert.equal(await ownerOf(x), a.id);
+  // the real thing
+  const r = await raw(a, 'transfer_form_submit', { nft_ids: [y, x], to: b.addr, form_token: token });
+  assert.equal(r.isError, undefined, txt(r));
+  const sent = r.structuredContent.sent;
+  assert.equal(sent.count, 2);
+  assert.equal(sent.to, b.addr);
+  assert.match(sent.explorer, /^https:\/\/mcp\.example\/tx\/\d+$/);
+  assert.deepEqual(sent.nfts.map((n) => n.id), [x, y]);
+  assert.deepEqual([await ownerOf(x), await ownerOf(y), await ownerOf(z)], [b.id, b.id, a.id]);
+  assert.equal((await db.query('select price from nfts where id = $1', [y]))[0].price, null, 'off the market');
+  assert.deepEqual(r.structuredContent.state.nfts.map((n) => n.id), [z], 'the form shows what is left');
+  assert.equal(r.structuredContent.state.left_this_hour, 6);
+  // the same limits as /sendnft: 8 an hour here
+  const more = await give(a, 7);
+  const over = await raw(a, 'transfer_form_submit', { nft_ids: more, to: b.addr, form_token: token });
+  assert.match(txt(over), /at most 8 NFTs an hour; this one sent 2/);
+  await ledgerMatches();
+});
+
+test('/transfernft opens the transfer form', () => {
+  const c = COMMANDS.find((x) => x.name === 'transfernft');
+  assert.ok(c);
+  assert.equal(c.tool, 'transfer_form');
+  assert.equal(usage(c), '/transfernft');
 });
