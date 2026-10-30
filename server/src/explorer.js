@@ -56,7 +56,7 @@ export function explorerConfig(env = process.env) {
   };
 }
 
-const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', team_mint: 'team mint', free_mint: 'free mint', buy: 'buy', withdraw: 'withdrawal', withdraw_refund: 'refund', payout: 'payout', mint_refund: 'refund' };
+const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', team_mint: 'team mint', free_mint: 'free mint', buy: 'buy', send: 'transfer', withdraw: 'withdrawal', withdraw_refund: 'refund', payout: 'payout', mint_refund: 'refund' };
 const ESCROW_SQL = `(${ESCROW_KINDS.map((k) => `'${k}'`).join(', ')})`;
 
 export function createExplorer(db, opts = {}) {
@@ -256,7 +256,7 @@ export function createExplorer(db, opts = {}) {
   // ---------- read side (the public API) ----------
 
   const typeOf = (kinds) => {
-    for (const k of ['deposit', 'withdraw', 'withdraw_refund', 'mint_refund', 'payout', 'buy', 'mint', 'team_mint', 'free_mint', 'faucet']) if (kinds.includes(k)) return KINDS[k];
+    for (const k of ['deposit', 'withdraw', 'withdraw_refund', 'mint_refund', 'payout', 'buy', 'mint', 'team_mint', 'free_mint', 'send', 'faucet']) if (kinds.includes(k)) return KINDS[k];
     return kinds[0] || 'other';
   };
 
@@ -269,8 +269,8 @@ export function createExplorer(db, opts = {}) {
     const wIds = [...new Set(rows.filter((r) => /^w\d+$/.test(r.ref || '')).map((r) => Number(r.ref.slice(1))))];
     const ws = wIds.length ? await db.query('select id, status, tx from withdrawals where id = any($1)', [wIds]) : [];
     const wById = new Map(ws.map((w) => [Number(w.id), w]));
-    // NFT rows (mints, buys) carry the NFT's number: its name, picture and collection for the page
-    const nIds = [...new Set(rows.filter((r) => ['mint', 'team_mint', 'free_mint', 'buy', 'mint_refund'].includes(r.kind) && /^\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref)))];
+    // NFT rows (mints, buys, transfers) carry the NFT's number: its name, picture and collection for the page
+    const nIds = [...new Set(rows.filter((r) => ['mint', 'team_mint', 'free_mint', 'buy', 'mint_refund', 'send'].includes(r.kind) && /^\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref)))];
     // payouts carry "c<collection id>"
     const cIds = [...new Set(rows.filter((r) => /^c\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref.slice(1))))];
     const cs = cIds.length ? await db.query('select id, slug, name from collections where id = any($1)', [cIds]) : [];
@@ -312,6 +312,16 @@ export function createExplorer(db, opts = {}) {
         const n = nById.get(Number(team[0].ref));
         if (n) t.nft = { id: Number(team[0].ref), name: n.name, rarity: n.rarity, collection: n.slug, collection_name: n.collection_name,
           image: `/img/${Number(team[0].ref)}.png`, thumb: `/thumb/${Number(team[0].ref)}.png`, pixel: n.pixel };
+      } else if (type === KINDS.send) {
+        // NFTs sent to other MCP addresses: one or many, to one or several accounts, in one transaction
+        const sends = g.filter((r) => r.kind === 'send');
+        const to = [];
+        for (const r of g) if (r.kind === 'receive' && !to.some((x) => x.account === r.public_id)) to.push({ account: r.public_id || null, name: r.name || null });
+        t.transfer = { count: sends.length, from: sends[0]?.public_id || null, from_name: sends[0]?.name || null, recipients: to.length, to: to.slice(0, 5) };
+        const first = sends[0] && /^\d{1,9}$/.test(sends[0].ref || '') ? Number(sends[0].ref) : null;
+        const n = first != null ? nById.get(first) : null;
+        if (first != null) t.nft = n ? { id: first, name: n.name, rarity: n.rarity, collection: n.slug, collection_name: n.collection_name,
+          image: `/img/${first}.png`, thumb: `/thumb/${first}.png`, pixel: n.pixel } : { id: first, name: nftName(first) };
       } else if (/^\d+$/.test(ref) && ['mint', 'free mint', 'buy', 'refund'].includes(type)) {
         const n = nById.get(Number(ref));
         t.nft = n ? { id: Number(ref), name: n.name, rarity: n.rarity, collection: n.slug, collection_name: n.collection_name,
@@ -325,7 +335,7 @@ export function createExplorer(db, opts = {}) {
     const n = Math.min(Math.max(Number(limit) || 30, 1), 100);
     // addr: only transactions touching that MCP address ("treasury": the market's own rows)
     // The newest rows by id (index), then their whole transactions. A transaction's rows have neighbouring ids,
-    // so a window of 4 rows per transaction is usually plenty. A big transaction (a team mint has 50 rows) can fill
+    // so a window of 4 rows per transaction is usually plenty. A big transaction (a team mint has 50 rows, a send of 50 NFTs 100) can fill
     // the window: then it is widened until the page is full or the window reaches the end of the ledger.
     let userId = null;
     if (addr && addr !== 'treasury' && addr !== 'escrow') {

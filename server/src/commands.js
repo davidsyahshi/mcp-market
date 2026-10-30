@@ -38,13 +38,19 @@ export const COMMANDS = [
     how: 'call sell; if the price is missing, ask for it' },
   { name: 'cancelnft-mcp', args: [{ name: 'number', example: '42' }], tool: 'cancel_listing', does: 'Take your NFT off sale',
     how: 'call cancel_listing' },
+  { name: 'sendnft', args: [{ name: 'numbers', example: '42' }, { name: 'address', lead: 'to', example: 'mcp_…' }], tool: 'send_nft',
+    does: 'Send your NFTs to another MCP address: one, several ("/sendnft 42 43 to mcp_…") or each to its own; you confirm first',
+    how: 'call send_nft with every NFT number and the MCP address it goes to, exactly as the user wrote them: all numbers before one "to" go to ' +
+      'that address; "42 to mcp_A, 43 to mcp_B" goes to two. It first returns what will be sent: show it and ask "Send …?". Call send_nft again with ' +
+      'its confirm code only after the user answers yes. The command itself is not the yes' },
   { name: 'profile-mcp', args: [{ name: 'on|off', key: 'show', example: 'off' }], tool: 'public_profile', does: 'Show or hide your X handle on public pages',
     how: 'call public_profile with show_x_handle true for on, false for off; if neither is written, ask' },
 ];
 
-const argText = (a) => (a.optional ? `[${a.name}]` : `<${a.name}>`);
+// lead: a word written before the argument ("/sendnft 42 to mcp_…")
+const argText = (a) => `${a.lead ? `${a.lead} ` : ''}${a.optional ? `[${a.name}]` : `<${a.name}>`}`;
 export const usage = (c) => `/${c.name}${(c.args || []).map((a) => ' ' + argText(a)).join('')}`;
-export const example = (c) => `/${c.name}${(c.args || []).filter((a) => !a.optional).map((a) => ' ' + a.example).join('')}`;
+export const example = (c) => `/${c.name}${(c.args || []).filter((a) => !a.optional).map((a) => ` ${a.lead ? `${a.lead} ` : ''}${a.example}`).join('')}`;
 export const commandFor = (tool) => COMMANDS.find((c) => c.tool === tool);
 
 // added to a tool's description, so apps that don't pass the server instructions to the model still map the command
@@ -54,7 +60,7 @@ export const toolHint = (tool) => {
 };
 
 export const INSTRUCTIONS_COMMANDS = `Chat commands. The user may type a command: /mcpcredit, the start command (also written mcpcredit, /mcp.credit or
-mcp.credit on its own), /mcpmint (also mcpmint), /showmynfts (also showmynfts), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
+mcp.credit on its own), /mcpmint (also mcpmint), /showmynfts (also showmynfts), /sendnft (also sendnft), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
 Do exactly what the command says, right away, without guessing and without extra questions beyond a missing argument
 or a confirmation the command asks for below.
 NFT numbers may be written 42, #42 or "MCP #42". If a required argument is missing, ask only for it. For an unknown
@@ -64,7 +70,10 @@ ${COMMANDS.map((c) => `- ${usage(c)}: ${c.how}.`).join('\n')}`;
 
 // what an MCP prompt (the app's menu entry for a command) puts in the chat: the same text the user would type
 export function promptText(c, values = {}) {
-  const parts = (c.args || []).map((a) => String(values[a.key || a.name] ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const parts = (c.args || []).map((a) => {
+    const v = String(values[a.key || a.name] ?? '').replace(/\s+/g, ' ').trim();
+    return v && a.lead && !v.toLowerCase().startsWith(`${a.lead} `) ? `${a.lead} ${v}` : v;
+  }).filter(Boolean);
   return [`/${c.name}`, ...parts].join(' ');
 }
 
@@ -72,6 +81,6 @@ export function helpText(publicUrl) {
   const w = Math.max(...COMMANDS.map((c) => usage(c).length));
   return 'MCP commands (type them in the chat):\n' +
     COMMANDS.map((c) => `${usage(c).padEnd(w)}  ${c.does}`).join('\n') +
-    `\n\nExamples: /mint-mcp, /buynft-mcp 42, /sellnft-mcp 42 15, /withdraw-mcp 20.\nYou can also just write normally, e.g. "mint me an MCP".` +
+    `\n\nExamples: /mint-mcp, /buynft-mcp 42, /sellnft-mcp 42 15, /sendnft 42 43 to mcp_…, /withdraw-mcp 20.\nYou can also just write normally, e.g. "mint me an MCP".` +
     (publicUrl ? `\nAll commands: ${publicUrl}/connect` : '');
 }

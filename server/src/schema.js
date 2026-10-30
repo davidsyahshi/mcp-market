@@ -141,7 +141,7 @@ create table if not exists ledger (
   id bigserial primary key,
   user_id int references users(id),     -- null = project treasury (fees, mint revenue)
   delta bigint not null,
-  kind text not null,                   -- deposit | faucet | mint | team_mint | free_mint | buy | sale | fee | withdraw | ...
+  kind text not null,                   -- deposit | faucet | mint | team_mint | free_mint | buy | sale | fee | send | receive | withdraw | ...
   ref text,
   created_at timestamptz not null default now()
 );
@@ -354,6 +354,15 @@ create table if not exists promo_tasks_shown (
   shown_at timestamptz not null default now(),
   primary key (code, user_id)
 );
+-- sending NFTs from the chat (send_nft): the list the user was shown, kept under a one-time code until they say yes
+-- (used once, within 10 minutes; old ones are cleared as new previews come). Not in backups.
+create table if not exists nft_send_previews (
+  code text primary key,
+  user_id int not null references users(id),
+  items jsonb not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists nft_send_previews_age on nft_send_previews(created_at);
 
 -- OAuth for the MCP connector. Codes and tokens are stored as sha256 hashes, never in plain text.
 create table if not exists oauth_clients (
@@ -409,6 +418,7 @@ alter table promo_codes enable row level security;
 alter table promo_redemptions enable row level security;
 alter table promo_misses enable row level security;
 alter table promo_tasks_shown enable row level security;
+alter table nft_send_previews enable row level security;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') and exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on all tables in schema public from anon, authenticated;

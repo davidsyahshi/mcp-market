@@ -4,7 +4,8 @@
 // server/scripts/restore-backup.js loads a file into a new, empty database.
 //
 // Kept: the copies of the last 48 hours, then the first copy of each day for 30 days.
-// Not kept: sign-in sessions, OAuth codes and logins in progress (short-lived; people just sign in again).
+// Not kept: sign-in sessions, OAuth codes and logins in progress (short-lived; people just sign in again), and
+// NFT send previews (a few minutes each; the user just asks again).
 // There are no keys or seed phrases in the database, so there are none in a backup either.
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';

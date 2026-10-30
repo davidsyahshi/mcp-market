@@ -401,12 +401,12 @@ async function lockCollectionOf(t, nftId) {
 
 // a collection that trades only after its sell-out: nothing is listed or bought before the last NFT is minted.
 // Mints only ever bring the sell-out closer, so a count read while they run can only refuse a bit early.
-async function tradingClosed(t, c) {
+async function tradingClosed(t, c, what = 'listed or bought') {
   if (!c.trade_after_sold_out) return false;
   const [{ left }] = await t.query('select exists (select 1 from nfts where collection_id = $1 and minted_at is null) as left', [c.id]);
   if (!left) return false;
   const [{ n, total }] = await t.query('select count(*) filter (where minted_at is not null)::int as n, count(*)::int as total from nfts where collection_id = $1', [c.id]);
-  return `Trading in ${c.name} opens when the whole collection is minted: ${n.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} so far. Until then its NFTs can't be listed or bought.`;
+  return `Trading in ${c.name} opens when the whole collection is minted: ${n.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} so far. Until then its NFTs can't be ${what}.`;
 }
 
 export async function list(db, userId, nftId, price) {
@@ -449,6 +449,122 @@ export async function buy(db, buyerId, nftId, expectedPrice) {
     await t.query('insert into sales (nft_id, seller_id, buyer_id, price) values ($1, $2, $3, $4)', [nftId, nft.owner_id, buyerId, price]);
     const [row] = await t.query('update nfts set owner_id = $1, price = null, listed_at = null where id = $2 returning *', [buyerId, nftId]);
     return { nft: row, price, fee };
+  });
+}
+
+// ---------- sending NFTs to other MCP addresses ----------
+// An owner gives NFTs to other accounts: one, several to one address, or each to its own address, all in one
+// transaction (every NFT goes, or none does). No money moves and there is no fee. Each NFT gets two zero-amount
+// ledger rows, "send" (the sender) and "receive" (the recipient), so the explorer and the NFT's history show it.
+// A listed NFT comes off the market as it leaves. Trading rules apply: nothing from a frozen collection, nothing
+// before the sell-out of a collection that trades only after it.
+// The chat sends in two steps: previewSend checks everything, moves nothing and keeps the exact list under a one-time
+// code (a new preview replaces the account's earlier one); after the user said yes, sendNfts with that code moves it.
+// The code works from SEND_CONFIRM_MIN_S (so the assistant has to go back to the user, it can't preview and send in one
+// breath) to SEND_CONFIRM_TTL_S after the preview, and is used up only by a send that goes through.
+// Sends are free, so each account sends at most SEND_PER_HOUR NFTs an hour: the ledger can't be flooded by passing
+// NFTs back and forth.
+export const SEND_MAX = 50;
+export const SEND_CONFIRM_TTL_S = 600;
+export const SEND_CONFIRM_MIN_S = 10;
+export const SEND_PER_HOUR = Math.max(1, Number(process.env.SEND_PER_HOUR) || 100);
+const notSent = 'Nothing was sent.';
+
+async function sendQuota(t, fromId, n) {
+  const [{ sent }] = await t.query("select count(*)::int as sent from ledger where user_id = $1 and kind = 'send' and created_at > now() - interval '1 hour'", [fromId]);
+  if (sent + n > SEND_PER_HOUR) {
+    fail(`An account sends at most ${SEND_PER_HOUR} NFTs an hour; this one sent ${sent} in the last hour.` +
+      `${sent < SEND_PER_HOUR ? ` Send ${SEND_PER_HOUR - sent} or fewer now, or the rest later.` : ' Try again later.'} ${notSent}`);
+  }
+}
+
+// [{nft_id, to}] checked and in NFT order, so the same list always reads the same
+function sendList(items) {
+  if (!Array.isArray(items) || !items.length) fail('Say which NFT to send and to which MCP address.');
+  if (items.length > SEND_MAX) fail(`Send at most ${SEND_MAX} NFTs at a time.`);
+  const seen = new Set();
+  const list = items.map((x) => {
+    const nft = Number(x?.nft_id);
+    const to = String(x?.to ?? '').trim();
+    if (!Number.isInteger(nft) || nft < 1 || nft > 2147483647) fail(`An NFT number is a whole number, like 42. ${notSent}`);
+    if (!isPublicId(to)) {
+      const shown = to.replace(/[^\w]/g, '').slice(0, 24);
+      fail(`${shown ? `"${shown}"` : 'That'} is not an MCP address. An MCP address is mcp_ and 12 letters and digits; copy it from the recipient. ${notSent}`);
+    }
+    if (seen.has(nft)) fail(`${nftName(nft)} is in the list twice. ${notSent}`);
+    seen.add(nft);
+    return { nft_id: nft, to };
+  });
+  return list.sort((a, b) => a.nft_id - b.nft_id);
+}
+
+// every check of a send; with lock, also the locks of trading in their order: collections (shared), then the NFTs
+async function checkSend(t, fromId, list, { lock }) {
+  const ids = list.map((x) => x.nft_id);
+  const addrs = [...new Set(list.map((x) => x.to))];
+  const users = await t.query('select id, public_id, handle, show_handle from users where public_id = any($1::text[])', [addrs]);
+  const byAddr = new Map(users.map((u) => [u.public_id, u]));
+  for (const a of addrs) {
+    const u = byAddr.get(a);
+    if (!u) fail(`There is no MCP account ${a}. Check the address. ${notSent}`);
+    if (Number(u.id) === Number(fromId)) fail(`${a} is your own MCP address. ${notSent}`);
+  }
+  const cols = await t.query(`select id, name, status, supply, trade_after_sold_out from collections
+    where id in (select collection_id from nfts where id = any($1::int[])) order by id ${lock ? 'for share' : ''}`, [ids]);
+  const nfts = await t.query(`select id, name, rarity, owner_id, price from nfts where id = any($1::int[]) order by id ${lock ? 'for update' : ''}`, [ids]);
+  const byId = new Map(nfts.map((n) => [Number(n.id), n]));
+  for (const id of ids) {
+    const n = byId.get(id);
+    if (!n || n.owner_id == null || Number(n.owner_id) !== Number(fromId)) fail(`You don't own ${n ? n.name : nftName(id)}. ${notSent}`);
+  }
+  for (const c of cols) {
+    if (c.status === 'frozen') fail(`${c.name} is frozen: its NFTs can't be traded or sent. ${notSent}`);
+    const closed = await tradingClosed(t, c, 'listed, bought or sent');
+    if (closed) fail(closed);
+  }
+  return list.map((x) => {
+    const n = byId.get(x.nft_id);
+    const u = byAddr.get(x.to);
+    return { ...x, to_id: Number(u.id), to_name: u.show_handle ? u.handle : null, name: n.name, rarity: n.rarity, listed: n.price != null };
+  });
+}
+
+export async function previewSend(db, fromId, items) {
+  const list = sendList(items);
+  return db.tx(async (t) => {
+    await sendQuota(t, fromId, list.length);
+    const rows = await checkSend(t, fromId, list, { lock: false });
+    const code = crypto.randomBytes(9).toString('base64url');
+    // one preview per account: the newest is what the user is being asked about
+    await t.query("delete from nft_send_previews where user_id = $1 or created_at < now() - interval '1 day'", [fromId]);
+    await t.query('insert into nft_send_previews (code, user_id, items) values ($1, $2, $3)', [code, fromId, JSON.stringify(list)]);
+    return { confirm: code, items: rows, ttl_s: SEND_CONFIRM_TTL_S, wait_s: SEND_CONFIRM_MIN_S };
+  });
+}
+
+export async function sendNfts(db, fromId, items, confirm) {
+  const list = sendList(items);
+  return db.tx(async (t) => {
+    const again = `Show the user what will be sent again (send_nft without confirm) and ask them. ${notSent}`;
+    const [p] = await t.query(`delete from nft_send_previews where code = $1 and user_id = $2
+      returning items, extract(epoch from now() - created_at)::float as age`, [String(confirm ?? '').trim().slice(0, 40), fromId]);
+    if (!p) fail(`This send has no confirmation: it was used already, or a newer preview replaced it. ${again}`);
+    if (p.age > SEND_CONFIRM_TTL_S) fail(`The confirmation is more than ${SEND_CONFIRM_TTL_S / 60} minutes old. ${again}`);
+    if (p.age < SEND_CONFIRM_MIN_S) fail(`Too soon: show the user what will be sent and wait for their yes before sending. ${notSent}`);
+    const items0 = typeof p.items === 'string' ? JSON.parse(p.items) : p.items;
+    if (JSON.stringify(sendList(items0)) !== JSON.stringify(list)) fail(`This is not the list the user confirmed. ${again}`);
+    await sendQuota(t, fromId, list.length);
+    const rows = await checkSend(t, fromId, list, { lock: true });
+    const moved = await t.query(`update nfts n set owner_id = x.to_id, price = null, listed_at = null
+      from unnest($1::int[], $2::int[]) as x(id, to_id) where n.id = x.id and n.owner_id = $3 returning n.id`, [rows.map((r) => r.nft_id), rows.map((r) => r.to_id), fromId]);
+    if (moved.length !== rows.length) fail(`Some of these NFTs just changed hands. ${notSent}`);
+    // per NFT, in NFT order: the sender's "send", then the recipient's "receive"
+    const users = rows.flatMap((r) => [Number(fromId), r.to_id]);
+    const kinds = rows.flatMap(() => ['send', 'receive']);
+    const refs = rows.flatMap((r) => [String(r.nft_id), String(r.nft_id)]);
+    const ins = await t.query(`insert into ledger (user_id, delta, kind, ref)
+      select x.u, 0, x.k, x.r from unnest($1::int[], $2::text[], $3::text[]) with ordinality as x(u, k, r, o) order by x.o returning id`, [users, kinds, refs]);
+    return { sent: rows, tx: Math.min(...ins.map((r) => Number(r.id))) };
   });
 }
 
@@ -500,10 +616,10 @@ export async function getNft(db, id, { anyStatus = false } = {}) {
   return nft;
 }
 
-// the NFT's own transactions from the ledger (mint and sales), newest first; tx = the explorer's transaction number
+// the NFT's own transactions from the ledger (mint, sales and transfers), newest first; tx = the explorer's transaction number
 export async function activity(db, id) {
   const rows = await db.query(`select l.id, l.xact, l.kind, l.delta, l.created_at, ${PUBLIC_NAME('u', 'user')}
-    from ledger l join users u on u.id = l.user_id where l.ref = $1 and l.kind in ('mint', 'team_mint', 'free_mint', 'buy', 'sale') order by l.id`, [String(id)]);
+    from ledger l join users u on u.id = l.user_id where l.ref = $1 and l.kind in ('mint', 'team_mint', 'free_mint', 'buy', 'sale', 'send', 'receive') order by l.id`, [String(id)]);
   const byX = new Map();
   for (const r of rows) {
     const key = String(r.xact);
@@ -514,6 +630,8 @@ export async function activity(db, id) {
     if (r.kind === 'free_mint') Object.assign(a, { type: 'mint', free: true, to_addr: r.user_addr, to_name: r.user_name, price: 0 });
     if (r.kind === 'buy') Object.assign(a, { type: 'sale', to_addr: r.user_addr, to_name: r.user_name, price: -Number(r.delta) });
     if (r.kind === 'sale') Object.assign(a, { from_addr: r.user_addr, from_name: r.user_name });
+    if (r.kind === 'send') Object.assign(a, { type: 'transfer', from_addr: r.user_addr, from_name: r.user_name, price: 0 });
+    if (r.kind === 'receive') Object.assign(a, { to_addr: r.user_addr, to_name: r.user_name });
   }
   return [...byX.values()].filter((a) => a.type).reverse();
 }
