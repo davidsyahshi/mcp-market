@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MCP transfer</title>
+<!--
+  The NFT transfer form shown inside the chat (an MCP App). The assistant only opens it; the person ticks their NFTs,
+  types the MCP address and presses Send, then Confirm, here. The server inlines the MCP Apps SDK in place of the
+  marker in the script below (server/src/ui.js). Pictures come from the site (allowed by the resource's CSP).
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --cherry: #FF2A1F;
+    --ink: #0B0B0B;
+    --fg: var(--color-text-primary, #141413);
+    --fg2: var(--color-text-secondary, #3D3D3A);
+    --fg3: var(--color-text-tertiary, #73726C);
+    --bg2: var(--color-background-secondary, #F5F4ED);
+    --line: var(--color-border-tertiary, rgba(31, 30, 29, .15));
+    --line2: var(--color-border-primary, rgba(31, 30, 29, .4));
+    --ring: var(--color-ring-primary, rgba(20, 20, 19, .7));
+    --danger: var(--color-text-danger, #7F2C28);
+    --danger-bg: var(--color-background-danger, #F7ECEC);
+    --ok: var(--color-text-success, #265B19);
+    --ok-bg: var(--color-background-success, #E9F1DC);
+    --warn: var(--color-text-warning, #5A4815);
+    --warn-bg: var(--color-background-warning, #F6EEDF);
+    --r: var(--border-radius-md, 8px);
+    --rl: var(--border-radius-lg, 10px);
+    --sans: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+    --mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    --pad-t: 16px; --pad-r: 16px; --pad-b: 16px; --pad-l: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fg: var(--color-text-primary, #FAF9F5);
+      --fg2: var(--color-text-secondary, #C2C0B6);
+      --fg3: var(--color-text-tertiary, #9C9A92);
+      --bg2: var(--color-background-secondary, #262624);
+      --line: var(--color-border-tertiary, rgba(222, 220, 209, .15));
+      --line2: var(--color-border-primary, rgba(222, 220, 209, .4));
+      --ring: var(--color-ring-primary, rgba(250, 249, 245, .7));
+      --danger: var(--color-text-danger, #EE8884);
+      --danger-bg: var(--color-background-danger, #602A28);
+      --ok: var(--color-text-success, #7AB948);
+      --ok-bg: var(--color-background-success, #1B4614);
+      --warn: var(--color-text-warning, #D1A041);
+      --warn-bg: var(--color-background-warning, #483A0F);
+    }
+  }
+  :root[data-theme="dark"] {
+    --fg: var(--color-text-primary, #FAF9F5);
+    --fg2: var(--color-text-secondary, #C2C0B6);
+    --fg3: var(--color-text-tertiary, #9C9A92);
+    --bg2: var(--color-background-secondary, #262624);
+    --line: var(--color-border-tertiary, rgba(222, 220, 209, .15));
+    --line2: var(--color-border-primary, rgba(222, 220, 209, .4));
+    --ring: var(--color-ring-primary, rgba(250, 249, 245, .7));
+    --danger: var(--color-text-danger, #EE8884);
+    --danger-bg: var(--color-background-danger, #602A28);
+    --ok: var(--color-text-success, #7AB948);
+    --ok-bg: var(--color-background-success, #1B4614);
+    --warn: var(--color-text-warning, #D1A041);
+    --warn-bg: var(--color-background-warning, #483A0F);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body {
+    font-family: var(--sans);
+    font-size: var(--font-text-sm-size, 14px);
+    line-height: var(--font-text-sm-line-height, 1.4);
+    color: var(--fg);
+    padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+    -webkit-text-size-adjust: 100%;
+  }
+  main { display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+  [hidden] { display: none !important; }
+
+  header { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 38px; height: 32px; border-radius: var(--r); overflow: hidden; flex: none; display: block; }
+  .logo svg { width: 100%; height: 100%; display: block; }
+  .ttl { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .ttl b { font-size: var(--font-heading-sm-size, 14px); font-weight: var(--font-weight-semibold, 600); letter-spacing: .06em; text-transform: uppercase; }
+  .ttl small { color: var(--fg3); font-size: var(--font-text-xs-size, 12px); font-family: var(--mono); overflow-wrap: anywhere; }
+
+  .label { color: var(--fg3); font-size: var(--font-text-xs-size, 12px); text-transform: uppercase; letter-spacing: .06em; }
+  .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .bar .count { flex: 1; min-width: 120px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bar .count small { color: var(--fg3); font-weight: 400; }
+  .chip { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid var(--line2); border-radius: var(--border-radius-full, 999px); background: transparent; color: var(--fg); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .find { flex: none; width: 120px; min-height: 32px; border: 1px solid var(--line2); border-radius: var(--border-radius-full, 999px); background: transparent; color: var(--fg); font: inherit; font-size: 13px; padding: 0 12px; }
+  .find:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 360px; overflow-y: auto; padding: 2px; }
+  .tile { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--rl); background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+  .tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .tile img { width: 100%; aspect-ratio: 1; border-radius: 6px; background: var(--bg2); display: block; object-fit: cover; }
+  .tile img.px { image-rendering: pixelated; }
+  .tile .nm { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .rr { font-size: 11px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .ck { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; background: rgba(0, 0, 0, .35); box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); display: flex; align-items: center; justify-content: center; }
+  .tile .ck svg { width: 14px; height: 14px; display: none; }
+  .tile.on { border-color: var(--cherry); box-shadow: 0 0 0 1px var(--cherry); }
+  .tile.on .ck { background: var(--cherry); border-color: var(--cherry); }
+  .tile.on .ck svg { display: block; }
+  .tile .tag { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 700; letter-spacing: .04em; background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 2px 6px; }
+  .tile:disabled { opacity: .45; cursor: default; }
+  .more { display: flex; justify-content: center; }
+  .locked .bar, .locked .grid, .locked .more { pointer-events: none; opacity: .6; }
+
+  .field { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line2); border-radius: var(--rl); padding: 4px 12px; background: transparent; }
+  .field:focus-within { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font-family: var(--mono); font-size: 15px; font-weight: 500; padding: 9px 0; }
+
+  .actions { display: flex; gap: 8px; }
+  button.primary, button.ghost { min-height: 44px; border-radius: var(--rl); font: inherit; font-weight: var(--font-weight-semibold, 600); font-size: 15px; cursor: pointer; padding: 0 16px; }
+  button.primary { flex: 1; border: 0; background: var(--cherry); color: var(--ink); }
+  button.ghost { border: 1px solid var(--line2); background: transparent; color: var(--fg); }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+  .note { margin: 0; padding: 10px 12px; border-radius: var(--r); font-size: 13px; }
+  .note.warn { background: var(--warn-bg); color: var(--warn); }
+  .note.err { background: var(--danger-bg); color: var(--danger); }
+  .note.ok { background: var(--ok-bg); color: var(--ok); }
+  .fine { margin: 0; color: var(--fg3); font-size: var(--font-text-xs-size, 12px); }
+
+  .done { display: flex; flex-direction: column; gap: 6px; }
+  .done .big { display: flex; align-items: center; gap: 8px; font-size: var(--font-heading-lg-size, 20px); font-weight: var(--font-weight-semibold, 600); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); flex: none; }
+  .mono { font-family: var(--mono); overflow-wrap: anywhere; }
+
+  .sk { height: 14px; border-radius: 6px; background: var(--bg2); }
+  .sk.w60 { width: 60%; } .sk.w40 { width: 40%; } .sk.h96 { height: 96px; border-radius: var(--rl); }
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite">
+  <header>
+    <span class="logo"><svg viewBox="0 0 19 16" shape-rendering="crispEdges" aria-hidden="true"><rect width="19" height="16" fill="#FF2A1F"/><path fill="#F5F1E8" d="M8 1h8v1h-8zM6 2h11v1h-11zM5 3h13v1h-13zM5 4h13v1h-13zM5 5h3v1h-3zM10 5h4v1h-4zM16 5h2v1h-2zM5 6h13v1h-13zM5 7h13v1h-13zM8 10h8v1h-8zM8 11h8v1h-8zM9 12h6v1h-6zM9 13h1v1h-1zM13 13h1v1h-1zM9 14h1v1h-1zM13 14h1v1h-1z"/><path fill="#B5B2AB" d="M17 2h1v1h-1zM18 3h1v1h-1zM18 4h1v1h-1zM18 5h1v1h-1zM18 6h1v1h-1zM18 7h1v1h-1zM6 8h12v1h-12zM10 13h1v1h-1zM14 13h1v1h-1zM10 14h1v1h-1zM14 14h1v1h-1z"/><path fill="#0B0B0B" d="M3 9h14v1h-14zM2 10h2v1h-2zM1 11h1v1h-1z"/><path fill="#363636" d="M17 9h1v1h-1zM2 11h1v1h-1z"/></svg></span>
+    <div class="ttl"><b>Send NFTs</b><small id="from">from your MCP address</small></div>
+  </header>
+
+  <section id="loading" aria-label="Loading">
+    <div class="sk w40"></div><div class="sk h96" style="margin-top:10px"></div><div class="sk w60" style="margin-top:10px"></div>
+  </section>
+
+  <!-- pick the NFTs, type the address, Send, Confirm -->
+  <section id="form" hidden>
+    <div class="bar">
+      <span class="count" id="count">0 selected</span>
+      <input class="find" id="find" placeholder="Find #…" autocomplete="off" aria-label="Find an NFT by number or name">
+      <button class="chip" id="all" type="button">Select all</button>
+      <button class="chip" id="none" type="button">Clear</button>
+    </div>
+    <div class="grid" id="grid" role="group" aria-label="Your NFTs" style="margin-top:10px"></div>
+    <div class="more" id="moreWrap" hidden style="margin-top:8px"><button class="chip" id="more" type="button">Load more</button></div>
+    <div style="margin-top:14px">
+      <span class="label" id="toLabel">To MCP address</span>
+      <label class="field" style="margin-top:4px"><input id="to" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="mcp_…" aria-labelledby="toLabel"></label>
+    </div>
+    <p class="note err" id="formErr" style="margin-top:10px" hidden></p>
+    <p class="note err" id="sendErr" style="margin-top:10px" role="alert" hidden></p>
+    <div class="actions" style="margin-top:12px" id="goActs"><button class="primary" id="go" disabled>Send</button></div>
+    <p class="note warn" id="confirmTo" style="margin-top:12px" hidden></p>
+    <div class="actions" style="margin-top:12px" id="confirmActs" hidden>
+      <button class="ghost" id="no">Cancel</button><button class="primary" id="yes">Confirm</button>
+    </div>
+    <p class="fine" id="limits" style="margin-top:10px"></p>
+  </section>
+
+  <!-- what happened -->
+  <section id="result" class="done" hidden>
+    <div class="big"><span class="dot"></span><span id="rHead"></span></div>
+    <div class="fine" id="rBody"></div>
+    <div class="actions" style="margin-top:6px">
+      <button class="ghost" id="again">Send more</button><button class="primary" id="tx">View in explorer</button>
+    </div>
+  </section>
+
+  <p class="note" id="msg" hidden></p>
+</main>
+
+<script type="module">
+/*MCP_APPS_SDK*/
+
+const $ = (id) => document.getElementById(id);
+const TOKEN = 'mcp-market/transfer-token';
+const ADDR = /^mcp_[1-9A-HJ-NP-Za-km-z]{12}$/;
+const textOf = (r) => (r?.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+const EXPIRED = 'This form has expired. Ask the assistant to open the transfer form again.';
+const CHECK = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5l3 3 6-6.5" fill="none" stroke="#0B0B0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+let st = null;            // the latest state from the server
+let nfts = [];            // the NFTs loaded so far (pages of state.nfts)
+const picked = new Set(); // ticked NFT numbers
+let token = null;         // the form's pass
+let busy = false;
+let sent = null;          // what this form sent last
+let armedAt = 0;          // the Confirm button works only a moment after it appears: a double click can't confirm
+let asked = false;        // asked the server for a pass at least once (the expired note waits for that)
+let pending = null;       // { ids, to } fixed when Send was pressed: Confirm sends exactly this
+const TTL_MS = 2 * 3600e3, MIN_AGE_MS = 5000; // the pass: valid 2 hours, works 5 seconds after it was issued
+
+const app = new McpApps.App({ name: 'MCP transfer', version: '1.0.0' }, {}, { autoResize: true });
+
+function applyContext(ctx) {
+  if (!ctx) return;
+  if (ctx.theme) McpApps.applyDocumentTheme(ctx.theme);
+  if (ctx.styles?.variables) McpApps.applyHostStyleVariables(ctx.styles.variables);
+  if (ctx.styles?.css?.fonts) McpApps.applyHostFonts(ctx.styles.css.fonts);
+  const s = ctx.safeAreaInsets;
+  if (s) {
+    const r = document.documentElement.style;
+    r.setProperty('--pad-t', `${Math.max(16, s.top)}px`);
+    r.setProperty('--pad-r', `${Math.max(16, s.right)}px`);
+    r.setProperty('--pad-b', `${Math.max(16, s.bottom)}px`);
+    r.setProperty('--pad-l', `${Math.max(16, s.left)}px`);
+  }
+}
+
+const show = (id, on) => { $(id).hidden = !on; };
+function message(text, kind = 'err') {
+  const el = $('msg');
+  el.textContent = text || '';
+  el.className = `note ${kind}`;
+  el.hidden = !text;
+}
+function sendError(text) { $('sendErr').textContent = text || ''; $('sendErr').hidden = !text; }
+let skew = 0; // server clock minus this device's clock
+const tokenOk = () => !!token && Number(String(token).split('.')[0]) > Date.now() + skew + 5000;
+const arm = () => { armedAt = Date.now() + 700; };
+const armed = () => Date.now() >= armedAt;
+// only pictures from our own site (https), never a link from somewhere else
+const siteOrigin = () => { try { return new URL(st?.explorer || '').origin; } catch { return null; } };
+const ours = (u) => { try { const x = new URL(u); return siteOrigin() && x.origin === siteOrigin() && (x.protocol === 'https:' || x.hostname === 'localhost') ? x.href : ''; } catch { return ''; } };
+const limit = () => (st ? Math.max(0, Math.min(st.max, st.left_this_hour)) : 0);
+
+// ---------- calls to our server, made only by this form ----------
+
+const expOf = (t) => Number(String(t || '').split('.')[0]) || 0;
+// a fresh pass replaces ours only when ours is missing or ends within 10 minutes (an older one is ready to use sooner)
+function takeToken(r) {
+  const t = r?._meta?.[TOKEN] || r?.structuredContent?.form_token;
+  if (typeof t !== 'string' || !/^\d{13}\.[0-9a-f]{64}$/.test(t)) return;
+  if (!tokenOk() || expOf(token) < Date.now() + skew + 600_000) token = t;
+}
+
+async function callTool(name, args = {}) {
+  const r = await app.callServerTool({ name, arguments: args });
+  takeToken(r);
+  const at = Number(r?.structuredContent?.state?.issued_at);
+  if (at) skew = at - Date.now();
+  return r;
+}
+
+// fresh state (and a fresh pass); offset > 0 adds the next page
+async function refresh(offset = 0, check = null) {
+  try {
+    const r = await callTool('transfer_form_state', { offset, ...(check ? { check } : {}) });
+    asked = true;
+    const s = r?.structuredContent?.state;
+    if (s) setState(s, { append: offset > 0 });
+    else if (!st) { show('loading', false); message(textOf(r) || 'The transfer form is not available right now.'); }
+    return r;
+  } catch {
+    asked = true;
+    if (!st) { show('loading', false); message('Could not load your NFTs. Ask the assistant to open the transfer form again.'); }
+    else { if (!tokenOk() && !sent) message('Could not get the form ready. Ask the assistant to open the transfer form again.', 'warn'); update(); }
+    return null;
+  }
+}
+
+// ---------- rendering ----------
+
+function setState(s, { append = false } = {}) {
+  if (!s || s.v !== 1) return;
+  st = s;
+  show('loading', false);
+  $('from').textContent = `from ${s.address}`;
+  const fresh = Array.isArray(s.nfts) ? s.nfts : [];
+  if (append) {
+    const have = new Set(nfts.map((n) => n.id));
+    nfts = nfts.concat(fresh.filter((n) => !have.has(n.id)));
+  } else {
+    nfts = fresh;
+    // keep only ticks of NFTs still in the list (some may have been sent away meanwhile)
+    const ids = new Set(nfts.map((n) => n.id));
+    for (const id of [...picked]) if (!ids.has(id) && Number(s.total) <= nfts.length) picked.delete(id);
+  }
+  if (sent) { renderResult(); return; }
+  if (!nfts.length) {
+    show('form', false); show('result', false);
+    message('You have no NFTs to send yet. Mint one: /mcpmint', 'warn');
+    return;
+  }
+  message(tokenOk() || !asked ? '' : EXPIRED, 'warn');
+  show('result', false); show('form', true);
+  renderGrid();
+  show('moreWrap', nfts.length < Number(s.total));
+  $('limits').textContent = `Up to ${s.max} NFTs at once and ${s.per_hour} an hour (${s.left_this_hour} left this hour). No fee. ` +
+    'Sent NFTs can\'t be taken back: check the address.';
+  update();
+}
+
+function tile(n) {
+  const on = picked.has(n.id);
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `tile${on ? ' on' : ''}`;
+  b.dataset.id = String(n.id);
+  b.disabled = !!(n.frozen || n.closed);
+  b.setAttribute('role', 'checkbox');
+  b.setAttribute('aria-checked', on ? 'true' : 'false');
+  b.title = n.frozen ? `${n.name}: its collection is frozen` : n.closed ? `${n.name}: its collection can't be traded until it sells out` : n.name;
+  const img = document.createElement('img');
+  img.src = ours(n.image_url);
+  img.alt = '';
+  img.loading = 'lazy';
+  if (n.pixel) img.className = 'px';
+  const ck = document.createElement('span');
+  ck.className = 'ck';
+  ck.innerHTML = CHECK;
+  const nm = Object.assign(document.createElement('span'), { className: 'nm', textContent: n.name });
+  const rr = Object.assign(document.createElement('span'), { className: 'rr', textContent: n.collection && n.collection !== 'mcp' ? n.collection_name : (n.rarity || '') });
+  b.append(img, ck, nm, rr);
+  if (n.listed != null) b.append(Object.assign(document.createElement('span'), { className: 'tag', textContent: 'LISTED', title: 'For sale now: sending takes it off the market' }));
+  b.addEventListener('click', () => toggle(n.id));
+  return b;
+}
+
+function visible() {
+  const q = $('find').value.trim().toLowerCase().replace(/^#/, '');
+  if (!q) return nfts;
+  return nfts.filter((n) => String(n.id) === q || String(n.id).startsWith(q) || n.name.toLowerCase().includes(q));
+}
+
+function renderGrid() {
+  const list = visible();
+  const grid = $('grid');
+  grid.replaceChildren(...list.map(tile));
+  if (!list.length) grid.append(Object.assign(document.createElement('p'), { className: 'fine', textContent: 'Nothing matches.' }));
+}
+
+function toggle(id) {
+  if (busy || pending) return;
+  if (picked.has(id)) picked.delete(id);
+  else if (picked.size < limit()) picked.add(id);
+  else { sendError(limit() ? `At most ${limit()} at once.` : 'No more sends this hour; try again later.'); return; }
+  sendError('');
+  const b = $('grid').querySelector(`[data-id="${id}"]`);
+  if (b) { b.classList.toggle('on', picked.has(id)); b.setAttribute('aria-checked', picked.has(id) ? 'true' : 'false'); }
+  update();
+}
+
+function addrCheck() {
+  const v = $('to').value.trim();
+  if (!v) return { ok: false };
+  if (!ADDR.test(v)) return { ok: false, err: 'An MCP address is mcp_ and 12 letters and digits. Copy it from the recipient.' };
+  if (st && v === st.address) return { ok: false, err: 'That is your own MCP address.' };
+  return { ok: true, v };
+}
+
+function update() {
+  if (!st) return;
+  const n = picked.size;
+  const listed = nfts.filter((x) => picked.has(x.id) && x.listed != null).length;
+  $('count').innerHTML = '';
+  $('count').append(`${n} selected`, Object.assign(document.createElement('small'), { textContent: ` of ${Number(st.total).toLocaleString('en-US')}${listed ? ` · ${listed} listed, will come off the market` : ''}` }));
+  const a = addrCheck();
+  $('formErr').textContent = a.err || '';
+  $('formErr').hidden = !a.err;
+  $('go').disabled = !n || !a.ok || busy || !tokenOk();
+  $('go').textContent = n ? `Send ${n} NFT${n === 1 ? '' : 's'}` : 'Send';
+  $('all').disabled = busy || !limit();
+}
+
+function closeConfirm() {
+  pending = null;
+  $('form').classList.remove('locked');
+  show('confirmActs', false); show('confirmTo', false); show('goActs', true);
+  $('to').disabled = false;
+  $('find').disabled = false;
+}
+
+function renderResult() {
+  if (!sent) return;
+  show('form', false); show('result', true);
+  message('');
+  $('rHead').textContent = `Sent ${sent.count === 1 ? sent.nfts?.[0]?.name || '1 NFT' : `${sent.count} NFTs`}`;
+  $('rBody').innerHTML = '';
+  $('rBody').append('To ', Object.assign(document.createElement('span'), { className: 'mono', textContent: sent.to }),
+    sent.to_name ? ` (@${sent.to_name})` : '', sent.count > 1 ? `: ${(sent.nfts || []).map((x) => x.name).join(', ')}` : '', '.');
+  show('tx', !!sent.explorer);
+}
+
+// ---------- actions ----------
+
+$('to').addEventListener('input', () => { sendError(''); update(); });
+$('find').addEventListener('input', renderGrid);
+$('all').addEventListener('click', () => {
+  if (busy || pending) return;
+  for (const n of visible()) { if (picked.size >= limit()) break; if (!n.frozen && !n.closed) picked.add(n.id); }
+  renderGrid(); update();
+});
+$('none').addEventListener('click', () => { if (busy || pending) return; picked.clear(); sendError(''); renderGrid(); update(); });
+$('more').addEventListener('click', async () => {
+  if (pending) return;
+  $('more').disabled = true;
+  await refresh(nfts.length);
+  $('more').disabled = false;
+});
+
+$('go').addEventListener('click', () => {
+  const a = addrCheck();
+  if (!a.ok || !picked.size || busy || pending) return;
+  pending = { ids: [...picked].sort((x, y) => x - y), to: a.v };
+  const n = pending.ids.length;
+  $('yes').textContent = `Confirm: send ${n} NFT${n === 1 ? '' : 's'}`;
+  $('confirmTo').textContent = '';
+  $('confirmTo').append('To ', Object.assign(document.createElement('b'), { className: 'mono', textContent: a.v }), '. Check every character: sent NFTs can\'t be taken back.');
+  $('to').disabled = true;
+  $('find').disabled = true;
+  $('form').classList.add('locked');
+  show('goActs', false); show('confirmTo', true); show('confirmActs', true);
+  arm();
+  $('no').focus();
+});
+$('no').addEventListener('click', closeConfirm);
+
+$('yes').addEventListener('click', async () => {
+  if (!pending || busy || !armed()) return;
+  const { ids, to } = pending;
+  busy = true;
+  sendError('');
+  $('yes').disabled = true; $('no').disabled = true;
+  const label = $('yes').textContent;
+  $('yes').textContent = 'Sending…';
+  const done = (s) => {
+    sent = s;
+    picked.clear();
+    closeConfirm();
+    renderResult();
+    tellAssistant();
+  };
+  try {
+    // a pass works a few seconds after it was issued: wait for that if it is brand new
+    const young = MIN_AGE_MS - (Date.now() + skew - (expOf(token) - TTL_MS));
+    if (young > 0) await new Promise((r) => setTimeout(r, young + 300));
+    let r = await callTool('transfer_form_submit', { nft_ids: ids, to, form_token: token || '' });
+    if (r?.structuredContent?.retry_ms) {
+      await new Promise((res) => setTimeout(res, Number(r.structuredContent.retry_ms) + 300));
+      r = await callTool('transfer_form_submit', { nft_ids: ids, to, form_token: token || '' });
+    }
+    if (r?.structuredContent?.sent) {
+      if (r.structuredContent.state) setState(r.structuredContent.state);
+      done(r.structuredContent.sent);
+    } else if (r?.structuredContent?.refused) {
+      // a definite no: nothing was sent
+      closeConfirm();
+      sendError(textOf(r) || 'Not sent.');
+      if (/expired|Only the transfer form/.test(textOf(r))) await refresh();
+    } else {
+      await check(ids, to); // an error that doesn't say what happened
+    }
+  } catch {
+    await check(ids, to); // the answer got lost on the way
+  } finally {
+    busy = false;
+    $('yes').disabled = false; $('no').disabled = false;
+    if ($('yes').textContent === 'Sending…') $('yes').textContent = label;
+    update();
+  }
+
+  // all of them went or none did: ask the server who owns them now
+  async function check(list, dest) {
+    sendError('Not sure it went through. Checking…');
+    const r = await refresh(0, list);
+    const owners = r?.structuredContent?.owners;
+    if (!owners) {
+      sendError('Could not check whether it went through. Look at your NFTs before sending again.');
+      closeConfirm();
+      return;
+    }
+    const at = list.map((id) => owners[String(id)]);
+    if (at.every((o) => o === dest)) {
+      sendError('');
+      done({ count: list.length, to: dest, to_name: null, tx: null, explorer: st?.explorer, nfts: list.map((id) => ({ id, name: `#${id}` })) });
+    } else if (at.every((o) => o === st?.address)) {
+      closeConfirm();
+      sendError('Not sent: the NFTs are still yours. Try again.');
+    } else {
+      closeConfirm();
+      sendError('Some of these NFTs are no longer yours. Check your NFTs before sending again.');
+    }
+  }
+});
+
+// lets the assistant answer "did it go through?" without the user retyping it
+function tellAssistant() {
+  if (!sent || !app.getHostCapabilities()?.updateModelContext) return;
+  app.updateModelContext({
+    content: [{ type: 'text', text: `The user sent ${sent.count} NFT${sent.count === 1 ? '' : 's'} in the transfer form to ${sent.to}: ` +
+      `${(sent.nfts || []).map((x) => `#${Number(x.id)}`).join(', ')}.${sent.explorer ? ` Explorer: ${sent.explorer}` : ''}` }],
+  }).catch(() => {});
+}
+
+$('again').addEventListener('click', async () => {
+  sent = null;
+  sendError('');
+  closeConfirm();
+  show('result', false);
+  if (st) setState(st);
+  await refresh();
+});
+
+$('tx').addEventListener('click', async () => {
+  const url = ours(sent?.explorer);
+  if (!url) return;
+  try {
+    const r = await app.openLink({ url });
+    if (r?.isError) message(url, 'ok');
+  } catch { message(url, 'ok'); }
+});
+
+// ---------- talking to the chat app ----------
+
+app.ontoolresult = async (r) => {
+  takeToken(r);
+  const s = r?.structuredContent?.state;
+  if (s) {
+    setState(s);
+    // no pass came with the result (some apps drop _meta), or the chat was reopened later: fetch fresh ones
+    if (!tokenOk() || Date.now() - Number(s.issued_at || 0) > 60_000) await refresh();
+  } else {
+    show('loading', false);
+    message(textOf(r) || 'The transfer form is not available right now.');
+  }
+};
+app.ontoolcancelled = () => { show('loading', false); message('Cancelled.', 'warn'); };
+app.onhostcontextchanged = applyContext;
+
+await app.connect();
+applyContext(app.getHostContext());
+</script>
+</body>
+</html>
