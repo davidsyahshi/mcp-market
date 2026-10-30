@@ -258,7 +258,11 @@
     };
     const field = (id, label, attrs = '') => `<label style="display:grid;gap:4px"><span class="note">${label}</span>
       <input id="${id}" ${attrs} style="background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:9px 10px;font:inherit"></label>`;
-    app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Team mint</h1>
+    app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Lost deposits</h1>
+      <p>Reports from <a href="/lost-deposit">/lost-deposit</a>. Each shows whose deposit address it is (as the person typed it: check on Solscan where the transaction really went) and whether that transaction was already credited. Crediting is still done by hand; a report moves no money.</p></div>
+      <div class="tabs" role="tablist" id="ldTabs" style="margin-left:auto">${[['new', 'New'], ['all', 'All']].map(([k, v]) => `<button class="tab" role="tab" data-ld="${k}" aria-selected="${k === 'new'}">${v}</button>`).join('')}</div></div>
+      <div id="ld" class="note">Loading…</div>
+      <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Team mint</h2>
       <p>Free MCP NFTs, picked at random, outside the per-account mint limit. In the explorer they show as <b>team mint</b>.</p></div></div>
       <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end">
         ${field('tmCount', 'How many', 'type="number" min="1" max="5000" step="1" value="10" inputmode="numeric"')}
@@ -292,6 +296,13 @@
         <button class="btn red" id="bkNow" style="margin-left:auto">Back up now</button></div>
       <div id="bk" class="note">Loading…</div><div style="height:60px"></div></div>`;
     loadBackups();
+    loadClaims('new');
+    $('#ldTabs').onclick = (e) => {
+      const b = e.target.closest('[data-ld]');
+      if (!b) return;
+      $('#ldTabs').querySelectorAll('[data-ld]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      loadClaims(b.dataset.ld);
+    };
     wireTeamMint(who);
     wirePromos();
     loadPromos();
@@ -414,6 +425,52 @@
       }
       $('#pcGo').disabled = false;
     };
+  }
+
+  // lost deposit reports, with what the database knows: whose deposit address, was the transaction credited
+  let claimsView = 'new';
+  async function loadClaims(view = claimsView) {
+    claimsView = view;
+    const el = $('#ld');
+    if (!el) return;
+    let list;
+    try { list = await send('GET', `/admin/deposit-claims${view === 'new' ? '?status=new' : ''}`); } catch (e) { el.textContent = e.message; return; }
+    const sol = (kind, v) => `<a class="mono-link" href="https://solscan.io/${kind}/${encodeURIComponent(v)}" target="_blank" rel="noopener" title="${esc(v)}">${esc(v.slice(0, 6))}…${esc(v.slice(-4))} ↗</a>`;
+    const acct = (o) => (o ? `<a class="addr" href="/a/${esc(o.addr)}">${esc(o.addr)}</a>${o.handle ? ` <span class="note">@${esc(o.handle)}</span>` : ''}` : '—');
+    const check = (k) => {
+      const addr = (k.address === 'not ours' ? '<span class="pill bad">not our deposit address</span>'
+        : `<span class="pill ok">${esc(k.address)}</span> ${acct(k.owner)}`) +
+        (k.other_addresses ? ` <span class="pill bad" title="Check on Solscan where the transaction really went">also reported with ${k.other_addresses} other address${k.other_addresses === 1 ? '' : 'es'}</span>` : '');
+      const tx = k.credited ? `<span class="pill ok">credited${k.manual ? ' by hand' : ''}</span>${k.deposits.map((d) => ` ${fmt(d.amount)} ${esc(d.token)} → ${acct({ addr: d.addr, handle: d.handle })}`).join('')}`
+        : k.deposits.length ? `<span class="pill wait">${esc(k.deposits.map((d) => `${d.status}: ${fmt(d.amount)} ${d.token}`).join(', '))}</span>`
+          : '<span class="pill wait">not seen by MCP</span>';
+      return `<div>${addr}</div><div style="margin-top:4px">${tx}</div>`;
+    };
+    const STATUS_PILL = { new: 'wait', done: 'ok', rejected: 'bad' };
+    el.innerHTML = `<table class="txs"><thead><tr><th>#</th><th>Sent to → from</th><th>Transaction</th><th>What MCP knows</th><th>Status</th><th></th></tr></thead><tbody>
+      ${list.map((c) => `<tr><td>#${c.id}<div class="note">${esc(new Date(c.created_at).toLocaleString())}</div>${c.reporter ? `<div class="note">by ${acct(c.reporter)}</div>` : ''}</td>
+        <td>${sol('account', c.deposit_address)}<div class="note">from ${sol('account', c.from_wallet)}</div></td>
+        <td>${sol('tx', c.tx)}</td>
+        <td>${check(c.check)}</td>
+        <td><span class="pill ${STATUS_PILL[c.status] || 'wait'}">${esc(c.status)}</span>${c.note ? `<div class="note">${esc(c.note)}</div>` : ''}</td>
+        <td style="text-align:right"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          ${c.status !== 'done' ? `<button class="btn red" data-cl="${c.id}" data-cs="done" style="padding:4px 8px">Done</button>` : ''}
+          ${c.status !== 'rejected' ? `<button class="btn ghost" data-cl="${c.id}" data-cs="rejected" style="padding:4px 8px">Reject</button>` : ''}
+          ${c.status !== 'new' ? `<button class="btn ghost" data-cl="${c.id}" data-cs="new" style="padding:4px 8px">Reopen</button>` : ''}
+          <button class="btn ghost" data-cl="${c.id}" data-cs="" style="padding:4px 8px">Note</button></div></td></tr>`).join('')
+        || `<tr><td colspan="6" class="note">${view === 'new' ? 'No new reports.' : 'No reports yet.'}</td></tr>`}
+      </tbody></table>`;
+    el.querySelectorAll('[data-cl]').forEach((b) => b.onclick = async () => {
+      const status = b.dataset.cs || undefined;
+      let note;
+      if (!status || status === 'rejected') {
+        note = window.prompt(status ? 'Why is it rejected? (for you; not shown to anyone)' : 'Note (for you; not shown to anyone)', '');
+        if (note == null) return;
+      }
+      b.disabled = true;
+      try { await send('POST', `/admin/deposit-claims/${b.dataset.cl}`, { status, note }); } catch (e) { alert(e.message); }
+      loadClaims();
+    });
   }
 
   async function loadBackups() {

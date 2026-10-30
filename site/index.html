@@ -64,8 +64,15 @@ header.top .wrap { display: flex; align-items: center; gap: 14px; height: 64px; 
 .tabs { display: flex; border: 2px solid var(--edge); }
 .tab { padding: 8px 14px; background: transparent; color: var(--dim); border: 0; font: inherit; cursor: pointer; }
 .tab[aria-selected="true"] { background: var(--cream); color: var(--bg); font-weight: 700; }
+.tx-filter { flex-wrap: wrap; }
 select { background: var(--panel); color: var(--cream); border: 2px solid var(--edge); padding: 8px 10px; font: inherit; }
 .count { color: var(--dim); margin-left: auto; }
+.bar-title { margin: 0 6px 0 0; font-size: 18px; }
+.refresh { padding: 8px 12px; display: inline-flex; align-items: center; gap: 6px; }
+.refresh .spin { display: inline-block; font-size: 16px; line-height: 1; }
+.refresh.busy .spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refresh.busy .spin { animation: none; } }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; padding-bottom: 60px; }
 .card { background: var(--panel); border: 2px solid var(--edge); text-decoration: none; display: flex; flex-direction: column; transition: transform .08s, border-color .08s; }
@@ -176,6 +183,21 @@ select { background: var(--panel); color: var(--cream); border: 2px solid var(--
 .testbar { background: var(--red); color: var(--cream); text-align: center; font-size: 12px; padding: 6px 16px; }
 .testbar b { font-weight: 700; }
 footer { border-top: 2px solid var(--edge); color: var(--dim); padding: 22px 0 40px; font-size: 12px; }
+.lost { max-width: 720px; padding-bottom: 50px; }
+.lost h1 { margin: 26px 0 8px; }
+.lost .lead { color: var(--dim); line-height: 1.55; margin: 0; }
+.lost-form { display: grid; gap: 16px; margin-top: 18px; }
+.lf { display: grid; gap: 6px; }
+.lf .lbl { font-weight: 700; color: var(--cream); }
+.lf input { background: var(--bg); color: var(--cream); border: 2px solid var(--edge); padding: 11px 12px; font: inherit; font-family: ui-monospace, Menlo, monospace; font-size: 14px; min-width: 0; }
+.lf input:focus-visible { outline: 2px solid var(--cream); outline-offset: 1px; }
+.err-text { color: var(--red); margin: 0; }
+.lost-form .btn { justify-content: center; padding: 12px; }
+.lost-done { margin-top: 18px; line-height: 1.5; }
+.lost-tips { margin-top: 26px; }
+.lost-tips h2 { font-size: 16px; margin: 0 0 8px; }
+.mono-link { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.lost-tips ul { margin: 0 0 10px; padding-left: 18px; color: var(--dim); line-height: 1.6; }
 nav.main { display: flex; gap: 4px; }
 nav.main a { padding: 8px 12px; color: var(--dim); text-decoration: none; border: 2px solid transparent; }
 nav.main a:hover { color: var(--cream); }
@@ -302,6 +324,11 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
   .detail { grid-template-columns: 1fr; }
   header.top .hide-sm { display: none; }
   .count { margin-left: 0; width: 100%; }
+  /* the market's Refresh stays top right, next to the title */
+  .bar .bar-title { order: 0; }
+  .bar .refresh { order: 1; margin-left: auto; }
+  .bar select { order: 2; }
+  .bar .count { order: 3; }
 }
 </style>
 </head>
@@ -310,7 +337,7 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
 <header class="top">
   <div class="wrap">
     <a class="brand" href="/"><img class="pix" src="/logo.png" alt=""><b class="px">MCP</b></a>
-    <nav class="main" aria-label="Main"><a href="/" data-nav="mint">Mint</a><a href="/collections" data-nav="collections">Collections</a><a href="/explorer" data-nav="explorer">Explorer</a></nav>
+    <nav class="main" aria-label="Main"><a href="/" data-nav="market">Market</a><a href="/collections" data-nav="collections">Collections</a><a href="/explorer" data-nav="explorer">Explorer</a></nav>
     <span class="spacer"></span>
     <a class="btn red" id="connectBtn" href="/connect"><span class="long">Connect to your AI</span><span class="short">Connect</span></a>
   </div>
@@ -318,7 +345,7 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
 
 <main id="app"></main>
 
-<footer><div class="wrap">MCP · the first NFT/token inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="/explorer">Explorer</a> · <a href="/launch">Launch a collection</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
+<footer><div class="wrap">MCP · the first NFT/token inside your AI. Everything here is view-only: minting, buying and selling happen in your AI chat. · <a href="/explorer">Explorer</a> · <a href="/launch">Launch a collection</a> · <a href="/lost-deposit">Lost deposit?</a> · <a href="https://github.com/davidsyahshi/mcp-market" target="_blank" rel="noopener">Open source on GitHub</a></div></footer>
 
 <script src="/launch.js"></script>
 <script>
@@ -348,12 +375,12 @@ const ago = (iso) => {
 };
 let stats = null;
 const PAGE = 60;
+// the market: only NFTs for sale, cheapest first on every visit; only the rarity filter is remembered
 const state = { status: 'listed', sort: 'price_asc', rarity: '' };
-try { Object.assign(state, JSON.parse(localStorage.getItem('mcp-filter') || '{}')); } catch {}
-delete state.character;
+try { const saved = JSON.parse(localStorage.getItem('mcp-filter') || '{}'); if (typeof saved?.rarity === 'string') state.rarity = saved.rarity; } catch {}
 const RARITIES = ['Common', 'Rare', 'Epic', 'Legendary', 'Ultra-Rare'];
 if (!RARITIES.includes(state.rarity)) state.rarity = '';
-if (!['price_asc', 'price_desc', 'recent', 'minted', 'id'].includes(state.sort)) state.sort = 'price_asc';
+const MARKET_SORTS = [['price_asc', 'Price: low to high'], ['price_desc', 'Price: high to low'], ['recent', 'Recently listed'], ['id', 'Number']];
 const rarClass = (r) => String(r || '').toLowerCase().replace(/[^a-z]+/g, '-');
 // 28x28 pixel art comes at its native size and is scaled up sharp; other pictures come full size
 const pic = (n, big = false) => n.pixel
@@ -492,7 +519,7 @@ async function renderMarket() {
         <p>Browse here. Mint, buy and sell only by talking to Claude, ChatGPT or Grok. Your balance and NFTs live in your MCP account. 1 $MCP = $1: top it up with USDC or USDT on Solana.</p>
         <div class="cta">
           <a class="btn red" data-add-claude href="${addToClaude(stats?.mcp_url || location.origin + '/mcp')}" target="_blank" rel="noopener">Add to Claude</a>
-          <a class="btn ghost" href="${claudeLink('Mint me an MCP NFT')}" target="_blank" rel="noopener">Mint in Claude</a>
+          <a class="btn ghost" href="${claudeLink('/market-mcp')}" target="_blank" rel="noopener">Buy in Claude</a>
           <a class="btn ghost" href="/c/mcp">The collection</a>
           <a class="btn ghost" href="/connect">ChatGPT, Grok &amp; more</a>
         </div>
@@ -502,21 +529,25 @@ async function renderMarket() {
     <div class="ticker" id="ticker" hidden></div>
     <div class="wrap">
       <div class="bar">
-        <div class="tabs" role="tablist">
-          <button class="tab" role="tab" data-status="listed">For sale</button>
-          <button class="tab" role="tab" data-status="all">All</button>
-          <button class="tab" role="tab" data-status="unminted">Mintable</button>
-        </div>
+        <h2 class="px bar-title">For sale</h2>
         <select id="rarity" aria-label="Rarity"><option value="">All rarities</option>${RARITIES.map((r) => `<option>${r}</option>`).join('')}</select>
-        <select id="sort" aria-label="Sort"><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="recent">Recently listed</option><option value="minted">Recently minted</option><option value="id">Number</option></select>
+        <select id="sort" aria-label="Sort">${MARKET_SORTS.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
         <span class="count" id="count"></span>
+        <button class="btn ghost refresh" id="refresh" type="button" title="Refresh the market" aria-label="Refresh the market"><span class="spin" aria-hidden="true">↻</span> Refresh</button>
       </div>
       <div class="grid" id="grid"></div>
       <div class="more"><button class="btn ghost" id="gridMore" hidden>Load more</button></div>
     </div>`;
-  app.querySelectorAll('.tab').forEach((t) => t.onclick = () => { state.status = t.dataset.status; loadGrid(); });
   ['rarity', 'sort'].forEach((k) => $('#' + k).onchange = (e) => { state[k] = e.target.value; loadGrid(); });
   $('#gridMore').onclick = () => loadGrid(true);
+  // new listings and sales without reloading the page
+  $('#refresh').onclick = async () => {
+    const b = $('#refresh');
+    if (b.classList.contains('busy')) return;
+    b.classList.add('busy');
+    try { await Promise.all([loadGrid(), loadStats(), loadTicker()]); b.title = `Updated ${new Date().toLocaleTimeString()}`; } catch {}
+    b.classList.remove('busy');
+  };
   loadStats(); loadTicker();
   await loadGrid();
 }
@@ -538,7 +569,7 @@ async function loadStats() {
 
 async function loadTicker() {
   const sales = await api('/sales');
-  if (!sales.length) return;
+  if (!sales.length || !$('#ticker')) return;
   const items = sales.map((s) => `<span><b>${esc(s.nft_name)}</b> sold for <i>${fmt(s.price)} $MCP</i> · ${esc(label(s.buyer_addr, s.buyer_name))}</span>`).join('');
   const t = $('#ticker');
   t.innerHTML = `<div class="row">${items}${items}</div>`;
@@ -546,22 +577,25 @@ async function loadTicker() {
 }
 
 let gridOffset = 0;
+let gridRun = 0;
 async function loadGrid(more = false) {
-  try { localStorage.setItem('mcp-filter', JSON.stringify(state)); } catch {}
-  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.status === state.status)));
+  const run = ++gridRun; // a newer load (filter, Refresh) wins over answers still on their way
+  try { localStorage.setItem('mcp-filter', JSON.stringify({ rarity: state.rarity })); } catch {}
+  state.status = 'listed';
   ['rarity', 'sort'].forEach((k) => $('#' + k).value = state[k]);
   if (!more) gridOffset = 0;
   const q = new URLSearchParams({ ...Object.fromEntries(Object.entries(state).filter(([, v]) => v)), limit: PAGE, offset: gridOffset, count: 1 });
   const r = await fetch('/api/nfts?' + q);
   const rows = r.ok ? await r.json() : [];
+  if (!$('#grid') || run !== gridRun) return; // the page or the filters changed meanwhile
   const total = Number(r.headers.get('X-Total-Count') || rows.length);
   gridOffset += rows.length;
   $('#count').textContent = `${total.toLocaleString('en-US')} item${total === 1 ? '' : 's'}`;
   const html = rows.map(card).join('');
   if (more) $('#grid').insertAdjacentHTML('beforeend', html);
-  else $('#grid').innerHTML = html || `<div class="empty">${state.status === 'listed'
-    ? (stats?.trading_open === false ? 'Mint phase: MCP NFTs can be listed once all 5,000 are minted. Mint yours in your AI now.'
-      : 'Nothing for sale right now. Be first: mint one in your AI and list it.') : 'Nothing matches these filters.'}</div>`;
+  else $('#grid').innerHTML = html || `<div class="empty">${state.rarity ? 'Nothing for sale matches this filter right now.'
+    : stats?.trading_open === false ? 'Mint phase: MCP NFTs can be listed once all 5,000 are minted. Mint yours in your AI now.'
+      : 'Nothing for sale right now. List yours in your AI: /sellnft-mcp 42 10'}</div>`;
   $('#gridMore').hidden = gridOffset >= total;
 }
 
@@ -600,7 +634,11 @@ async function renderCollection(slug, query) {
   app.innerHTML = '<div class="wrap"><div class="note" style="padding:30px 0">Loading…</div></div>';
   let c;
   try { c = await api('/collections/' + encodeURIComponent(slug)); } catch { app.innerHTML = '<div class="wrap"><div class="empty">No such collection.</div></div>'; return; }
-  if (cState.slug !== c.slug) Object.assign(cState, { slug: c.slug, status: 'all', sort: 'id', traits: new Set() });
+  // still minting: open on everything by number; sold out: what is for sale, cheapest first
+  const minting = c.minted < c.supply;
+  if (cState.slug !== c.slug) Object.assign(cState, { slug: c.slug, status: minting ? 'all' : 'listed', sort: minting ? 'id' : 'price_asc', traits: new Set() });
+  const cTabs = [['listed', 'For sale'], ['all', 'All'], ...(minting ? [['unminted', 'Mintable']] : [])];
+  if (!cTabs.some(([k]) => k === cState.status)) cState.status = 'listed';
   // /c/mcp?t=Chassis:Bunny opens the collection filtered by that trait
   const t = new URLSearchParams(query || '').getAll('t');
   if (t.length) cState.traits = new Set(t);
@@ -631,9 +669,8 @@ async function renderCollection(slug, query) {
       ['Per account', c.mint_limit], ['Volume', `${fmt(c.volume)} <small>$MCP</small>`],
     ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
     <div class="bar">
-      <div class="tabs" role="tablist">${[['all', 'All'], ['listed', 'For sale'], ['unminted', 'Mintable'], ['minted', 'Minted']]
-        .map(([k, v]) => `<button class="tab" role="tab" data-cstatus="${k}">${v}</button>`).join('')}</div>
-      <select id="cSort" aria-label="Sort"><option value="id">Number</option><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="recent">Recently listed</option><option value="minted">Recently minted</option></select>
+      <div class="tabs" role="tablist">${cTabs.map(([k, v]) => `<button class="tab" role="tab" data-cstatus="${k}">${v}</button>`).join('')}</div>
+      <select id="cSort" aria-label="Sort"><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="recent">Recently listed</option><option value="id">Number</option></select>
       <span class="count" id="cCount"></span>
     </div>
     <div class="c-body">
@@ -773,21 +810,44 @@ function txTable(id) {
     <tbody id="${id}"><tr><td colspan="6" class="note">Loading…</td></tr></tbody></table>`;
 }
 
-// fills a transaction table page by page ("Load more" goes back in time)
-async function loadTxs(tbodyId, moreId, addr) {
+// fills a transaction table page by page ("Load more" goes back in time); type: only mints, sales, … (TX_TYPES)
+let txsRun = 0;
+async function loadTxs(tbodyId, moreId, addr, type = '') {
   const body = $('#' + tbodyId);
   const more = $('#' + moreId);
+  const run = ++txsRun; // a newer filter wins over answers still on their way
   let before = null;
   const page = async () => {
-    const q = new URLSearchParams({ limit: 30, ...(addr ? { addr } : {}), ...(before ? { before } : {}) });
+    const q = new URLSearchParams({ limit: 30, ...(addr ? { addr } : {}), ...(type ? { type } : {}), ...(before ? { before } : {}) });
     const list = await api('/explorer/txs?' + q);
+    if (run !== txsRun || !document.body.contains(body)) return;
     if (before == null) body.innerHTML = '';
-    body.insertAdjacentHTML('beforeend', list.map(txRow).join('') || (before == null ? '<tr><td colspan="6" class="note">No transactions yet.</td></tr>' : ''));
+    body.insertAdjacentHTML('beforeend', list.map(txRow).join('') || (before == null ? `<tr><td colspan="6" class="note">${type ? 'None of these yet.' : 'No transactions yet.'}</td></tr>` : ''));
     before = list.length ? list[list.length - 1].id : before;
     more.hidden = list.length < 30;
   };
   more.onclick = () => page();
+  if (body.querySelector('tr')) body.innerHTML = '<tr><td colspan="6" class="note">Loading…</td></tr>';
   await page();
+}
+
+// the type filter above a transaction table; the choice stays in the address (?type=mint) so it can be shared
+const TX_FILTERS = [['', 'All'], ['mint', 'Mints'], ['buy', 'Sales'], ['transfer', 'Transfers'], ['deposit', 'Deposits'], ['withdrawal', 'Withdrawals']];
+const TX_FILTERS_ACCOUNT = [['', 'All'], ['mint', 'Mints'], ['buy', 'Bought'], ['sell', 'Sold'], ['transfer', 'Transfers'], ['deposit', 'Deposits'], ['withdrawal', 'Withdrawals']];
+const txTypeNow = (list) => { const t = new URLSearchParams(location.search).get('type') || ''; return list.some(([k]) => k === t) ? t : ''; };
+function txFilter(id, list, current) {
+  return `<div class="tabs tx-filter" role="tablist" id="${id}" aria-label="Show only">${list.map(([k, v]) =>
+    `<button class="tab" role="tab" data-txtype="${k}" aria-selected="${k === current}">${v}</button>`).join('')}</div>`;
+}
+function wireTxFilter(id, tbodyId, moreId, addr) {
+  $('#' + id).onclick = (e) => {
+    const b = e.target.closest('[data-txtype]');
+    if (!b) return;
+    const type = b.dataset.txtype;
+    $('#' + id).querySelectorAll('[data-txtype]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+    history.replaceState(null, '', location.pathname + (type ? `?type=${type}` : ''));
+    loadTxs(tbodyId, moreId, addr, type);
+  };
 }
 
 function searchBox() {
@@ -817,9 +877,11 @@ async function renderExplorer() {
       <section class="panel" id="exReserves" aria-label="Proof of reserves"><h2 class="px">Reserves</h2><div class="note">Loading…</div></section>
       <section class="panel" id="exChain" aria-label="The chain"><h2 class="px">The chain</h2><div class="note">Loading…</div></section>
     </div>
+    <div class="bar"><h2 class="px bar-title">Transactions</h2>${txFilter('exType', TX_FILTERS, txTypeNow(TX_FILTERS))}</div>
     ${txTable('exTxs')}
     <div class="more"><button class="btn ghost" id="exMore" hidden>Load more</button></div></div>`;
   wireSearch();
+  wireTxFilter('exType', 'exTxs', 'exMore', null);
   const s = await api('/explorer/summary');
   exNet = s.network;
   $('#exTiles').innerHTML = [
@@ -829,7 +891,7 @@ async function renderExplorer() {
   ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
   renderReserves(s.reserves);
   renderChain(s);
-  await loadTxs('exTxs', 'exMore');
+  await loadTxs('exTxs', 'exMore', null, txTypeNow(TX_FILTERS));
 }
 
 function renderReserves(r) {
@@ -987,9 +1049,10 @@ async function renderAddress(addr) {
         : a.address === 'escrow' ? '<div class="note">Mint money of launchpad collections, held at least 7 days per mint. It goes to the creator when the MCP team releases it, or back to the minters if a collection is frozen.</div>'
         : '<div class="note">An MCP address is an account number inside MCP, not a Solana wallet: never send tokens to it.</div>'}</div></div>
     ${a.nfts.length ? `<h2 class="px" style="margin:18px 0 10px;font-size:18px">NFTs</h2><div class="grid" style="padding-bottom:20px">${a.nfts.map(card).join('')}</div>` : ''}
-    <h2 class="px" style="margin:18px 0 10px;font-size:18px">Transactions</h2>
+    <div class="bar" style="padding-top:18px"><h2 class="px bar-title">Transactions</h2>${['treasury', 'escrow'].includes(addr) ? '' : txFilter('addrType', TX_FILTERS_ACCOUNT, txTypeNow(TX_FILTERS_ACCOUNT))}</div>
     ${txTable('addrTxs')}<div class="more"><button class="btn ghost" id="addrMore" hidden>Load more</button></div>`;
-  await loadTxs('addrTxs', 'addrMore', addr);
+  if (!['treasury', 'escrow'].includes(addr)) wireTxFilter('addrType', 'addrTxs', 'addrMore', addr);
+  await loadTxs('addrTxs', 'addrMore', addr, ['treasury', 'escrow'].includes(addr) ? '' : txTypeNow(TX_FILTERS_ACCOUNT));
 }
 
 document.addEventListener('click', async (e) => {
@@ -1093,7 +1156,59 @@ function renderConnect() {
     <div class="cmds">${CHAT_COMMANDS.map(([cmd, args, does]) => `<div><button type="button" data-cmd="${esc(cmd)} ">${esc(cmd + (args ? ' ' + args : ''))}</button><span>${esc(does)}</span></div>`).join('')}</div>
     <p class="note">${k('&lt;…&gt;')} you fill in, ${k('[…]')} you can skip. Buying always asks you to confirm the name and price first.</p>
     <p class="note">One X account = one MCP account; X accounts younger than 30 days can't sign in. MCP never sees your X password. Any other app that supports remote MCP with sign-in works with the same link.</p>
+    <p class="note">Sent a deposit that didn't arrive? <a href="/lost-deposit">Report a lost deposit</a>.</p>
   </div>`;
+}
+
+// ---------- a lost deposit: the report goes to the owner's /admin, checked by hand ----------
+function renderLostDeposit() {
+  const field = (id, label, hint, ph) => `<label class="lf"><span class="lbl">${label}</span>
+    <input id="${id}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${ph}" maxlength="200">
+    <span class="note">${hint}</span></label>`;
+  $('#app').innerHTML = `<div class="wrap lost">
+    <h1 class="px">Lost a deposit?</h1>
+    <p class="lead">Sent USDC or USDT to your MCP deposit address and it isn't on your balance? First type <b>/deposit-mcp</b> in your AI chat: it checks Solana again and credits anything new. Still missing after 10 minutes? Tell us here and we check it by hand, usually within 24 hours.</p>
+    <form class="panel lost-form" id="lostForm" novalidate>
+      ${field('ldTo', 'MCP deposit address', 'The Solana address your AI gave you for deposits (from /deposit-mcp).', 'e.g. 4erdBhPx…3kGdqa')}
+      ${field('ldFrom', 'Your wallet', 'The Solana wallet you sent from (Phantom, Solflare, an exchange…).', 'e.g. 7xKXtg2C…osgAsU')}
+      ${field('ldTx', 'Transaction link', 'The Solscan link of the transfer, or its signature.', 'https://solscan.io/tx/…')}
+      <p class="note err-text" id="ldErr" role="alert" hidden></p>
+      <button class="btn red" id="ldGo" type="submit">Send report</button>
+    </form>
+    <div class="panel lost-done" id="ldDone" hidden></div>
+    <div class="lost-tips"><h2 class="px">Common reasons</h2><ul>
+      <li>Sent on another network (Ethereum, Tron, BNB…) or a token other than USDC/USDT on Solana: these can't be credited automatically.</li>
+      <li>Sent SOL instead of USDC/USDT.</li>
+      <li>Sent to an MCP address (<code>mcp_…</code>): that is an account number inside MCP, not a Solana wallet.</li>
+      <li>Less than 0.01: too small to credit.</li>
+    </ul><p class="note">We never ask for your seed phrase or private key. Nobody from MCP will DM you first.</p></div>
+  </div>`;
+  const sol = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  const sigOk = (v) => /^[1-9A-HJ-NP-Za-km-z]{64,90}$/.test(v) || /\/tx\/[1-9A-HJ-NP-Za-km-z]{64,90}(?:[/?#]|$)/.test(v);
+  const err = (t) => { $('#ldErr').textContent = t || ''; $('#ldErr').hidden = !t; };
+  $('#lostForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = { deposit_address: $('#ldTo').value.trim(), from_wallet: $('#ldFrom').value.trim(), tx: $('#ldTx').value.trim() };
+    if (!sol.test(body.deposit_address)) return err('MCP deposit address: a Solana address, 32 to 44 letters and digits.');
+    if (!sol.test(body.from_wallet)) return err('Your wallet: a Solana address, 32 to 44 letters and digits.');
+    if (body.deposit_address === body.from_wallet) return err('The deposit address and your wallet are the same. Check both.');
+    if (!sigOk(body.tx)) return err('Transaction: paste its Solscan link (solscan.io/tx/…) or the signature.');
+    err('');
+    $('#ldGo').disabled = true;
+    try {
+      const r = await fetch('/api/deposit-claims', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-MCP-Site': '1' }, body: JSON.stringify(body), credentials: 'same-origin' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Error ${r.status}`);
+      $('#lostForm').hidden = true;
+      $('#ldDone').innerHTML = j.duplicate
+        ? `<b>We already have this transaction</b> (report #${Number(j.id)}). We'll look at it; no need to send it again.`
+        : `<b>Report #${Number(j.id)} received.</b> We check it by hand, usually within 24 hours. If the deposit is ours, it is credited to the account of that deposit address.`;
+      $('#ldDone').hidden = false;
+    } catch (ex) {
+      err(ex.message || 'Could not send. Try again.');
+    }
+    $('#ldGo').disabled = false;
+  };
 }
 
 async function route() {
@@ -1101,7 +1216,7 @@ async function route() {
   const query = location.search.slice(1);
   let mm;
   const section = pathPart === '/connect' ? '' : /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer'
-    : /^\/(collections|c\/|nft\/|launch|admin|market)/.test(pathPart) ? 'collections' : 'mint';
+    : /^\/(collections|c\/|nft\/|launch|admin)/.test(pathPart) ? 'collections' : /^\/lost-deposit/.test(pathPart) ? '' : 'market';
   stopMintPage();
   document.querySelectorAll('[data-nav]').forEach((a) => {
     if (a.dataset.nav === section) a.setAttribute('aria-current', 'page');
@@ -1118,12 +1233,16 @@ async function route() {
   if (pathPart === '/collections') return renderCollections();
   if ((mm = pathPart.match(/^\/c\/([a-z0-9-]{1,40})/))) return renderCollection(mm[1], query);
   if ((mm = pathPart.match(/^\/nft\/(\d{1,9})/))) return renderNft(Number(mm[1]));
+  if (pathPart === '/lost-deposit') return renderLostDeposit();
   if (pathPart === '/market') return renderMarket();
-  return renderMint();
+  if (pathPart === '/mint') return renderMint();
+  // the home page: the market once MCP NFTs trade (after the sell-out), the mint page before
+  if (!stats) await loadStats().catch(() => {});
+  return stats?.trading_open === false ? renderMint() : renderMarket();
 }
 // Pages have plain addresses (/c/mcp, /nft/42, /explorer): Netlify serves index.html for them (netlify.toml) and the
 // page draws itself. Links inside the site change the address without reloading.
-const SITE_PATH = /^\/($|market$|collections$|connect$|explorer$|launch$|admin$|(c|nft|tx|a|u)\/[^/?#]+)/;
+const SITE_PATH = /^\/($|market$|mint$|lost-deposit$|collections$|connect$|explorer$|launch$|admin$|(c|nft|tx|a|u)\/[^/?#]+)/;
 function go(path, { replace = false } = {}) {
   if (replace) history.replaceState(null, '', path); else history.pushState(null, '', path);
   route();
@@ -1141,7 +1260,7 @@ window.addEventListener('popstate', route);
 const fromHash = () => { if (location.hash.startsWith('#/')) history.replaceState(null, '', location.hash.slice(1)); };
 window.addEventListener('hashchange', () => { fromHash(); route(); });
 fromHash();
-loadStats().then(route);
+loadStats().catch(() => {}).finally(route); // a page even if the stats are down
 </script>
 </body>
 </html>
