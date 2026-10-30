@@ -212,7 +212,7 @@ table.txs td.num { text-align: right; font-variant-numeric: tabular-nums; white-
 table.txs a.tx { color: var(--cream); }
 .type { text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
 .type.deposit { color: #7AE582; } .type.withdrawal { color: var(--red); } .type.buy { color: #FFE600; }
-.type.mint { color: var(--cream); } .type.refund, .type.faucet { color: var(--dim); } .type.payout { color: #7AE582; }
+.type.mint { color: var(--cream); } .type.refund, .type.faucet { color: var(--dim); } .type.payout { color: #7AE582; } .type.transfer { color: #8AB4FF; }
 .plus { color: #7AE582; } .minus { color: var(--cream); }
 .more { display: flex; justify-content: center; padding: 16px 0 50px; }
 .wallets { display: grid; gap: 4px; font-size: 12px; max-height: 180px; overflow: auto; }
@@ -704,6 +704,8 @@ async function renderNft(id) {
       : `<div class="big" style="font-size:18px">Not for sale</div><div style="color:var(--dim);font-size:12px">Owned by ${who(n.owner_addr, n.owner_name)}.</div>`;
   const act = (a) => a.type === 'mint'
     ? `<tr><td><span class="type mint">${a.team ? 'team mint' : a.free ? 'free mint' : 'mint'}</span></td><td>${who(a.to_addr, a.to_name)}</td><td class="num">${a.team || a.free ? 'free' : `${fmt(a.price)} <small style="color:var(--dim)">$MCP</small>`}</td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`
+    : a.type === 'transfer'
+    ? `<tr><td><span class="type transfer">transfer</span></td><td>${who(a.from_addr, a.from_name)} → ${who(a.to_addr, a.to_name)}</td><td class="num note">sent</td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`
     : `<tr><td><span class="type buy">sale</span></td><td>${who(a.from_addr, a.from_name)} → ${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`;
   app.innerHTML = `<div class="wrap">
     <div class="crumbs"><a href="/collections">Collections</a> / <a href="/c/${esc(n.collection)}">${esc(n.collection_name)}</a> / ${esc(n.name)}</div>
@@ -721,7 +723,7 @@ async function renderNft(id) {
     <h2 class="px" style="margin:6px 0 10px;font-size:18px">Activity</h2>
     <table class="txs"><thead><tr><th>Event</th><th>Who</th><th style="text-align:right">Price</th><th class="hide-sm">When</th><th>Tx</th></tr></thead>
       <tbody>${n.activity.map(act).join('') || '<tr><td colspan="5" class="note">Not minted yet.</td></tr>'}</tbody></table>
-    <p class="note" style="padding:12px 0 40px">Every mint and sale is a transaction in the <a href="/explorer">explorer</a>, part of the hash chain anchored on Solana.</p></div>`;
+    <p class="note" style="padding:12px 0 40px">Every mint, sale and transfer is a transaction in the <a href="/explorer">explorer</a>, part of the hash chain anchored on Solana.</p></div>`;
 }
 
 // ---------- the explorer ----------
@@ -743,6 +745,11 @@ function txSummary(t) {
     return { what: `${who(b.account, b.name)} bought ${nftLink(t.nft)} from ${se ? who(se.account, se.name) : '—'}`, amount: usd(-b.amount), unit: '$MCP' };
   }
   if (t.type === 'team mint' && t.team) return { what: `team mint → ${who(t.team.account, t.team.name)}: ${t.team.count > 1 ? `${t.team.count} NFTs, first ` : ''}${nftLink(t.nft)}`, amount: 'free', unit: '' };
+  if (t.type === 'transfer' && t.transfer) {
+    const tr = t.transfer;
+    const to = tr.recipients === 1 && tr.to[0] ? who(tr.to[0].account, tr.to[0].name) : `${tr.recipients} accounts`;
+    return { what: `${who(tr.from, tr.from_name)} sent ${tr.count > 1 ? `${tr.count} NFTs, first ${nftLink(t.nft)},` : nftLink(t.nft)} to ${to}`, amount: 'no sale', unit: '' };
+  }
   if (t.type === 'free mint') { const e = find('free_mint'); return { what: `${who(e.account, e.name)} got ${nftLink(t.nft)} free with a code`, amount: 'free', unit: '' }; }
   if (t.type === 'mint') { const mn = find('mint'); return { what: `${who(mn.account, mn.name)} minted ${nftLink(t.nft)}${find('hold', false) ? ' · held for the creator' : ''}`, amount: usd(-mn.amount), unit: '$MCP' }; }
   if (t.type === 'payout') { const e = find('payout'); return { what: `escrow → ${who(e.account, e.name)}, creator of ${t.collection ? `<a href="/c/${esc(t.collection.slug)}">${esc(t.collection.name)}</a>` : 'a collection'}`, amount: `+${usd(e.amount)}`, unit: '$MCP', cls: 'plus' }; }
@@ -1010,6 +1017,7 @@ const CHAT_COMMANDS = [
   ['/buynft-mcp', '<number>', 'Buy a listed NFT, after you confirm name and price'],
   ['/sellnft-mcp', '<number> <price>', 'List your NFT for sale or change its price'],
   ['/cancelnft-mcp', '<number>', 'Take your NFT off sale'],
+  ['/sendnft', '<numbers> to <address>', 'Send your NFTs to another MCP address: one, several ("/sendnft 42 43 to mcp_…") or each to its own; you confirm first'],
   ['/profile-mcp', '<on|off>', 'Show or hide your X handle on public pages'],
 ];
 document.addEventListener('click', async (e) => {
