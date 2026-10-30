@@ -126,7 +126,9 @@ Anyone signed in with X can launch a collection on MCP at [`/launch`](https://mc
 
 ## Explorer
 
-Everything that happens in the market is public at [`/explorer`](https://mcp.credit/explorer): deposits, mints, buys, withdrawals, fees. Code: [`server/src/explorer.js`](server/src/explorer.js).
+Everything that happens in the market is public at [`/explorer`](https://mcp.credit/explorer): deposits, mints, buys, transfers, withdrawals, fees. The list filters by type (mints, sales, transfers, deposits, withdrawals; on an account's page also bought vs sold), and the filter stays in the link (`/explorer?type=mint`). Code: [`server/src/explorer.js`](server/src/explorer.js).
+
+**Lost deposits.** A deposit that didn't arrive can be reported at [`/lost-deposit`](https://mcp.credit/lost-deposit): the deposit address, the wallet it came from and the transaction. No sign-in needed; a few reports an hour per sender, one per transaction. The owner sees them in `/admin`, each with whose deposit address it is and whether that transaction was already credited ([`server/src/claims.js`](server/src/claims.js)). A report moves no money: crediting stays a manual step.
 
 - **MCP addresses, not X handles.** Every account has a public MCP address like `mcp_7Hq2kPzX9aBc`. It is an account number inside MCP, not a Solana wallet (the underscore makes sure it can't be pasted as one). Public pages and other users see the address; the X handle only if its owner turns it on (`public_profile` in the chat). That is not full anonymity: deposits and withdrawals are Solana transactions, so the wallets they come from and go to are public there.
 - **The chain.** Every ledger row gets a number and a hash: `sha256(previous hash, number, row id, MCP address, amount, kind, reference, time)`, so changing, removing or inserting any past row breaks every hash after it. The database also refuses to change or delete ledger rows (trigger). The explorer page downloads the whole chain and recomputes every hash in your browser (*Verify the whole chain*); [`/api/explorer/chain`](https://mcp.credit/api/explorer/chain) is the raw data.

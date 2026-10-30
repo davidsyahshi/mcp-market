@@ -28,6 +28,16 @@
   status = 200
 
 [[redirects]]
+  from = "/mint"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/lost-deposit"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
   from = "/collections"
   to = "/index.html"
   status = 200
