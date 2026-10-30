@@ -124,6 +124,10 @@
   button.ghost { border: 1px solid var(--line2); background: transparent; color: var(--fg); }
   button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
+  .tasks { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: t; }
+  .tasks li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: var(--rl); padding: 10px 12px; counter-increment: t; }
+  .tasks li::before { content: counter(t); flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--cherry); color: var(--ink); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+  .tasks li b { flex: 1; font-weight: 600; }
   .note { margin: 0; padding: 10px 12px; border-radius: var(--r); font-size: 13px; }
   .note.warn { background: var(--warn-bg); color: var(--warn); }
   .note.ok { background: var(--ok-bg); color: var(--ok); }
@@ -229,7 +233,18 @@ function renderOne(n, { back } = {}) {
         el('span', { text: t.trait_type }), el('b', { text: t.value, title: t.value }), t.percent != null ? el('i', { text: `${t.percent}% have it` }) : null))) : null,
       el('div', { class: 'actions', style: 'margin-top:12px' },
         back ? el('button', { class: 'ghost', type: 'button', text: '← All', onclick: back }) : null,
-        n.url ? el('button', { class: 'primary', type: 'button', text: 'Open on mcp.credit', onclick: () => open(n.url) }) : null))));
+        ...(!back && data?.share?.length ? data.share.map((s, i) => el('button', { class: i ? 'ghost' : 'primary', type: 'button', text: s.label, onclick: () => open(s.url) })) : []),
+        n.url ? el('button', { class: !back && data?.share?.length ? 'ghost' : 'primary', type: 'button', text: 'Open on mcp.credit', onclick: () => open(n.url) }) : null))));
+}
+
+function renderTasks() {
+  const d = data;
+  header(d.title || 'Free mint', d.subtitle || '', d.badge);
+  $('view').replaceChildren(
+    el('p', { class: 'sub', style: 'margin:0 0 10px', text: 'Before you get your free mint:' }),
+    el('ol', { class: 'tasks' }, ...(d.tasks || []).map((t) => el('li', {},
+      el('b', { text: t.text }), el('button', { class: 'ghost', type: 'button', text: 'Open on X', onclick: () => open(t.url) })))),
+    d.note ? el('p', { class: 'note warn', style: 'margin-top:12px', text: d.note }) : null);
 }
 
 function renderGallery() {
@@ -254,8 +269,10 @@ function renderGallery() {
 function render() {
   $('loading').hidden = true;
   const d = data;
-  if (d.note) note(d.note, d.note_kind || 'ok'); else note('');
-  if (d.view === 'one' && d.items?.[0]) {
+  if (d.note && d.view !== 'tasks') note(d.note, 'ok'); else note('');
+  if (d.view === 'tasks') {
+    renderTasks();
+  } else if (d.view === 'one' && d.items?.[0]) {
     const n = d.items[0];
     header(d.title || n.name, d.subtitle || n.collection_name, d.badge);
     renderOne(n);
