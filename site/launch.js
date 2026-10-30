@@ -266,6 +266,15 @@
         <button class="btn red" id="tmGo" style="justify-content:center;padding:12px">Mint free</button>
       </div>
       <div id="tmOut" class="note" aria-live="polite" style="margin-top:10px"></div>
+      <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Promo codes</h2>
+      <p>Each account that types the code in its AI chat (<b>/mcpcredit CODE</b>) gets one free random MCP, until the uses run out. In the explorer they show as <b>free mint</b>.</p></div></div>
+      <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end">
+        ${field('pcCode', 'Code', 'placeholder="FIRST200" maxlength="32" autocomplete="off" spellcheck="false"')}
+        ${field('pcUses', 'Uses (accounts)', 'type="number" min="1" max="5000" step="1" value="200" inputmode="numeric"')}
+        <button class="btn red" id="pcGo" style="justify-content:center;padding:12px">Make code</button>
+      </div>
+      <div id="pcOut" class="note" aria-live="polite" style="margin:10px 0"></div>
+      <div id="pc" class="note">Loading…</div>
       <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Review queue</h2>
       <p>Open a collection to look through every picture before approving it. Pay-outs include only mints older than the hold.</p></div></div>
       <table class="txs"><thead><tr><th>Collection</th><th>Creator</th><th>Status</th><th class="hide-sm">NFTs</th><th style="text-align:right">Held</th><th style="text-align:right">Ready</th><th></th></tr></thead><tbody>
@@ -281,6 +290,8 @@
       <div id="bk" class="note">Loading…</div><div style="height:60px"></div></div>`;
     loadBackups();
     wireTeamMint(who);
+    wirePromos();
+    loadPromos();
     $('#bkNow').onclick = async (e) => {
       e.target.disabled = true;
       try { await send('POST', '/admin/backups'); } catch (err) { alert(err.message); }
@@ -339,6 +350,58 @@
       }
       go.disabled = false;
       reset();
+    };
+  }
+
+  // promo codes: each gives one free MCP per account (typed in the chat), up to its number of uses
+  async function loadPromos() {
+    const el = $('#pc');
+    if (!el) return;
+    let list;
+    try { list = await send('GET', '/admin/promo'); } catch (e) { el.textContent = e.message; return; }
+    el.innerHTML = `<table class="txs"><thead><tr><th>Code</th><th style="text-align:right">Used</th><th>Status</th><th class="hide-sm">Last used</th><th></th></tr></thead><tbody>
+      ${list.map((p) => `<tr><td><code>${esc(p.code)}</code><div class="note">type: /mcpcredit ${esc(p.code)}</div></td>
+        <td class="num"><b>${Number(p.used).toLocaleString('en-US')}</b> / ${Number(p.max_uses).toLocaleString('en-US')}</td>
+        <td>${pill(p.status === 'active' ? (p.used >= p.max_uses ? 'used up' : 'live') : 'paused')}</td>
+        <td class="hide-sm note">${p.last_used_at ? esc(new Date(p.last_used_at).toLocaleString()) : '—'}</td>
+        <td style="text-align:right"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn ghost" data-pc="${esc(p.code)}" data-pa="${p.status === 'active' ? 'pause' : 'resume'}" style="padding:4px 8px">${p.status === 'active' ? 'Pause' : 'Resume'}</button>
+          <button class="btn ghost" data-pc="${esc(p.code)}" data-pa="uses" data-used="${Number(p.used)}" data-max="${Number(p.max_uses)}" style="padding:4px 8px">Change uses</button></div></td></tr>`).join('')
+        || '<tr><td colspan="5" class="note">No codes yet.</td></tr>'}
+      </tbody></table>`;
+    el.querySelectorAll('[data-pc]').forEach((b) => b.onclick = async () => {
+      const a = b.dataset.pa;
+      let body;
+      if (a === 'uses') {
+        const v = window.prompt(`How many accounts can use ${b.dataset.pc}? (${b.dataset.used} already did)`, b.dataset.max);
+        if (v == null) return;
+        body = { uses: Math.floor(Number(v)) };
+      } else {
+        body = { status: a === 'pause' ? 'paused' : 'active' };
+      }
+      b.disabled = true;
+      try { await send('POST', `/admin/promo/${encodeURIComponent(b.dataset.pc)}`, body); } catch (e) { alert(e.message); }
+      loadPromos();
+    });
+  }
+
+  function wirePromos() {
+    const out = $('#pcOut');
+    $('#pcGo').onclick = async () => {
+      const code = $('#pcCode').value.trim().toUpperCase();
+      const uses = Math.floor(Number($('#pcUses').value));
+      if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code)) { out.textContent = 'Code: 3 to 32 letters, digits, - or _.'; return; }
+      if (!(uses >= 1 && uses <= 5000)) { out.textContent = 'Uses: 1 to 5,000.'; return; }
+      $('#pcGo').disabled = true;
+      try {
+        const p = await send('POST', '/admin/promo', { code, uses });
+        out.innerHTML = `Made <code>${esc(p.code)}</code> for ${Number(p.max_uses).toLocaleString('en-US')} accounts. In the chat: <code>/mcpcredit ${esc(p.code)}</code>`;
+        $('#pcCode').value = '';
+        loadPromos();
+      } catch (e) {
+        out.innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`;
+      }
+      $('#pcGo').disabled = false;
     };
   }
 
