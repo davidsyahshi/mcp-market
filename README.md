@@ -81,7 +81,7 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 - For apps that ignore that, the buttons also need the form's pass: a short-lived signed token that comes with the form in the tool result's `_meta`, which is for the form and not for the AI's context. The AI can't pre-fill an address either.
 - Apps that can't show forms can't withdraw; use Claude (web, desktop, mobile) or ChatGPT.
 
-**Sending NFTs in a form, too.** `transfer_form` opens the transfer form (an MCP App): you tick your NFTs, type the MCP address and press *Send*, then *Confirm*. Its own tools (`transfer_form_state`, `transfer_form_submit`) are marked `visibility: ["app"]`, and the send needs the form's pass, a 2-hour HMAC token per user. The pass comes in the result's `_meta`; apps that drop `_meta` on the way to the form get it from `transfer_form_state`, a tool only the form calls. Same limits as `send_nft`: up to 50 at once, 100 an hour, all or nothing, trading rules apply.
+**Sending NFTs in a form, too.** `transfer_form` opens the transfer form (an MCP App): you tick your NFTs, type or paste the MCP address (the assistant can't pre-fill it) and press *Send*, then *Confirm*, which shows the full address. Its own tools (`transfer_form_state`, `transfer_form_submit`) are marked `visibility: ["app"]`, and the send needs the form's pass, a 2-hour HMAC token per user that works 5 seconds after it was issued. The pass comes in the result's `_meta`; apps that drop `_meta` on the way to the form get it from `transfer_form_state`, a tool only the form calls. Same limits as `send_nft`: up to 50 at once, 100 an hour, all or nothing, trading rules apply.
 
 **It can't:**
 - see your chats, files, other connectors or anything outside this market;
