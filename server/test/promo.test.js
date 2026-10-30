@@ -222,6 +222,43 @@ test('redeem: guessing is limited to a few wrong codes an hour per account', asy
   assert.equal((await g.redeem('LATE')).error, false);
 });
 
+test('tasks: the code asks to follow and like + RT first, mints only with proof from a screenshot, then asks for a reply or quote', async () => {
+  const boss = await browser('chief');
+  for (const bad of [{ follow_url: 'https://evil.example/x' }, { follow_url: 'https://x.com/mcpmarkets/status/123456' }, { tweet_url: 'https://x.com/mcpmarkets' },
+    { tweet_url: 'javascript:alert(1)' }, { follow_url: 'http://x.com/mcpmarkets' }]) {
+    assert.equal((await boss.call('POST', '/admin/promo', { code: 'TASKBAD', uses: 5, ...bad })).status, 400, JSON.stringify(bad));
+  }
+  const made = await boss.call('POST', '/admin/promo', { code: 'TASK', uses: 5, follow_url: 'https://x.com/mcpmarkets/', tweet_url: 'https://x.com/mcpmarkets/status/2116226786858328452' });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  assert.equal(made.body.follow_url, 'https://x.com/mcpmarkets');
+
+  const u = await chat('tasker');
+  const first = await u.redeem('task');
+  assert.equal(first.error, false);
+  assert.match(first.text, /^Before you get your FREE MINT:\n1\. Follow us on X: https:\/\/x\.com\/mcpmarkets\n2\. Like \+ RT this post: https:\/\/x\.com\/mcpmarkets\/status\/2116226786858328452\n\nDone\? Send a screenshot as proof below\./);
+  assert.equal((await owned(u.id)).length, 0, 'nothing minted yet');
+  // proof right away: too soon, the tasks come back
+  const soon = await u.call('redeem_code', { code: 'TASK', proof: 'liked and reposted' });
+  assert.match(soon.text, /Do the tasks first/);
+  assert.equal((await owned(u.id)).length, 0);
+  // no proof later: still the tasks
+  await db.query("update promo_tasks_shown set shown_at = now() - interval '20 seconds' where user_id = $1", [u.id]);
+  assert.match((await u.redeem('TASK')).text, /^Before you get your FREE MINT/);
+  // with proof after a while: the mint, and the ask to reply or quote the post
+  const done = await u.call('redeem_code', { code: 'TASK', proof: 'post liked and reposted, following @mcpmarkets' });
+  assert.equal(done.error, false, done.text);
+  assert.match(done.text, /^Free mint! Code TASK gave you MCP #\d+/);
+  assert.match(done.text, /Support the collection: reply to or quote the post with your NFT 👉 https:\/\/x\.com\/mcpmarkets\/status\/2116226786858328452/);
+  const [r] = await db.query("select proof from promo_redemptions where code = 'TASK' and user_id = $1", [u.id]);
+  assert.equal(r.proof, 'post liked and reposted, following @mcpmarkets');
+  assert.equal((await owned(u.id)).length, 1);
+
+  // tasks off again: a plain code
+  const off = await boss.call('POST', '/admin/promo/TASK', { follow_url: '', tweet_url: '' });
+  assert.deepEqual([off.body.follow_url, off.body.tweet_url], [null, null]);
+  assert.match((await (await chat('plain')).redeem('TASK')).text, /^Free mint!/);
+});
+
 test('commands: /mcpcredit <code> and /mcpmint with code <code> redeem; the tool names them', async () => {
   const code = COMMANDS.find((x) => x.name === 'mcpmint');
   assert.equal(code.tool, 'redeem_code');

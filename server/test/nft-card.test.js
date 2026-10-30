@@ -101,6 +101,19 @@ test('mint, free mint and nft: one NFT big, the text and picture as before', asy
   assert.equal(nft.structuredContent.nfts.items[0].id, id);
   assert.match(nft.structuredContent.nfts.subtitle, /^owned by mcp_/);
 
+  // a code with tasks: the card lists them first, and after the mint offers reply / quote on X
+  await m.createPromo(db, { code: 'SOCIAL', uses: 5, follow_url: 'https://x.com/mcpmarkets', tweet_url: 'https://x.com/mcpmarkets/status/2116226786858328452' });
+  const ask = await c.callTool({ name: 'redeem_code', arguments: { code: 'SOCIAL' } });
+  assert.equal(ask.structuredContent.nfts.view, 'tasks');
+  assert.deepEqual(ask.structuredContent.nfts.tasks.map((t) => t.kind), ['follow', 'like_rt']);
+  assert.match(ask.content[1].text, /^Note for the assistant/);
+  await db.query("update promo_tasks_shown set shown_at = now() - interval '1 minute'");
+  const got = await c.callTool({ name: 'redeem_code', arguments: { code: 'SOCIAL', proof: 'liked, reposted, following' } });
+  const share = got.structuredContent.nfts.share;
+  assert.deepEqual(share.map((x) => x.label), ['Reply on X', 'Quote on X']);
+  assert.match(share[0].url, /^https:\/\/x\.com\/intent\/post\?in_reply_to=2116226786858328452&text=Just%20minted%20MCP%20%23\d+/);
+  assert.match(share[1].url, /&url=https%3A%2F%2Fx\.com%2Fmcpmarkets%2Fstatus%2F2116226786858328452$/);
+
   // a refusal is plain text: the card shows it as a message
   const bad = await c.callTool({ name: 'redeem_code', arguments: { code: 'CARD' } });
   assert.equal(bad.isError, true);
