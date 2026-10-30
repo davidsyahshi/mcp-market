@@ -342,6 +342,18 @@ create table if not exists promo_misses (
   created_at timestamptz not null default now()
 );
 create index if not exists promo_misses_user on promo_misses(user_id, created_at);
+-- social tasks before a free mint (optional, per code): follow this X account, like + repost this post. The assistant
+-- shows them, the user sends a screenshot, the assistant checks it and redeems with a note of what it saw (proof).
+alter table promo_codes add column if not exists follow_url text;
+alter table promo_codes add column if not exists tweet_url text;
+alter table promo_redemptions add column if not exists proof text;
+-- when an account was shown a code's tasks: a redemption with proof needs them shown a little while before
+create table if not exists promo_tasks_shown (
+  code text not null references promo_codes(code),
+  user_id int not null references users(id),
+  shown_at timestamptz not null default now(),
+  primary key (code, user_id)
+);
 
 -- OAuth for the MCP connector. Codes and tokens are stored as sha256 hashes, never in plain text.
 create table if not exists oauth_clients (
@@ -396,6 +408,7 @@ alter table site_sessions enable row level security;
 alter table promo_codes enable row level security;
 alter table promo_redemptions enable row level security;
 alter table promo_misses enable row level security;
+alter table promo_tasks_shown enable row level security;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') and exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on all tables in schema public from anon, authenticated;

@@ -290,8 +290,9 @@ export async function createApp(opts) {
   }));
   // promo codes: one free MCP per account that types the code in the chat, up to the code's number of uses
   admin.get('/promo', wrap(async () => m.promos(db)));
-  admin.post('/promo', wrap(async (req) => m.createPromo(db, { code: req.body?.code, uses: req.body?.uses })));
-  admin.post('/promo/:code', wrap(async (req) => m.updatePromo(db, req.params.code, { status: req.body?.status, uses: req.body?.uses })));
+  const links = (b) => ({ follow_url: typeof b?.follow_url === 'string' ? b.follow_url : undefined, tweet_url: typeof b?.tweet_url === 'string' ? b.tweet_url : undefined });
+  admin.post('/promo', wrap(async (req) => m.createPromo(db, { code: req.body?.code, uses: req.body?.uses, ...links(req.body) })));
+  admin.post('/promo/:code', wrap(async (req) => m.updatePromo(db, req.params.code, { status: req.body?.status, uses: req.body?.uses, ...links(req.body) })));
   // database backups: the list, one more now, and a download (the file holds every account: owner only)
   admin.get('/backups', wrap(async () => ({
     last: await lastBackup(db),

@@ -28,6 +28,7 @@ export const TABLES = {
   chain_anchors: 'id',
   promo_codes: 'code',
   promo_redemptions: 'id',
+  promo_tasks_shown: 'code, user_id',
   oauth_clients: 'client_id',
   oauth_tokens: 'token',
 };

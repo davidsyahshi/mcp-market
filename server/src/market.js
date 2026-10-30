@@ -273,7 +273,18 @@ export const isCode = (s) => /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(s);
 export const PROMO_MISSES_PER_HOUR = 10;
 const tooManyMisses = 'Too many wrong codes. Try again in an hour.';
 
-export async function redeemCode(db, userId, input) {
+// a link to X: an account or a post. Only x.com / twitter.com, so the chat never shows the user some other site.
+export const isXUrl = (s) => /^https:\/\/(x|twitter)\.com\/[A-Za-z0-9_]{1,15}(\/status\/\d{5,25})?\/?$/.test(String(s || ''));
+// the tasks wait at least this long between being shown and a redemption with proof (the user has to do them)
+export const PROMO_TASK_WAIT_S = 15;
+export const promoTasks = (p) => [
+  p.follow_url ? { kind: 'follow', text: 'Follow us on X', url: p.follow_url } : null,
+  p.tweet_url ? { kind: 'like_rt', text: 'Like + RT this post', url: p.tweet_url } : null,
+].filter(Boolean);
+
+// proof: what the assistant saw on the user's screenshot. A code with tasks without it: the tasks come back instead
+// of a mint ({ tasks }), and are remembered as shown.
+export async function redeemCode(db, userId, input, { proof } = {}) {
   const code = normCode(input);
   const [{ n: misses }] = await db.query("select count(*)::int as n from promo_misses where user_id = $1 and created_at > now() - interval '1 hour'", [userId]);
   if (misses >= PROMO_MISSES_PER_HOUR) fail(tooManyMisses);
@@ -299,38 +310,59 @@ export async function redeemCode(db, userId, input) {
     if (p.status !== 'active') fail(`The code ${code} is paused right now.`);
     if (p.used >= p.max_uses) fail(`All ${p.max_uses.toLocaleString('en-US')} free mints of ${code} are taken. You can still mint one for ${fmt(c.mint_price)}: /mint-mcp`);
     if (c.status !== 'live') fail(`${c.name} is not open for minting.`);
+    const tasks = promoTasks(p);
+    const note = String(proof ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    if (tasks.length) {
+      const [shown] = await t.query('select extract(epoch from now() - shown_at)::float as ago from promo_tasks_shown where code = $1 and user_id = $2', [code, userId]);
+      if (!note || !shown || shown.ago < PROMO_TASK_WAIT_S) {
+        if (!shown) await t.query('insert into promo_tasks_shown (code, user_id) values ($1, $2) on conflict do nothing', [code, userId]);
+        return { tasks, code, left: p.max_uses - p.used, max_uses: p.max_uses, tweet_url: p.tweet_url || null, proof_missing: !!note };
+      }
+    }
     const [pick] = await t.query('select id from nfts where collection_id = $1 and minted_at is null order by random() limit 1 for update skip locked', [c.id]);
     if (!pick) fail(`${c.name} is sold out: every NFT is minted.`);
     const [nft] = await t.query('update nfts set owner_id = $1, minted_at = now() where id = $2 and minted_at is null returning *', [userId, pick.id]);
     if (!nft) fail('Someone minted that one a moment ago; try again.');
     await t.query("insert into ledger (user_id, delta, kind, ref) values ($1, 0, 'free_mint', $2)", [userId, String(nft.id)]);
-    await t.query('insert into promo_redemptions (code, user_id, nft_id) values ($1, $2, $3)', [code, userId, nft.id]);
+    await t.query('insert into promo_redemptions (code, user_id, nft_id, proof) values ($1, $2, $3, $4)', [code, userId, nft.id, tasks.length ? note : null]);
     const [{ used }] = await t.query('update promo_codes set used = used + 1 where code = $1 returning used', [code]);
     const [{ left }] = await t.query('select exists (select 1 from nfts where collection_id = $1 and minted_at is null) as left', [c.id]);
     return { ...nft, code, used, max_uses: p.max_uses, collection: c.slug, collection_name: c.name,
-      trade_after_sold_out: c.trade_after_sold_out, sold_out: !left };
+      trade_after_sold_out: c.trade_after_sold_out, sold_out: !left, tweet_url: p.tweet_url || null };
   });
 }
 
-const PROMO_COLS = `p.code, p.max_uses, p.used, p.status, p.created_at, c.slug as collection,
+const PROMO_COLS = `p.code, p.max_uses, p.used, p.status, p.created_at, p.follow_url, p.tweet_url, c.slug as collection,
   (select max(created_at) from promo_redemptions r where r.code = p.code) as last_used_at`;
 
 export async function promos(db) {
   return db.query(`select ${PROMO_COLS} from promo_codes p join collections c on c.id = p.collection_id order by p.created_at desc, p.code`);
 }
 
+// '' clears a link; anything else must be an X link
+const checkLinks = ({ follow_url: f, tweet_url: tw }) => {
+  for (const [v, what, post] of [[f, 'Follow link', false], [tw, 'Tweet link', true]]) {
+    if (v == null || v === '') continue;
+    if (!isXUrl(v) || /\/status\//.test(v) !== post) fail(`${what}: an x.com link to ${post ? 'a post, like https://x.com/name/status/123…' : 'an account, like https://x.com/name'}.`);
+  }
+};
+const linkOr = (v) => (v == null ? null : String(v).trim().replace(/\/$/, ''));
+
 const checkUses = (uses) => {
   if (!Number.isInteger(uses) || uses < 1 || uses > PROMO_MAX_USES) fail(`Uses: 1 to ${PROMO_MAX_USES.toLocaleString('en-US')}.`);
 };
 
-export async function createPromo(db, { code, uses } = {}) {
+export async function createPromo(db, { code, uses, follow_url, tweet_url } = {}) {
   const c0 = normCode(code);
   if (!isCode(c0)) fail('A code is 3 to 32 letters, digits, - or _, starting with a letter or digit.');
   checkUses(uses);
+  const links = { follow_url: linkOr(follow_url), tweet_url: linkOr(tweet_url) };
+  checkLinks(links);
   const col = await getCollection(db, OWN_COLLECTION);
   if (!col) fail(`There is no collection "${OWN_COLLECTION}".`);
   try {
-    await db.query('insert into promo_codes (code, collection_id, max_uses) values ($1, $2, $3)', [c0, col.id, uses]);
+    await db.query('insert into promo_codes (code, collection_id, max_uses, follow_url, tweet_url) values ($1, $2, $3, $4, $5)',
+      [c0, col.id, uses, links.follow_url || null, links.tweet_url || null]);
   } catch (e) {
     if (e.code === '23505') fail(`${c0} already exists.`);
     throw e;
@@ -339,17 +371,22 @@ export async function createPromo(db, { code, uses } = {}) {
 }
 
 // pause or resume a code, or change how many accounts can use it (never below how many already did)
-export async function updatePromo(db, code, { status, uses } = {}) {
+export async function updatePromo(db, code, { status, uses, follow_url, tweet_url } = {}) {
   const c0 = normCode(code);
   if (!isCode(c0)) fail('That is not a code.');
   if (status != null && !['active', 'paused'].includes(status)) fail('Status: active or paused.');
   if (uses != null) checkUses(uses);
-  if (status == null && uses == null) fail('Nothing to change.');
+  const links = { follow_url: linkOr(follow_url), tweet_url: linkOr(tweet_url) };
+  checkLinks(links);
+  if (status == null && uses == null && links.follow_url == null && links.tweet_url == null) fail('Nothing to change.');
   return db.tx(async (t) => {
     const [p] = await t.query('select * from promo_codes where code = $1 for update', [c0]);
     if (!p) fail(`There is no code "${c0}".`);
     if (uses != null && uses < p.used) fail(`${p.used} accounts already used ${c0}: uses can't go below that.`);
-    await t.query('update promo_codes set status = coalesce($2, status), max_uses = coalesce($3, max_uses) where code = $1', [c0, status ?? null, uses ?? null]);
+    await t.query(`update promo_codes set status = coalesce($2, status), max_uses = coalesce($3, max_uses),
+      follow_url = case when $4::text is null then follow_url else nullif($4::text, '') end,
+      tweet_url = case when $5::text is null then tweet_url else nullif($5::text, '') end where code = $1`,
+    [c0, status ?? null, uses ?? null, links.follow_url, links.tweet_url]);
     return (await t.query(`select ${PROMO_COLS} from promo_codes p join collections c on c.id = p.collection_id where p.code = $1`, [c0]))[0];
   });
 }
