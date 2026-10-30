@@ -128,7 +128,7 @@ test('redeem: one free random MCP per account, nothing paid, outside the mint li
 
 test('redeem: unknown, malformed, paused, used up', async () => {
   const b = await chat('bob');
-  for (const [code, why] of [['NOSUCH', /no code "NOSUCH"/], ['', /not a valid code/], ['a b c', /not a valid code/], ['x'.repeat(41), /./]]) {
+  for (const [code, why] of [['NOSUCH', /no code "NOSUCH"/], ['', /not a valid code/], ['a b c', /not a valid code/], ['x'.repeat(41), /not a valid code/]]) {
     const r = await b.call('redeem_code', { code });
     assert.equal(r.error, true, code);
     assert.match(r.text, why, code);
@@ -203,6 +203,23 @@ test('redeem: sold out says so, and the code is not spent', async () => {
   assert.match(r.text, /sold out/);
   const list = (await boss.call('GET', '/admin/promo')).body;
   assert.equal(list.find((p) => p.code === 'LATE').used, 0);
+  // put them back: everything not minted through the ledger is unminted again
+  await db.query(`update nfts set minted_at = null, owner_id = null where minted_at is not null
+    and id::text not in (select ref from ledger where kind in ('mint', 'team_mint', 'free_mint'))`);
+});
+
+test('redeem: guessing is limited to a few wrong codes an hour per account', async () => {
+  const g = await chat('guesser');
+  for (let i = 0; i < 10; i++) assert.match((await g.redeem(`GUESS${i}`)).text, /no code/);
+  const r = await g.redeem('LATE');
+  assert.equal(r.error, true);
+  assert.match(r.text, /Too many wrong codes/);
+  assert.equal((await owned(g.id)).length, 0);
+  // someone else is not affected
+  assert.equal((await (await chat('honest')).redeem('LATE')).error, false);
+  // an hour later it works again
+  await db.query("update promo_misses set created_at = now() - interval '61 minutes' where user_id = $1", [g.id]);
+  assert.equal((await g.redeem('LATE')).error, false);
 });
 
 test('commands: /mcpcredit <code> and /code-mcp <code> redeem; the tool names them', async () => {
@@ -213,6 +230,8 @@ test('commands: /mcpcredit <code> and /code-mcp <code> redeem; the tool names th
   const c = (await chat('zed')).client;
   const t = (await c.listTools()).tools.find((x) => x.name === 'redeem_code');
   assert.match(t.description, /Chat command: \/code-mcp <code>\./);
+  const start = (await c.listTools()).tools.find((x) => x.name === 'mcpcredit');
+  assert.match(start.description, /If a code follows the command .* call redeem_code with that code instead/);
   assert.equal(t.annotations.readOnlyHint, false);
   const ins = c.getInstructions();
   assert.match(ins, /- \/mcpcredit \[code\]: .*redeem_code/);

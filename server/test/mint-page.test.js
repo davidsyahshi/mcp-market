@@ -116,7 +116,7 @@ test('team mint stops at the sell-out and says so', async () => {
   assert.match(again.body.error, /sold out/);
   // put them back for the next test: everything not minted through the ledger is unminted again
   await db.query(`update nfts set minted_at = null, owner_id = null where minted_at is not null
-    and id::text not in (select ref from ledger where kind in ('mint', 'team_mint'))`);
+    and id::text not in (select ref from ledger where kind in ('mint', 'team_mint', 'free_mint'))`);
 });
 
 test('mint page API: progress and the newest mints, cached briefly by the CDN; paging gives every mint once', async () => {
