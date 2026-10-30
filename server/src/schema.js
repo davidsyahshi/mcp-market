@@ -141,7 +141,7 @@ create table if not exists ledger (
   id bigserial primary key,
   user_id int references users(id),     -- null = project treasury (fees, mint revenue)
   delta bigint not null,
-  kind text not null,                   -- deposit | faucet | mint | buy | sale | fee | withdraw
+  kind text not null,                   -- deposit | faucet | mint | team_mint | free_mint | buy | sale | fee | withdraw | ...
   ref text,
   created_at timestamptz not null default now()
 );
@@ -317,6 +317,32 @@ end $g$;
 drop trigger if exists chain_anchors_guard on chain_anchors;
 create trigger chain_anchors_guard before update or delete on chain_anchors for each row execute function chain_anchors_guard();
 
+-- Promo codes (/admin): each account that redeems one in the chat gets one free random NFT of the market's own
+-- collection, until max_uses accounts have (market.js redeemCode). Codes are stored upper case.
+create table if not exists promo_codes (
+  code text primary key,
+  collection_id int not null references collections(id),
+  max_uses int not null check (max_uses > 0),
+  used int not null default 0 check (used >= 0 and used <= max_uses),
+  status text not null default 'active' check (status in ('active', 'paused')),
+  created_at timestamptz not null default now()
+);
+create table if not exists promo_redemptions (
+  id serial primary key,
+  code text not null references promo_codes(code),
+  user_id int not null references users(id),
+  nft_id int not null unique references nfts(id),
+  created_at timestamptz not null default now(),
+  unique (code, user_id)
+);
+-- wrong codes tried, per account: a few an hour, so codes can't be guessed by trying many (kept a day)
+create table if not exists promo_misses (
+  id bigserial primary key,
+  user_id int not null references users(id),
+  created_at timestamptz not null default now()
+);
+create index if not exists promo_misses_user on promo_misses(user_id, created_at);
+
 -- OAuth for the MCP connector. Codes and tokens are stored as sha256 hashes, never in plain text.
 create table if not exists oauth_clients (
   client_id text primary key,
@@ -367,6 +393,9 @@ alter table oauth_tokens enable row level security;
 alter table chain_anchors enable row level security;
 alter table mint_holds enable row level security;
 alter table site_sessions enable row level security;
+alter table promo_codes enable row level security;
+alter table promo_redemptions enable row level security;
+alter table promo_misses enable row level security;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') and exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on all tables in schema public from anon, authenticated;

@@ -258,6 +258,102 @@ export async function teamMint(db, userId, count) {
   return { minted: minted.map((x) => ({ id: Number(x.id), name: x.name, rarity: x.rarity })), left, ...(stopped ? { stopped } : {}) };
 }
 
+// Promo codes (/admin makes them, the chat's redeem_code tool redeems them): each account that redeems a code gets one
+// free random NFT of the market's own collection, until the code's max_uses accounts have. No payment and outside the
+// per-account mint limit (minted_by stays empty), like a team mint. Each one is a zero-amount "free_mint" ledger row,
+// so the explorer and the NFT's history show it as a free mint; the code itself is never published.
+export const PROMO_MAX_USES = 5000;
+// how a code is written doesn't matter: case, spaces around it and quotes the user may have typed are dropped
+// and so are words around it the user may have copied: "with code EARLY", "code: EARLY"
+export const normCode = (s) => String(s ?? '').trim().replace(/^["'`«“]+|["'`»”]+$/g, '').trim()
+  .replace(/^(?:with\s+)?(?:(?:promo|the)\s+)?code\s*[:=]?\s*/i, '').replace(/^["'`«“]+|["'`»”]+$/g, '').trim().toUpperCase();
+export const isCode = (s) => /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(s);
+
+// guessing codes: an account gets PROMO_MISSES_PER_HOUR wrong codes an hour, then has to wait
+export const PROMO_MISSES_PER_HOUR = 10;
+const tooManyMisses = 'Too many wrong codes. Try again in an hour.';
+
+export async function redeemCode(db, userId, input) {
+  const code = normCode(input);
+  const [{ n: misses }] = await db.query("select count(*)::int as n from promo_misses where user_id = $1 and created_at > now() - interval '1 hour'", [userId]);
+  if (misses >= PROMO_MISSES_PER_HOUR) fail(tooManyMisses);
+  const known = isCode(code) && (await db.query('select 1 from promo_codes where code = $1', [code])).length;
+  if (!known) {
+    // remembered outside any transaction, so the refusal below doesn't undo it; old rows go as new ones come
+    await db.query("delete from promo_misses where user_id = $1 and created_at < now() - interval '1 day'", [userId]);
+    await db.query('insert into promo_misses (user_id) values ($1)', [userId]);
+    fail(isCode(code) ? `There is no code "${code}". Check the spelling.` : 'That is not a valid code. Check the spelling.');
+  }
+  return db.tx(async (t) => {
+    const [p0] = await t.query('select collection_id from promo_codes where code = $1', [code]);
+    if (!p0) fail(`There is no code "${code}". Check the spelling.`);
+    // the same lock order as a mint: the collection (shared), then the account; then the code, so redemptions of one
+    // code take turns and its count never goes past the limit
+    const [c] = await t.query('select * from collections where id = $1 for share', [p0.collection_id]);
+    if (!c || c.creator_id != null) fail(`The code ${code} can't be used.`);
+    await t.query('select id from users where id = $1 for update', [userId]);
+    const [p] = await t.query('select * from promo_codes where code = $1 for update', [code]);
+    const [had] = await t.query(`select r.nft_id, n.name from promo_redemptions r left join nfts n on n.id = r.nft_id
+      where r.code = $1 and r.user_id = $2`, [code, userId]);
+    if (had) fail(`You already used ${code}: it gave you ${had.name || nftName(had.nft_id)}. One per account.`);
+    if (p.status !== 'active') fail(`The code ${code} is paused right now.`);
+    if (p.used >= p.max_uses) fail(`All ${p.max_uses.toLocaleString('en-US')} free mints of ${code} are taken. You can still mint one for ${fmt(c.mint_price)}: /mint-mcp`);
+    if (c.status !== 'live') fail(`${c.name} is not open for minting.`);
+    const [pick] = await t.query('select id from nfts where collection_id = $1 and minted_at is null order by random() limit 1 for update skip locked', [c.id]);
+    if (!pick) fail(`${c.name} is sold out: every NFT is minted.`);
+    const [nft] = await t.query('update nfts set owner_id = $1, minted_at = now() where id = $2 and minted_at is null returning *', [userId, pick.id]);
+    if (!nft) fail('Someone minted that one a moment ago; try again.');
+    await t.query("insert into ledger (user_id, delta, kind, ref) values ($1, 0, 'free_mint', $2)", [userId, String(nft.id)]);
+    await t.query('insert into promo_redemptions (code, user_id, nft_id) values ($1, $2, $3)', [code, userId, nft.id]);
+    const [{ used }] = await t.query('update promo_codes set used = used + 1 where code = $1 returning used', [code]);
+    const [{ left }] = await t.query('select exists (select 1 from nfts where collection_id = $1 and minted_at is null) as left', [c.id]);
+    return { ...nft, code, used, max_uses: p.max_uses, collection: c.slug, collection_name: c.name,
+      trade_after_sold_out: c.trade_after_sold_out, sold_out: !left };
+  });
+}
+
+const PROMO_COLS = `p.code, p.max_uses, p.used, p.status, p.created_at, c.slug as collection,
+  (select max(created_at) from promo_redemptions r where r.code = p.code) as last_used_at`;
+
+export async function promos(db) {
+  return db.query(`select ${PROMO_COLS} from promo_codes p join collections c on c.id = p.collection_id order by p.created_at desc, p.code`);
+}
+
+const checkUses = (uses) => {
+  if (!Number.isInteger(uses) || uses < 1 || uses > PROMO_MAX_USES) fail(`Uses: 1 to ${PROMO_MAX_USES.toLocaleString('en-US')}.`);
+};
+
+export async function createPromo(db, { code, uses } = {}) {
+  const c0 = normCode(code);
+  if (!isCode(c0)) fail('A code is 3 to 32 letters, digits, - or _, starting with a letter or digit.');
+  checkUses(uses);
+  const col = await getCollection(db, OWN_COLLECTION);
+  if (!col) fail(`There is no collection "${OWN_COLLECTION}".`);
+  try {
+    await db.query('insert into promo_codes (code, collection_id, max_uses) values ($1, $2, $3)', [c0, col.id, uses]);
+  } catch (e) {
+    if (e.code === '23505') fail(`${c0} already exists.`);
+    throw e;
+  }
+  return (await db.query(`select ${PROMO_COLS} from promo_codes p join collections c on c.id = p.collection_id where p.code = $1`, [c0]))[0];
+}
+
+// pause or resume a code, or change how many accounts can use it (never below how many already did)
+export async function updatePromo(db, code, { status, uses } = {}) {
+  const c0 = normCode(code);
+  if (!isCode(c0)) fail('That is not a code.');
+  if (status != null && !['active', 'paused'].includes(status)) fail('Status: active or paused.');
+  if (uses != null) checkUses(uses);
+  if (status == null && uses == null) fail('Nothing to change.');
+  return db.tx(async (t) => {
+    const [p] = await t.query('select * from promo_codes where code = $1 for update', [c0]);
+    if (!p) fail(`There is no code "${c0}".`);
+    if (uses != null && uses < p.used) fail(`${p.used} accounts already used ${c0}: uses can't go below that.`);
+    await t.query('update promo_codes set status = coalesce($2, status), max_uses = coalesce($3, max_uses) where code = $1', [c0, status ?? null, uses ?? null]);
+    return (await t.query(`select ${PROMO_COLS} from promo_codes p join collections c on c.id = p.collection_id where p.code = $1`, [c0]))[0];
+  });
+}
+
 // Trading locks in one order everywhere: the collection (shared), then the NFT, then the accounts by id. A freeze
 // locks the collection first too, so a listing or a sale either finishes before it or sees it.
 async function lockCollectionOf(t, nftId) {
@@ -370,7 +466,7 @@ export async function getNft(db, id, { anyStatus = false } = {}) {
 // the NFT's own transactions from the ledger (mint and sales), newest first; tx = the explorer's transaction number
 export async function activity(db, id) {
   const rows = await db.query(`select l.id, l.xact, l.kind, l.delta, l.created_at, ${PUBLIC_NAME('u', 'user')}
-    from ledger l join users u on u.id = l.user_id where l.ref = $1 and l.kind in ('mint', 'team_mint', 'buy', 'sale') order by l.id`, [String(id)]);
+    from ledger l join users u on u.id = l.user_id where l.ref = $1 and l.kind in ('mint', 'team_mint', 'free_mint', 'buy', 'sale') order by l.id`, [String(id)]);
   const byX = new Map();
   for (const r of rows) {
     const key = String(r.xact);
@@ -378,6 +474,7 @@ export async function activity(db, id) {
     const a = byX.get(key);
     if (r.kind === 'mint') Object.assign(a, { type: 'mint', to_addr: r.user_addr, to_name: r.user_name, price: -Number(r.delta) });
     if (r.kind === 'team_mint') Object.assign(a, { type: 'mint', team: true, to_addr: r.user_addr, to_name: r.user_name, price: 0 });
+    if (r.kind === 'free_mint') Object.assign(a, { type: 'mint', free: true, to_addr: r.user_addr, to_name: r.user_name, price: 0 });
     if (r.kind === 'buy') Object.assign(a, { type: 'sale', to_addr: r.user_addr, to_name: r.user_name, price: -Number(r.delta) });
     if (r.kind === 'sale') Object.assign(a, { from_addr: r.user_addr, from_name: r.user_name });
   }

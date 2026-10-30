@@ -288,6 +288,10 @@ export async function createApp(opts) {
     const [u] = await db.query('select public_id from users where id = $1', [userId]);
     return { ...r, to: u.public_id };
   }));
+  // promo codes: one free MCP per account that types the code in the chat, up to the code's number of uses
+  admin.get('/promo', wrap(async () => m.promos(db)));
+  admin.post('/promo', wrap(async (req) => m.createPromo(db, { code: req.body?.code, uses: req.body?.uses })));
+  admin.post('/promo/:code', wrap(async (req) => m.updatePromo(db, req.params.code, { status: req.body?.status, uses: req.body?.uses })));
   // database backups: the list, one more now, and a download (the file holds every account: owner only)
   admin.get('/backups', wrap(async () => ({
     last: await lastBackup(db),

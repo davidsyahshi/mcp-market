@@ -56,7 +56,7 @@ export function explorerConfig(env = process.env) {
   };
 }
 
-const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', team_mint: 'team mint', buy: 'buy', withdraw: 'withdrawal', withdraw_refund: 'refund', payout: 'payout', mint_refund: 'refund' };
+const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', team_mint: 'team mint', free_mint: 'free mint', buy: 'buy', withdraw: 'withdrawal', withdraw_refund: 'refund', payout: 'payout', mint_refund: 'refund' };
 const ESCROW_SQL = `(${ESCROW_KINDS.map((k) => `'${k}'`).join(', ')})`;
 
 export function createExplorer(db, opts = {}) {
@@ -256,7 +256,7 @@ export function createExplorer(db, opts = {}) {
   // ---------- read side (the public API) ----------
 
   const typeOf = (kinds) => {
-    for (const k of ['deposit', 'withdraw', 'withdraw_refund', 'mint_refund', 'payout', 'buy', 'mint', 'team_mint', 'faucet']) if (kinds.includes(k)) return KINDS[k];
+    for (const k of ['deposit', 'withdraw', 'withdraw_refund', 'mint_refund', 'payout', 'buy', 'mint', 'team_mint', 'free_mint', 'faucet']) if (kinds.includes(k)) return KINDS[k];
     return kinds[0] || 'other';
   };
 
@@ -270,7 +270,7 @@ export function createExplorer(db, opts = {}) {
     const ws = wIds.length ? await db.query('select id, status, tx from withdrawals where id = any($1)', [wIds]) : [];
     const wById = new Map(ws.map((w) => [Number(w.id), w]));
     // NFT rows (mints, buys) carry the NFT's number: its name, picture and collection for the page
-    const nIds = [...new Set(rows.filter((r) => ['mint', 'team_mint', 'buy', 'mint_refund'].includes(r.kind) && /^\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref)))];
+    const nIds = [...new Set(rows.filter((r) => ['mint', 'team_mint', 'free_mint', 'buy', 'mint_refund'].includes(r.kind) && /^\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref)))];
     // payouts carry "c<collection id>"
     const cIds = [...new Set(rows.filter((r) => /^c\d{1,9}$/.test(r.ref || '')).map((r) => Number(r.ref.slice(1))))];
     const cs = cIds.length ? await db.query('select id, slug, name from collections where id = any($1)', [cIds]) : [];
@@ -312,7 +312,7 @@ export function createExplorer(db, opts = {}) {
         const n = nById.get(Number(team[0].ref));
         if (n) t.nft = { id: Number(team[0].ref), name: n.name, rarity: n.rarity, collection: n.slug, collection_name: n.collection_name,
           image: `/img/${Number(team[0].ref)}.png`, thumb: `/thumb/${Number(team[0].ref)}.png`, pixel: n.pixel };
-      } else if (/^\d+$/.test(ref) && ['mint', 'buy', 'refund'].includes(type)) {
+      } else if (/^\d+$/.test(ref) && ['mint', 'free mint', 'buy', 'refund'].includes(type)) {
         const n = nById.get(Number(ref));
         t.nft = n ? { id: Number(ref), name: n.name, rarity: n.rarity, collection: n.slug, collection_name: n.collection_name,
           image: `/img/${Number(ref)}.png`, thumb: `/thumb/${Number(ref)}.png`, pixel: n.pixel } : { id: Number(ref), name: nftName(ref) };
