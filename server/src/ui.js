@@ -1,5 +1,5 @@
-// The withdrawal form shown inside the chat, as an MCP App (https://github.com/modelcontextprotocol/ext-apps).
-// The page is server/ui/withdraw.html with the MCP Apps SDK inlined, so the host's sandbox needs no outside
+// Pages shown inside the chat as MCP Apps (https://github.com/modelcontextprotocol/ext-apps): the withdrawal form and
+// the NFT card. Each page is server/ui/<name>.html with the MCP Apps SDK inlined, so the host's sandbox needs no outside
 // domains. The SDK file is pinned by its hash: a changed file stops the form instead of running unknown code.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,21 +28,28 @@ export function inlineSdk(sdk) {
   return `const McpApps=(()=>{\n${body}\nreturn {${names.join(',')}};\n})();\n`;
 }
 
-let cached = null;
+const cache = new Map();
 
-// { uri, html }. The URI carries a hash of the page, so a host that caches resources sees a new version
-// as a new resource.
-export function withdrawUi({ root = findRoot() } = {}) {
-  if (cached) return cached;
+// { uri, html } for server/ui/<name>.html. The URI carries a hash of the page, so a host that caches resources sees a
+// new version as a new resource.
+export function appPage(name, { root = findRoot() } = {}) {
+  const k = `${root}|${name}`;
+  if (cache.has(k)) return cache.get(k);
   const sdk = fs.readFileSync(path.join(root, SDK_FILE), 'utf8');
   const sha = crypto.createHash('sha256').update(sdk).digest('hex');
   if (sha !== SDK_SHA256) throw new Error(`the MCP Apps SDK file changed (sha256 ${sha}): check the new version, then update SDK_SHA256 in ui.js`);
   const lib = inlineSdk(sdk);
   if (/<\/script|<!--/i.test(lib)) throw new Error('MCP Apps SDK can not be inlined into a <script>');
-  const page = fs.readFileSync(path.join(root, 'server', 'ui', 'withdraw.html'), 'utf8');
-  if (page.split(MARKER).length !== 2) throw new Error('withdraw.html: SDK marker missing');
+  const page = fs.readFileSync(path.join(root, 'server', 'ui', `${name}.html`), 'utf8');
+  if (page.split(MARKER).length !== 2) throw new Error(`${name}.html: SDK marker missing`);
   const html = page.replace(MARKER, () => lib);
   const hash = crypto.createHash('sha256').update(html).digest('hex').slice(0, 12);
-  cached = { uri: `ui://mcp-market/withdraw-${hash}.html`, html };
-  return cached;
+  const out = { uri: `ui://mcp-market/${name}-${hash}.html`, html };
+  cache.set(k, out);
+  return out;
 }
+
+// the withdrawal form
+export const withdrawUi = (opts) => appPage('withdraw', opts);
+// NFTs shown in the chat: a gallery of the account's NFTs, or one NFT big
+export const nftsUi = (opts) => appPage('nfts', opts);

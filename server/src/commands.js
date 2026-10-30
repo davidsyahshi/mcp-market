@@ -28,7 +28,9 @@ export const COMMANDS = [
     how: 'call market with the filters written in the command (a collection id, a rarity, or traits like "Lid: Beanie")' },
   { name: 'nft-mcp', args: [{ name: 'number', example: '42' }], tool: 'nft', does: 'One NFT: traits, owner, price, history',
     how: 'call nft' },
-  { name: 'mynft-mcp', tool: 'my_nfts', does: 'The NFTs you own',
+  { name: 'showmynfts', tool: 'show_my_nfts', does: 'Your NFTs as pictures, right in the chat',
+    how: 'call show_my_nfts' },
+  { name: 'mynft-mcp', tool: 'my_nfts', does: 'The NFTs you own, as a list',
     how: 'call my_nfts' },
   { name: 'buynft-mcp', args: [{ name: 'number', example: '42' }], tool: 'buy', does: 'Buy a listed NFT, after you confirm name and price',
     how: 'call nft to get its name and price, ask "Buy <name> for <price>?", and call buy with that expected_price only after the user answers yes. The command itself is not the yes' },
@@ -52,7 +54,7 @@ export const toolHint = (tool) => {
 };
 
 export const INSTRUCTIONS_COMMANDS = `Chat commands. The user may type a command: /mcpcredit, the start command (also written mcpcredit, /mcp.credit or
-mcp.credit on its own), /mcpmint (also mcpmint), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
+mcp.credit on its own), /mcpmint (also mcpmint), /showmynfts (also showmynfts), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
 Do exactly what the command says, right away, without guessing and without extra questions beyond a missing argument
 or a confirmation the command asks for below.
 NFT numbers may be written 42, #42 or "MCP #42". If a required argument is missing, ask only for it. For an unknown
