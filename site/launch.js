@@ -271,8 +271,11 @@
       <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end">
         ${field('pcCode', 'Code', 'placeholder="FIRST200" maxlength="32" autocomplete="off" spellcheck="false"')}
         ${field('pcUses', 'Uses (accounts)', 'type="number" min="1" max="5000" step="1" value="200" inputmode="numeric"')}
+        ${field('pcFollow', 'Task: follow (optional)', 'placeholder="https://x.com/mcpmarkets" autocomplete="off" spellcheck="false"')}
+        ${field('pcTweet', 'Task: like + RT post (optional)', 'placeholder="https://x.com/mcpmarkets/status/…" autocomplete="off" spellcheck="false"')}
         <button class="btn red" id="pcGo" style="justify-content:center;padding:12px">Make code</button>
       </div>
+      <p class="note" style="margin:8px 0 0">With tasks, the AI first asks for them and a screenshot, looks at the screenshot, then mints; after the mint it suggests replying to or quoting the post with the NFT. The AI only looks at a picture: an edited screenshot can pass.</p>
       <div id="pcOut" class="note" aria-live="polite" style="margin:10px 0"></div>
       <div id="pc" class="note">Loading…</div>
       <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Review queue</h2>
@@ -360,13 +363,15 @@
     let list;
     try { list = await send('GET', '/admin/promo'); } catch (e) { el.textContent = e.message; return; }
     el.innerHTML = `<table class="txs"><thead><tr><th>Code</th><th style="text-align:right">Used</th><th>Status</th><th class="hide-sm">Last used</th><th></th></tr></thead><tbody>
-      ${list.map((p) => `<tr><td><code>${esc(p.code)}</code><div class="note">type: /mcpmint with code ${esc(p.code)}</div></td>
+      ${list.map((p) => `<tr><td><code>${esc(p.code)}</code><div class="note">type: /mcpmint with code ${esc(p.code)}</div>
+        ${p.follow_url || p.tweet_url ? `<div class="note">tasks: ${p.follow_url ? `follow <a href="${esc(p.follow_url)}" target="_blank" rel="noopener">${esc(p.follow_url.replace(/^https:\/\//, ''))}</a>` : ''}${p.follow_url && p.tweet_url ? ' · ' : ''}${p.tweet_url ? `like + RT <a href="${esc(p.tweet_url)}" target="_blank" rel="noopener">post</a>` : ''}</div>` : '<div class="note">no tasks</div>'}</td>
         <td class="num"><b>${Number(p.used).toLocaleString('en-US')}</b> / ${Number(p.max_uses).toLocaleString('en-US')}</td>
         <td>${pill(p.status === 'active' ? (p.used >= p.max_uses ? 'used up' : 'live') : 'paused')}</td>
         <td class="hide-sm note">${p.last_used_at ? esc(new Date(p.last_used_at).toLocaleString()) : '—'}</td>
         <td style="text-align:right"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
           <button class="btn ghost" data-pc="${esc(p.code)}" data-pa="${p.status === 'active' ? 'pause' : 'resume'}" style="padding:4px 8px">${p.status === 'active' ? 'Pause' : 'Resume'}</button>
-          <button class="btn ghost" data-pc="${esc(p.code)}" data-pa="uses" data-used="${Number(p.used)}" data-max="${Number(p.max_uses)}" style="padding:4px 8px">Change uses</button></div></td></tr>`).join('')
+          <button class="btn ghost" data-pc="${esc(p.code)}" data-pa="uses" data-used="${Number(p.used)}" data-max="${Number(p.max_uses)}" style="padding:4px 8px">Change uses</button>
+          <button class="btn ghost" data-pc="${esc(p.code)}" data-pa="tasks" data-follow="${esc(p.follow_url || '')}" data-tweet="${esc(p.tweet_url || '')}" style="padding:4px 8px">Tasks</button></div></td></tr>`).join('')
         || '<tr><td colspan="5" class="note">No codes yet.</td></tr>'}
       </tbody></table>`;
     el.querySelectorAll('[data-pc]').forEach((b) => b.onclick = async () => {
@@ -376,6 +381,12 @@
         const v = window.prompt(`How many accounts can use ${b.dataset.pc}? (${b.dataset.used} already did)`, b.dataset.max);
         if (v == null) return;
         body = { uses: Math.floor(Number(v)) };
+      } else if (a === 'tasks') {
+        const f = window.prompt(`${b.dataset.pc}: X account to follow (https://x.com/name), empty for none`, b.dataset.follow);
+        if (f == null) return;
+        const t = window.prompt(`${b.dataset.pc}: post to like + RT (https://x.com/name/status/…), empty for none`, b.dataset.tweet);
+        if (t == null) return;
+        body = { follow_url: f.trim(), tweet_url: t.trim() };
       } else {
         body = { status: a === 'pause' ? 'paused' : 'active' };
       }
@@ -394,7 +405,7 @@
       if (!(uses >= 1 && uses <= 5000)) { out.textContent = 'Uses: 1 to 5,000.'; return; }
       $('#pcGo').disabled = true;
       try {
-        const p = await send('POST', '/admin/promo', { code, uses });
+        const p = await send('POST', '/admin/promo', { code, uses, follow_url: $('#pcFollow').value.trim(), tweet_url: $('#pcTweet').value.trim() });
         out.innerHTML = `Made <code>${esc(p.code)}</code> for ${Number(p.max_uses).toLocaleString('en-US')} accounts. In the chat: <code>/mcpmint with code ${esc(p.code)}</code>`;
         $('#pcCode').value = '';
         loadPromos();
