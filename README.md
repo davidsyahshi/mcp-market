@@ -41,7 +41,8 @@ Or type a command, and the AI does exactly that ([`server/src/commands.js`](serv
 | `/mint-mcp [count] [collection]` | mint random NFTs (1 from MCP if you name nothing) |
 | `/market-mcp [filter]` | NFTs for sale, cheapest first; filter by collection, rarity or trait |
 | `/nft-mcp <number>` | one NFT: traits, owner, price, history |
-| `/mynft-mcp` | the NFTs you own |
+| `/showmynfts` | your NFTs as pictures, right in the chat |
+| `/mynft-mcp` | the NFTs you own, as a list |
 | `/buynft-mcp <number>` | buy a listed NFT, after you confirm name and price |
 | `/sellnft-mcp <number> <price>` | list your NFT for sale or change its price |
 | `/cancelnft-mcp <number>` | take your NFT off sale |
@@ -57,6 +58,7 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 |---|---|---|
 | `mcpcredit` | the start command: balance, NFTs, the mint, all chat commands | no |
 | `help` | the list of chat commands | no |
+| `show_my_nfts` | your NFTs as a picture card in the chat (MCP App) | no |
 | `redeem_code` | redeems a promo code the user typed: one free random MCP per account, while the code lasts | gives you one NFT, free |
 | `account` | your MCP address, balance, deposit address, NFTs, recent balance changes, your page in the explorer | no |
 | `public_profile` | show or hide your X handle on public pages (hidden by default) | your profile's visibility |
