@@ -134,7 +134,8 @@ async function loadBatch(q, id) {
   return batchRow(b, await q('select id, wallet, amount, tx from credit_claims where batch_id = $1 order by id', [id]));
 }
 
-// The next batch: the oldest pending claims that are in no batch, up to `size` wallets (all of a wallet's claims go together).
+// The next batch: the pending claims that are in no batch, smallest wallet totals first (1,000s first, the biggest last, so
+// the big holders come at the end), up to `size` wallets (all of a wallet's claims go together). Equal totals: oldest first.
 export async function makeBatch(db, size = PACE.size) {
   const n = Number(size);
   if (!Number.isInteger(n) || n < 1 || n > BATCH_MAX) fail(`A batch is 1 to ${BATCH_MAX} wallets.`);
@@ -143,7 +144,7 @@ export async function makeBatch(db, size = PACE.size) {
     const [open] = await t.query("select no from credit_batches where status = 'sending'");
     if (open) fail(`Batch #${open.no} is still open: mark it sent (or cancel it) first.`);
     const pick = await t.query(`select wallet from credit_claims where status = 'pending' and batch_id is null
-      group by wallet order by min(id) limit $1`, [n]);
+      group by wallet order by sum(amount), min(id) limit $1`, [n]);
     if (!pick.length) fail('Nobody is waiting: there are no pending claims outside a batch.');
     const [{ no }] = await t.query('select coalesce(max(no), 0) + 1 as no from credit_batches');
     const [b] = await t.query('insert into credit_batches (no, size) values ($1, $2) returning id', [no, n]);
@@ -265,7 +266,7 @@ export async function feed(db, { now = new Date(), rows = 100, batches = 20, que
       cardinality(b.txs) as batch_txs, min(c.id) as first
     from credit_claims c join credit_batches b on b.id = c.batch_id
     where c.status = 'sent' group by b.no, b.txs, c.wallet order by max(c.sent_at) desc, b.no desc, min(c.id) desc limit $1`, [rows]);
-  const next = await db.query(`${QUEUE} order by first limit $1`, [queue]);
+  const next = await db.query(`${QUEUE} order by amount, first limit $1`, [queue]);
   const tk = await token(db);
   const launch = launchAt();
   return {
@@ -305,8 +306,10 @@ export async function walletStatus(db, wallet, { now = new Date() } = {}) {
   let queued = null;
   const sch = queuedRows.length || sendingRows.length ? await schedule(db, now) : null;
   if (queuedRows.length) {
+    // the queue goes smallest total first, then oldest claim first
     const first = Math.min(...queuedRows.map((r) => Number(r.id)));
-    const [{ ahead }] = await db.query(`select count(*)::int as ahead from (${QUEUE}) q where q.first < $1`, [first]);
+    const mine = sum(queuedRows);
+    const [{ ahead }] = await db.query(`select count(*)::int as ahead from (${QUEUE}) q where q.amount < $2 or (q.amount = $2 and q.first < $1)`, [first, mine]);
     queued = { amount: sum(queuedRows), pos: Number(ahead) + 1, ...sch.at(Number(ahead) + 1) };
   }
   return {
