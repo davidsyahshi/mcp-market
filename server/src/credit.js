@@ -1,4 +1,4 @@
-// $CREDIT: holders burn MCP NFTs for $CREDIT (10,000 per NFT), then claim it to a Solana wallet for the airdrop of the
+// $CREDIT: holders burn MCP NFTs for $CREDIT (10,000 per NFT, rarer ones up to 10x), then claim it to a Solana wallet for the airdrop of the
 // $CREDIT token. $CREDIT is a balance of its own (users.credit_balance, whole units), never $MCP: it does not enter the
 // $MCP ledger, balances or reserves. Burning and claiming happen in a form inside the chat (server/ui/credit.html):
 // the person ticks the NFTs or pastes the wallet and presses Confirm there.
@@ -34,6 +34,13 @@ export const CONFIG = {
   })(),
 };
 export const BURN_MAX = 500; // NFTs in one burn (one transaction); burn again for more
+// rarer NFTs burn for more: CREDIT_PER_BURN times this (Common and anything unlisted: 1x)
+export const RARITY_X = { Common: 1, Rare: 2, Epic: 5, Legendary: 8, 'Ultra-Rare': 10 };
+export const rarityX = (rarity) => (Object.hasOwn(RARITY_X, rarity ?? '') ? RARITY_X[rarity] : 1);
+// the $CREDIT one NFT of this rarity burns for
+export const creditFor = (rarity) => CONFIG.perNft * rarityX(rarity);
+// "10,000 each · Rare 2x · Epic 5x · Legendary 8x · Ultra-Rare 10x"
+export const rarityLine = () => `${CONFIG.perNft.toLocaleString('en-US')} each · ${Object.entries(RARITY_X).filter(([, x]) => x > 1).map(([r, x]) => `${r} ${x}x`).join(' · ')}`;
 const notBurned = 'Nothing was burned.';
 
 // When the $CREDIT token goes live: CREDIT_LAUNCH_AT (an ISO time). Not set: no countdown, just "soon".
@@ -101,14 +108,14 @@ export async function burn(db, userId, ids) {
     if (gone.length !== list.length) fail(`Some of these NFTs just changed hands. ${notBurned}`);
     const rows = await t.query(`insert into ledger (user_id, delta, kind, ref)
       select $1, 0, 'burn', x.id::text from unnest($2::int[]) as x(id) order by x.id returning id`, [userId, list]);
-    const credit = list.length * CONFIG.perNft;
+    const credit = list.reduce((sum, id) => sum + creditFor(byId.get(id).rarity), 0);
     const [b] = await t.query('insert into burns (user_id, nft_ids, count, credit) values ($1, $2, $3, $4) returning id, created_at',
       [userId, list, list.length, credit]);
     const [u] = await t.query('update users set credit_balance = credit_balance + $1 where id = $2 returning credit_balance, public_id', [credit, userId]);
     return {
       id: Number(b.id), count: list.length, credit, balance: Number(u.credit_balance), address: u.public_id,
       tx: Math.min(...rows.map((r) => Number(r.id))), at: b.created_at,
-      nfts: list.map((id) => ({ id, name: byId.get(id).name, rarity: byId.get(id).rarity, pixel: !!byId.get(id).pixel })),
+      nfts: list.map((id) => ({ id, name: byId.get(id).name, rarity: byId.get(id).rarity, pixel: !!byId.get(id).pixel, credit: creditFor(byId.get(id).rarity) })),
     };
   });
 }
@@ -299,7 +306,7 @@ export async function creditInfo(db, userId, now = new Date()) {
         + (select coalesce(sum(amount), 0)::bigint from credit_drop_claims where user_id = u.id and stage = 'done') as earned
     from users u where u.id = $1`, [userId]);
   return {
-    balance: Number(u.credit_balance), burned: Number(u.burned), earned: Number(u.earned), per_nft: CONFIG.perNft,
+    balance: Number(u.credit_balance), burned: Number(u.burned), earned: Number(u.earned), per_nft: CONFIG.perNft, rarity_x: RARITY_X,
     fee: CONFIG.claimFee / 1e6, mcp_balance: Number(u.balance) / 1e6,
     launch_at: launchAt()?.toISOString() || null, launch_text: launchText(now), launch_line: launchLine(now),
     claims: await myClaims(db, userId),

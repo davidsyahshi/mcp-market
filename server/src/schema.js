@@ -586,6 +586,18 @@ const DATA_MIGRATIONS = [
       end if;
     end $c$;
     delete from nfts where collection_id is null;`],
+  // 2026-10-31: rarer NFTs burn for more (credit.js RARITY_X: Rare 2x, Epic 5x, Legendary 8x, Ultra-Rare 10x). Burns made
+  // before that got 10,000 each: they are topped up to the new rate, never lowered, and the $CREDIT goes to the account.
+  ['credit-rarity', `
+    with fix as (
+      select b.id, b.user_id, b.credit, sum(10000 * case n.rarity when 'Rare' then 2 when 'Epic' then 5 when 'Legendary' then 8
+        when 'Ultra-Rare' then 10 else 1 end)::bigint as want
+      from burns b join nfts n on n.id = any(b.nft_ids) group by b.id, b.user_id, b.credit
+    ), up as (
+      update burns b set credit = f.want from fix f where b.id = f.id and f.want > b.credit returning b.user_id, f.want - f.credit as diff
+    )
+    update users u set credit_balance = u.credit_balance + s.diff from (select user_id, sum(diff) as diff from up group by user_id) s
+    where u.id = s.user_id;`],
 ];
 
 const VERSION = crypto.createHash('sha256').update(SCHEMA + DATA_MIGRATIONS.map(([k]) => k).join(',')).digest('hex').slice(0, 16);

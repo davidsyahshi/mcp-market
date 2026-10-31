@@ -47,7 +47,7 @@ export const COMMANDS = [
       'its confirm code only after the user answers yes. The command itself is not the yes' },
   { name: 'transfernft', tool: 'transfer_form', does: 'The transfer form: tick the NFTs you want to send, type the MCP address, confirm',
     how: 'call transfer_form and let the user pick in the form; nothing is sent until they confirm there' },
-  { name: 'burnmcp', tool: 'burn_form', does: 'Burn MCP NFTs for $CREDIT, 10,000 each: tick them in a form and confirm there',
+  { name: 'burnmcp', tool: 'burn_form', does: 'Burn MCP NFTs for $CREDIT: 10,000 each, Rare 2x, Epic 5x, Legendary 8x, Ultra-Rare 10x; in a form',
     how: 'call burn_form and let the user pick in the form; nothing is burned until they confirm there' },
   { name: 'claimcredit', tool: 'claim_credit_form', does: 'Claim your $CREDIT to your Solana wallet for the airdrop (fee 0.5 $MCP), in a form',
     how: 'call claim_credit_form; the user pastes the wallet and confirms in the form' },

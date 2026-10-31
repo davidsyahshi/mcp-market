@@ -400,7 +400,7 @@ export function buildMcpServer(db, userId, opts) {
       ? `You already got your FREE ${amt} $CREDIT from ${d.code}: one per account. Your $CREDIT: ${credit.credits(d.balance)}.`
       : `Allocation confirmed ✅ FREE ${amt} $CREDIT is on your account. Your $CREDIT: ${credit.credits(d.balance)}.`;
     const next = `${launch} To get it on Solana, bind your wallet: /claimcredit (if your AI doesn't know that command yet, reconnect the MCP connector once). ` +
-      `Hold MCP NFTs? Each one burns for ${credit.credits(credit.CONFIG.perNft)} $CREDIT: /burnmcp`;
+      `Hold MCP NFTs? Each one burns for $CREDIT (${credit.rarityLine()}): /burnmcp`;
     return {
       ...ok(text(`${msg}\n${next}`)),
       ...shown({ view: 'drop', done: true, amount: d.amount, image_url: `${page}.png`, steps: [], share: [{ label: 'Open card', url: page }],
@@ -770,7 +770,7 @@ export function buildMcpServer(db, userId, opts) {
       offset,
       page: C_PAGE,
       nfts: items.map((n) => ({ id: Number(n.id), name: n.name, rarity: n.rarity || null, pixel: !!n.pixel, listed: n.price != null ? units(n.price) : null,
-        image_url: `${publicUrl}/thumb/${Number(n.id)}.png` })),
+        credit: credit.creditFor(n.rarity), image_url: `${publicUrl}/thumb/${Number(n.id)}.png` })),
       max: credit.BURN_MAX,
       burn_open: !burnClosed,
       burn_closed: burnClosed,
@@ -796,7 +796,7 @@ export function buildMcpServer(db, userId, opts) {
   tool('burn_form', {
     title: 'Burn NFTs for $CREDIT',
     description: `Shows the burn form inside the chat: every MCP NFT the user owns with a checkbox; each burned NFT gives ` +
-      `${credit.credits(credit.CONFIG.perNft)} $CREDIT, the coming token's airdrop allocation. The user ticks NFTs and presses Burn, then Confirm, ` +
+      `$CREDIT, the coming token's airdrop allocation (${credit.rarityLine()}). The user ticks NFTs and presses Burn, then Confirm, ` +
       'in the form. Burned NFTs are gone for good. This tool burns nothing and takes no arguments. Use it when the user types /burnmcp ' +
       'or wants to burn NFTs for $CREDIT.',
     annotations: read,
@@ -806,7 +806,7 @@ export function buildMcpServer(db, userId, opts) {
     const state = await cState();
     return {
       content: [text(state.burn_closed ? `Burn form shown to ${state.address}, but burning is closed: ${state.burn_closed} ${creditLine(state.credit)}\n${noForm}` : `Burn form shown to ${state.address}: ${state.total} MCP NFT${state.total === 1 ? '' : 's'} to pick from; each burned NFT gives ` +
-        `${credit.credits(credit.CONFIG.perNft)} $CREDIT. ${creditLine(state.credit)} Nothing is burned until the user confirms in the form, so don't say it is done. ` +
+        `$CREDIT by rarity: ${credit.rarityLine()}. ${creditLine(state.credit)} Nothing is burned until the user confirms in the form, so don't say it is done. ` +
         `When the form says it is done, the $CREDIT is on their account; ${credit.launchLine()} They bind a Solana wallet for it with /claimcredit.\n${noForm}`)],
       structuredContent: { state, view: 'burn' },
       _meta: { [C_TOKEN]: creditToken(userId) },
