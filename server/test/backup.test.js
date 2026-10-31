@@ -69,7 +69,7 @@ test('a backup is one gzipped file with every table, and a restore brings back e
   const fresh = await openDb({ url: '' });
   try {
     const out = await bk.restoreBackup(fresh, file);
-    assert.deepEqual(out.check, { balancesMatch: true, balancesOff: 0, chainOk: true, sealed: out.check.sealed, brokenAt: null });
+    assert.deepEqual(out.check, { balancesMatch: true, balancesOff: 0, chainOk: true, sealed: out.check.sealed, brokenAt: null, creditMatch: true });
     assert.ok(out.check.sealed > 10);
     // row for row, to the microsecond
     for (const [table, order] of Object.entries(bk.TABLES)) {

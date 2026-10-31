@@ -122,6 +122,7 @@ export function runSuite(setup) {
 
     const tools = (await alice.listTools()).tools.map((t) => t.name).sort();
     assert.deepEqual(tools, ['account', 'buy', 'cancel_listing', 'collections', 'deposit', 'faucet', 'help', 'holders_chat', 'market', 'mcpcredit', 'mint', 'my_nfts', 'nft', 'public_profile', 'redeem_code', 'sell', 'send_nft', 'show_my_nfts', 'transfer_form', 'transfer_form_state', 'transfer_form_submit',
+      'burn_form', 'claim_credit_form', 'credit_form_state', 'burn_form_submit', 'claim_form_submit',
       'withdraw_form', 'withdraw_form_state', 'withdraw_form_bind', 'withdraw_form_submit', 'my_withdrawals'].sort());
 
     // no money yet

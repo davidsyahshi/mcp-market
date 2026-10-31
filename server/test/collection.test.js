@@ -326,7 +326,7 @@ test('the website pages have plain addresses: /c/mcp, /nft/1, /connect are the s
 test('netlify.toml rewrites exactly the site pages to index.html, before the catch-all to the function', () => {
   const toml = fs.readFileSync(path.join(ROOT, 'netlify.toml'), 'utf8');
   const froms = [...toml.matchAll(/from = "([^"]+)"\s*\n\s*to = "\/index\.html"/g)].map((x) => x[1]);
-  assert.deepEqual(froms.sort(), ['/a/*', '/admin', '/c/*', '/collections', '/connect', '/explorer', '/launch', '/lost-deposit', '/market', '/mint', '/nft/*', '/tx/*', '/u/*'].sort());
+  assert.deepEqual(froms.sort(), ['/a/*', '/admin', '/c/*', '/collections', '/connect', '/explorer', '/launch', '/lost-deposit', '/market', '/mint', '/nft/*', '/tokens', '/tx/*', '/u/*'].sort());
   assert.ok(toml.indexOf('to = "/index.html"') < toml.indexOf('to = "/.netlify/functions/api/:splat"'));
 });
 

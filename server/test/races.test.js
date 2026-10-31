@@ -170,3 +170,81 @@ test('mints and a freeze in parallel: every mint either refunded or refused, mon
   assert.equal(open, 0);
   assert.ok(await ledgerOk());
 });
+
+// ---------- $CREDIT (credit.js) ----------
+const creditOk = async () => (await db.query(`select count(*)::int as n from users u where u.credit_balance <>
+  coalesce((select sum(credit) from burns where user_id = u.id), 0)
+    + coalesce((select sum(amount) from credit_drop_claims where user_id = u.id and stage = 'done'), 0)
+    - coalesce((select sum(amount) from credit_claims where user_id = u.id and status <> 'void'), 0)`))[0].n === 0;
+async function mcpReady() {
+  const path = await import('node:path');
+  const { findRoot } = await import('../src/paths.js');
+  await m.seedCollection(db, path.join(findRoot(), 'collection', 'collection.json'));
+  await db.query("update collections set trade_after_sold_out = false where slug = 'mcp'"); // burn before the sell-out here
+}
+
+test('$CREDIT: two burns of the same NFT, a burn racing a buy and a send, two claims at once: each happens once, everything adds up', opts, async () => {
+  const credit = await import('../src/credit.js');
+  await mcpReady();
+  const a = await user('burner', 5e6);
+  const b = await user('buyer', 20e6);
+  const [x, y, z, w, v] = (await m.teamMint(db, a.id, 5)).minted.map((t) => t.id);
+  // the same NFT in two burns at once: one burns it, the other burns nothing
+  const two = await Promise.all([settle(credit.burn(db, a.id, [x, y])), settle(credit.burn(db, a.id, [y, z]))]);
+  assert.equal(two.filter((o) => o.ok).length, 1);
+  assert.match(two.find((o) => !o.ok).e.message, /don't own .*Nothing was burned/);
+  // a buy holding the NFT: the burn waits, then finds it sold
+  await m.list(db, a.id, w, 3e6);
+  const G = gated(/from nfts where id = \$1 for update/);
+  const pb = settle(m.buy(G.db, b.id, w, 3e6));
+  await G.at;
+  const pburn = settle(credit.burn(db, a.id, [w]));
+  assert.ok(await pending(pburn), 'the burn waits for the sale');
+  G.release();
+  assert.ok((await pb).ok);
+  assert.match((await pburn).e.message, /don't own/);
+  // a burn and a send of the same NFT at once: one of them
+  const bs = await Promise.all([settle(credit.burn(db, a.id, [v])), settle(m.sendNftsFromForm(db, a.id, [{ nft_id: v, to: (await db.query('select public_id from users where id = $1', [b.id]))[0].public_id }]))]);
+  assert.equal(bs.filter((o) => o.ok).length, 1);
+  const [vr] = await db.query('select owner_id, burned_at from nfts where id = $1', [v]);
+  assert.ok(bs[0].ok ? vr.owner_id == null && vr.burned_at : vr.owner_id === b.id && !vr.burned_at);
+  // two claims with different request keys at once: one claims everything, the other nothing, one fee
+  const wallet = 'Fd7btgySsrjuo25CJCj7oE7VPMyezDhnx7pZkj2v69Nk';
+  const before = await bal(a.id);
+  const cl = await Promise.all([settle(credit.claim(db, a.id, { wallet, requestKey: `ka-${run}-0001` })), settle(credit.claim(db, a.id, { wallet, requestKey: `kb-${run}-0002` }))]);
+  assert.equal(cl.filter((o) => o.ok).length, 1);
+  assert.match(cl.find((o) => !o.ok).e.message, /No \$CREDIT to claim yet/);
+  assert.equal(await bal(a.id), before - 500_000);
+  const deadlocks = [...two, ...bs, ...cl].filter((o) => !o.ok && /deadlock/.test(o.e.message));
+  assert.equal(deadlocks.length, 0);
+  assert.ok(await ledgerOk());
+  assert.ok(await creditOk());
+});
+
+test('$CREDIT: many burns, buys, sends and mints in parallel: no deadlock, every NFT has one fate', opts, async () => {
+  const credit = await import('../src/credit.js');
+  await mcpReady();
+  const people = [];
+  for (let i = 0; i < 6; i++) people.push(await user(`crowd_${i}`, 50e6));
+  const owned = new Map();
+  for (const p of people) owned.set(p.id, (await m.teamMint(db, p.id, 6)).minted.map((t) => t.id));
+  for (const p of people) await m.list(db, p.id, owned.get(p.id)[0], 2e6);
+  const jobs = [];
+  for (const p of people) {
+    const mine = owned.get(p.id);
+    const next = people[(people.indexOf(p) + 1) % people.length];
+    jobs.push(settle(credit.burn(db, p.id, mine.slice(0, 4))));
+    jobs.push(settle(m.buy(db, next.id, mine[0], 2e6)));
+    jobs.push(settle(m.sendNftsFromForm(db, p.id, [{ nft_id: mine[3], to: next.public_id || (await db.query('select public_id from users where id = $1', [next.id]))[0].public_id }])));
+    jobs.push(settle(m.mint(db, p.id)));
+  }
+  const out = await Promise.all(jobs);
+  assert.equal(out.filter((o) => !o.ok && /deadlock/.test(o.e.message)).length, 0);
+  // each burned NFT is burned once and owned by nobody; each owned one isn't burned
+  const rows = await db.query('select id, owner_id, burned_at from nfts where id = any($1::int[])', [[...owned.values()].flat()]);
+  for (const r of rows) assert.ok((r.owner_id == null) === !!r.burned_at, `NFT ${r.id}`);
+  const [{ dup }] = await db.query("select count(*)::int as dup from (select ref from ledger where kind = 'burn' group by ref having count(*) > 1) d");
+  assert.equal(dup, 0);
+  assert.ok(await ledgerOk());
+  assert.ok(await creditOk());
+});

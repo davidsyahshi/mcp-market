@@ -29,7 +29,7 @@ after(async () => { await db?.close(); });
 test('commands: unique, end in -mcp (or one of the few named ones), each one points at a real tool that names it', async () => {
   const names = COMMANDS.map((x) => x.name);
   assert.equal(new Set(names).size, names.length);
-  for (const n of names) assert.match(n, /^([a-z]+-mcp|mcpcredit|mcpmint|mcpchat|showmynfts|sendnft|transfernft)$/, n);
+  for (const n of names) assert.match(n, /^([a-z]+-mcp|mcpcredit|mcpmint|mcpchat|showmynfts|sendnft|transfernft|burnmcp|claimcredit)$/, n);
   for (const n of ['mcpcredit', 'deposit-mcp', 'withdraw-mcp', 'mint-mcp', 'buynft-mcp', 'sellnft-mcp', 'help-mcp']) assert.ok(names.includes(n), n);
   const tools = (await c.listTools()).tools;
   for (const x of COMMANDS) {
@@ -72,7 +72,7 @@ test('commands: offered as MCP prompts that put the command in the chat', async 
 
 test('commands: the /connect page shows the same list', () => {
   const site = fs.readFileSync(new URL('../../site/index.html', import.meta.url), 'utf8');
-  const listed = [...site.matchAll(/\['(\/(?:[a-z]+-mcp|mcpcredit|mcpmint|mcpchat|showmynfts|sendnft|transfernft))', '([^']*)', '([^']*)'\]/g)].map((x) => x.slice(1));
+  const listed = [...site.matchAll(/\['(\/(?:[a-z]+-mcp|mcpcredit|mcpmint|mcpchat|showmynfts|sendnft|transfernft|burnmcp|claimcredit))', '([^']*)', '([^']*)'\]/g)].map((x) => x.slice(1));
   assert.deepEqual(listed, COMMANDS.map((x) => [`/${x.name}`, usage(x).slice(x.name.length + 2), x.does]));
 });
 
