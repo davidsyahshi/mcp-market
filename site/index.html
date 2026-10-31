@@ -278,14 +278,107 @@ table.txs a.tx { color: var(--cream); }
 .crumbs a { color: var(--dim); }
 .nftpage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 14px 0 22px; }
 .nftpage .art img { width: 100%; aspect-ratio: 1; border: 2px solid var(--edge); background: var(--panel); }
-.soon { min-height: calc(100vh - 230px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; padding: 48px 0; }
-.soon svg { width: 72px; height: 84px; image-rendering: pixelated; }
-.soon h1 { margin: 0; font-size: clamp(30px, 7.4vw, 92px); line-height: 1.04; letter-spacing: .01em; }
-.soon h1 .tk { color: var(--red); }
-.soon .tag { color: var(--dim); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; border: 2px solid var(--edge); padding: 6px 12px; }
-.soon .cur { color: var(--red); animation: blink 1.1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .soon .cur { animation: none; } }
+/* the Tokens page: $CREDIT on the left, its airdrop live on the right */
+.tk-grid { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 28px; padding: 30px 0 60px; align-items: start; }
+.tk-side { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 14px; }
+.tk-coin { width: 168px; height: 168px; }
+.tk-coin img { width: 100%; height: 100%; image-rendering: pixelated; filter: drop-shadow(8px 8px 0 rgba(0,0,0,.55)); animation: bob 3.2s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-6px); } }
+.tk-side h1 { margin: 0; font-size: clamp(40px, 6vw, 64px); line-height: 1; color: var(--red); }
+.tk-sub { margin: 0; color: var(--dim); }
+.tk-state .pill { font-size: 12px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 8px; }
+.tk-clock { font: 700 13px 'JetBrains Mono', monospace; color: var(--cream); letter-spacing: .04em; }
+.live.ok { background: #7AE582; box-shadow: none; animation: none; }
+.tk-ca { background: var(--panel); border: 2px solid var(--edge); padding: 12px; display: grid; gap: 8px; }
+.tk-ca .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.tk-ca-row { display: flex; gap: 8px; align-items: stretch; }
+.tk-ca-val { flex: 1; min-width: 0; background: var(--bg); border: 2px solid var(--edge); padding: 9px 10px; font-size: 13px; word-break: break-all; line-height: 1.4; cursor: text; user-select: all; }
+.tk-ca-val.dim { color: var(--dim); user-select: none; cursor: default; word-break: normal; }
+.tk-ca .btn { padding: 8px 14px; }
+.tk-ca .note:empty { display: none; }
+a.btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+.tk-steps { display: grid; gap: 0; border: 2px solid var(--edge); background: var(--panel); }
+.tk-steps div { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center; padding: 9px 12px; border-top: 1px solid var(--edge); font-size: 13px; }
+.tk-steps div:first-child { border-top: 0; }
+.tk-steps b { width: 22px; height: 22px; display: grid; place-items: center; background: var(--bg); border: 2px solid var(--line); font: 11px Silkscreen, monospace; }
+.tk-cmd { all: unset; cursor: pointer; font-weight: 700; color: var(--cream); border-bottom: 1px dotted var(--line); }
+.tk-cmd:hover { border-bottom-color: var(--cream); }
+.tk-warn { border-left: 3px solid var(--red); padding: 4px 0 4px 10px; }
+.tk-main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.tk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tk-head h2 { margin: 0; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+.tk-head .note { margin-left: auto; }
+.tk-tiles { grid-template-columns: repeat(4, 1fr); margin: 0; }
+.tk-tiles .v { font-size: 20px; white-space: nowrap; }
+.tk-prog { display: grid; gap: 6px; }
+.tk-prog .blocks i { height: 22px; }
+.tk-prog .blocks .pct { font-size: 16px; }
+.tk-search { margin: 0; min-width: 0; }
+.tk-search .btn { padding: 9px 18px; }
+.tk-card { background: var(--panel); border: 2px solid var(--cream); padding: 12px 14px; display: grid; gap: 10px; }
+.tk-card.note, .tk-card.bad { border-color: var(--edge); }
+.tk-card.bad { color: var(--red); }
+.tk-card-h { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.tk-card-h a { text-transform: none; letter-spacing: 0; color: var(--cream); }
+.tk-x { all: unset; cursor: pointer; margin-left: auto; font-size: 20px; line-height: 1; color: var(--dim); padding: 0 4px; }
+.tk-x:hover { color: var(--cream); }
+.tk-st { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: 13.5px; }
+.tk-st .pill { white-space: nowrap; margin-top: 1px; }
+.tk-st:not(:has(.pill)) { grid-template-columns: 1fr; }
+.tk-st a { color: var(--cream); }
+.tk-now { border: 2px solid var(--edge); background: var(--panel); }
+.tk-now-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; }
+.tk-now-top b { font-size: 16px; }
+.tk-now-top span:last-child { color: var(--dim); font-size: 13px; }
+.tk-stripes { height: 6px; background: repeating-linear-gradient(-45deg, var(--red) 0 10px, var(--red-d) 10px 20px); background-size: 28px 28px; animation: stripes 1s linear infinite; }
+@keyframes stripes { to { background-position: 28px 0; } }
+.tk-next { font-size: 13px; color: var(--cream); margin-top: 8px; }
+.tk-next .note { display: inline; }
+.tk-bar { padding: 4px 0 0; }
+.tk-list { display: grid; align-content: start; border: 2px solid var(--edge); background: var(--panel); max-height: min(70vh, 680px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.tk-list .empty { padding: 34px 16px; }
+.tk-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto 92px 16px; gap: 12px; align-items: center; padding: 9px 12px; border-top: 1px solid var(--edge); text-decoration: none; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tk-row:first-child { border-top: 0; }
+.tk-row:hover { background: var(--bg); }
+.tk-row .tk-b { color: var(--dim); font-size: 12px; }
+.tk-row .tk-w { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-row .tk-w small { color: var(--red); font-weight: 400; text-transform: uppercase; font-size: 10px; letter-spacing: .08em; margin-left: 4px; }
+.tk-row .tk-a { color: #7AE582; text-align: right; }
+.tk-row.q .tk-a { color: var(--cream); }
+.tk-row .tk-t { color: var(--dim); font-size: 12px; text-align: right; white-space: nowrap; }
+.tk-row.q { grid-template-columns: 54px minmax(0, 1fr) auto minmax(92px, auto) 16px; }
+.tk-row .tk-go { color: var(--dim); }
+.tk-row:hover .tk-go { color: var(--cream); }
+.tk-row.mine { background: rgba(255,42,31,.08); box-shadow: inset 3px 0 0 var(--red); }
+.tk-row.new { animation: tkin .7s ease-out; }
+@keyframes tkin { from { background: rgba(122,229,130,.22); transform: translateX(-8px); opacity: .3; } to { background: transparent; transform: none; opacity: 1; } }
+.tk-sub-h { padding: 8px 12px; font: 11px Silkscreen, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); border-top: 1px solid var(--edge); background: var(--bg); }
+.tk-sub-h:first-child { border-top: 0; }
+.tk-more { padding: 8px 12px; border-top: 1px solid var(--edge); }
+.tk-batch { padding: 12px; border-top: 1px solid var(--edge); display: grid; gap: 8px; }
+.tk-batch:first-child { border-top: 0; }
+.tk-batch.open { background: rgba(255,230,0,.04); }
+.tk-batch-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tk-batch-n { font-size: 13px; }
+.tk-batch-t { margin-left: auto; }
+.tk-txs { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 12px; }
+.tk-txs details { width: 100%; }
+.tk-txs summary { cursor: pointer; }
+.tk-tx { color: var(--cream); }
+@media (prefers-reduced-motion: reduce) { .tk-coin img, .tk-stripes, .tk-row.new { animation: none; } }
+@media (max-width: 900px) {
+  .tk-grid { grid-template-columns: 1fr; gap: 22px; padding-top: 20px; }
+  .tk-side { position: static; }
+  .tk-coin { width: 120px; height: 120px; }
+  .tk-tiles { grid-template-columns: repeat(2, 1fr); }
+  .tk-list { max-height: 62vh; }
+}
+@media (max-width: 520px) {
+  .tk-row, .tk-row.q { grid-template-columns: 40px minmax(0, 1fr) auto 16px; gap: 8px; }
+  .tk-row .tk-t { grid-column: 2 / 4; grid-row: 2; text-align: left; margin-top: -4px; }
+  .tk-row .tk-go { grid-column: 4; grid-row: 1; }
+  .tk-head .note { margin-left: 0; width: 100%; }
+}
 .nftpage .art .dl { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .nftpage .art .dl .note { font-size: 12px; }
 .nftpage .info { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -754,15 +847,338 @@ async function loadCollectionGrid(more = false) {
   $('#cMore').hidden = cState.offset >= r.total;
 }
 
-// ---------- tokens: closed until the $CREDIT token is live ----------
-function renderTokens() {
-  // a pixel padlock: body red, shackle cream
-  const lock = `<svg viewBox="0 0 12 14" shape-rendering="crispEdges" aria-hidden="true"><path fill="#F5F1E8" d="M3 1h6v1h-6zM2 2h2v4h-2zM8 2h2v4h-2z"/>
-    <path fill="#FF2A1F" d="M1 6h10v8h-10z"/><path fill="#0B0B0B" d="M5 8h2v1h-2zM5 9h2v2h-2z"/></svg>`;
-  $('#app').innerHTML = `<div class="wrap"><section class="soon" aria-labelledby="soonT">${lock}
-    <span class="tag px">Tokens · closed for now</span>
-    <h1 class="px" id="soonT"><span class="tk">$CREDIT</span> IS GOING<br>LIVE SOON<span class="cur" aria-hidden="true">_</span></h1>
-  </section></div>`;
+// ---------- tokens: the $CREDIT token and its airdrop, live ----------
+// Left: the coin, $CREDIT, the CA to copy and the pump.fun button (both appear once the owner sets the CA in /admin).
+// Right: the airdrop as it goes out, batch by batch, with a Solscan link for every wallet, the batch being sent, the
+// queue, and a search for one wallet. Everything comes from /api/credit/airdrop (one URL, cached ~3 s by the CDN),
+// polled every 5 s while the page is open and visible; a searched wallet is polled with it.
+const TK_POLL_MS = 5000;
+const tk = { timer: null, clock: null, data: null, first: true, tab: 'live', wallet: '', walletData: null, polling: false, shown: [], pending: [], reveal: null };
+const cr = (v) => Number(v || 0).toLocaleString('en-US');
+// 1,234,567 → 1.23M (tiles); small numbers stay whole
+const crShort = (v) => {
+  const x = Number(v || 0);
+  if (x >= 1e9) return `${(x / 1e9).toFixed(x >= 1e10 ? 1 : 2)}B`;
+  if (x >= 1e6) return `${(x / 1e6).toFixed(x >= 1e7 ? 1 : 2)}M`;
+  if (x >= 1e5) return `${Math.round(x / 1e3)}K`;
+  return cr(x);
+};
+const shortW = (w) => `${w.slice(0, 4)}…${w.slice(-4)}`;
+const isWallet = (s) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
+const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+// "in 12 min" / "any minute" / "in 1 h 20 min"
+const until = (iso) => {
+  const min = Math.round((new Date(iso).getTime() - Date.now()) / 60e3);
+  if (min <= 1) return 'any minute';
+  if (min < 60) return `in ${min} min`;
+  return `in ${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`;
+};
+// a wallet's Solscan link: its own transaction, else its account (the transfer shows there)
+const walletLink = (r) => (r.tx ? solscan('tx', r.tx) : `${solscan('account', r.wallet)}#transfers`);
+function stopTokens() {
+  clearTimeout(tk.timer);
+  clearInterval(tk.clock);
+  clearTimeout(tk.reveal);
+  tk.timer = null;
+  tk.clock = null;
+  tk.reveal = null;
+}
+const coinImg = (cls = '') => `<img class="pix ${cls}" src="/credit.svg" alt="$CREDIT" width="30" height="30">`;
+
+function renderTokens(query = '') {
+  stopTokens();
+  tk.data = null;
+  tk.first = true;
+  tk.shown = [];
+  tk.pending = [];
+  const fromUrl = new URLSearchParams(query).get('w') || '';
+  let saved = '';
+  try { saved = localStorage.getItem('mcp-credit-wallet') || ''; } catch {}
+  tk.wallet = isWallet(fromUrl) ? fromUrl : isWallet(saved) ? saved : '';
+  tk.walletData = null;
+  $('#app').innerHTML = `<div class="wrap"><div class="tk-grid">
+    <aside class="tk-side" aria-labelledby="tkTitle">
+      <div class="tk-coin">${coinImg()}</div>
+      <div class="tk-state" id="tkState"><span class="pill wait">Loading…</span></div>
+      <h1 class="px" id="tkTitle">$CREDIT</h1>
+      <p class="tk-sub">The first token inside your AI. Burn MCP NFTs for it, claim it to your Solana wallet, get it in the airdrop.</p>
+      <div class="tk-ca">
+        <div class="k">Contract address (CA)</div>
+        <div class="tk-ca-row"><code id="tkCa" class="tk-ca-val">—</code><button class="btn ghost" id="tkCopy" disabled>Copy</button></div>
+        <div class="note" id="tkCaNote" aria-live="polite"></div>
+      </div>
+      <a class="btn red big" id="tkBuy" aria-disabled="true">Buy on pump.fun <span class="arr">↗</span></a>
+      <div class="tk-steps">
+        <div><b>1</b><span>Burn MCP NFTs in your AI: <button class="tk-cmd" data-copy="/burnmcp">/burnmcp</button></span></div>
+        <div><b>2</b><span>Bind your wallet: <button class="tk-cmd" data-copy="/claimcredit">/claimcredit</button></span></div>
+        <div><b>3</b><span>Watch your airdrop go out here →</span></div>
+      </div>
+      <p class="note tk-warn">The only $CREDIT is the CA above. Anything else with the name is not ours.</p>
+    </aside>
+    <section class="tk-main" aria-labelledby="adTitle">
+      <div class="tk-head"><h2 class="px" id="adTitle"><span class="live"></span> Airdrop · live</h2>
+        <span class="note" id="tkUpdated"></span></div>
+      <div class="tiles tk-tiles" id="tkTiles">${['Wallets sent', '$CREDIT sent', 'Batches', 'In queue'].map((k) => `<div class="stat"><div class="k">${k}</div><div class="v">—</div></div>`).join('')}</div>
+      <div class="tk-prog"><div class="blocks" id="tkBlocks">${'<i></i>'.repeat(10)}<span class="pct" id="tkPct">0%</span></div>
+        <div class="note" id="tkProgNote"></div></div>
+      <form class="search tk-search" id="tkFind" role="search">
+        <input id="tkWallet" placeholder="Your Solana wallet: find your airdrop" autocomplete="off" spellcheck="false" aria-label="Your Solana wallet" value="${esc(tk.wallet)}">
+        <button class="btn red">Find</button>
+      </form>
+      <div id="tkMine" aria-live="polite"></div>
+      <div id="tkNow"></div>
+      <div class="bar tk-bar"><div class="tabs" role="tablist" id="tkTabs">${[['live', 'Live feed'], ['batches', 'Batches'], ['queue', 'Queue']]
+        .map(([k, v]) => `<button class="tab" role="tab" data-tk="${k}" aria-selected="${k === tk.tab}">${v}</button>`).join('')}</div>
+        <span class="count" id="tkCount"></span></div>
+      <div id="tkList" class="tk-list"><div class="empty">Loading the airdrop…</div></div>
+    </section>
+  </div></div>`;
+  $('#tkTabs').onclick = (e) => {
+    const b = e.target.closest('[data-tk]');
+    if (!b) return;
+    tk.tab = b.dataset.tk;
+    $('#tkTabs').querySelectorAll('[data-tk]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+    paintTkList();
+  };
+  $('#tkFind').onsubmit = (e) => {
+    e.preventDefault();
+    const w = $('#tkWallet').value.trim().replace(/^https?:\/\/solscan\.io\/account\//, '').replace(/[?#].*$/, '');
+    if (!w) { tk.wallet = ''; tk.walletData = null; $('#tkMine').innerHTML = ''; saveWallet(''); return; }
+    if (!isWallet(w)) { $('#tkMine').innerHTML = '<div class="tk-card bad">That is not a Solana wallet address. Paste the address you gave in /claimcredit.</div>'; return; }
+    tk.wallet = w;
+    saveWallet(w);
+    $('#tkMine').innerHTML = '<div class="tk-card note">Looking…</div>';
+    loadWallet(true);
+  };
+  $('#tkCopy').onclick = async () => {
+    const ca = tk.data?.token?.ca;
+    if (!ca) return;
+    try { await navigator.clipboard.writeText(ca); $('#tkCaNote').textContent = 'Copied.'; } catch { $('#tkCaNote').textContent = 'Select it above and copy.'; selectText($('#tkCa')); }
+    setTimeout(() => { if ($('#tkCaNote')) $('#tkCaNote').textContent = ''; }, 2500);
+  };
+  $('#tkCa').onclick = () => selectText($('#tkCa'));
+  pollTokens();
+  if (tk.wallet) loadWallet(true);
+  tk.clock = setInterval(paintTkState, 1000);
+}
+const selectText = (el) => { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); };
+function saveWallet(w) {
+  try { if (w) localStorage.setItem('mcp-credit-wallet', w); else localStorage.removeItem('mcp-credit-wallet'); } catch {}
+  history.replaceState(null, '', w ? `/tokens?w=${encodeURIComponent(w)}` : '/tokens');
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('.tk-cmd[data-copy]');
+  if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); const t = b.textContent; b.textContent = 'copied'; setTimeout(() => { b.textContent = t; }, 1200); } catch {}
+});
+
+async function pollTokens() {
+  if (!$('#tkList') || tk.polling) return;
+  tk.polling = true;
+  try {
+    const d = await api('/credit/airdrop');
+    if (!$('#tkList')) return; // the page changed meanwhile
+    tk.data = d;
+    paintTokens();
+  } catch {
+    if ($('#tkUpdated')) $('#tkUpdated').textContent = 'Reconnecting…';
+  } finally {
+    tk.polling = false;
+  }
+  // a searched wallet moves with the feed: refresh it when something was sent or a batch started
+  if (tk.wallet && tk.walletData && tk.data) loadWallet();
+  clearTimeout(tk.timer);
+  if ($('#tkList')) tk.timer = setTimeout(() => (document.visibilityState === 'visible' ? pollTokens() : null), TK_POLL_MS);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && $('#tkList')) pollTokens(); });
+
+function paintTkState() {
+  const el = $('#tkState');
+  const d = tk.data;
+  if (!el || !d) return;
+  const t = d.token;
+  const ms = t.launch_at ? new Date(t.launch_at).getTime() - Date.now() : null;
+  if (t.ca) el.innerHTML = '<span class="pill ok"><span class="live ok"></span> Live on Solana</span>';
+  else if (ms != null && ms > 0) {
+    const s = Math.floor(ms / 1000);
+    const two = (x) => String(x).padStart(2, '0');
+    el.innerHTML = `<span class="pill wait">Launch in <b class="tk-clock">${s >= 86400 ? `${Math.floor(s / 86400)}d ` : ''}${two(Math.floor(s / 3600) % 24)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}</b></span>`;
+  } else el.innerHTML = `<span class="pill wait">${t.live ? 'Launching now: the CA is coming' : 'Launching soon'}</span>`;
+}
+
+function paintTokens() {
+  const d = tk.data;
+  const t = d.token;
+  paintTkState();
+  // the CA and the Buy button
+  const ca = $('#tkCa');
+  if (t.ca) {
+    if (ca.textContent !== t.ca) ca.textContent = t.ca;
+    ca.classList.remove('dim');
+    $('#tkCopy').disabled = false;
+    const buy = $('#tkBuy');
+    buy.href = t.url;
+    buy.target = '_blank';
+    buy.rel = 'noopener';
+    buy.removeAttribute('aria-disabled');
+  } else {
+    ca.textContent = t.launch_at && new Date(t.launch_at) > new Date() ? `Posted here at launch, ${hhmm(t.launch_at)}` : 'Posted here the moment it is live';
+    ca.classList.add('dim');
+  }
+  // the rows that came in since the last poll start showing one by one; the numbers count up with them
+  const s = d.totals;
+  takeRecent(d);
+  paintTkNumbers();
+  $('#tkUpdated').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+  // the batch going out now, and the next one
+  const p = d.pace;
+  const now = d.open
+    ? `<div class="tk-now"><div class="tk-now-top"><span class="pill wait">Next batch</span><b class="px">Batch #${d.open.no}</b>
+        <span>${cr(d.open.wallets)} wallet${d.open.wallets === 1 ? '' : 's'} · ${cr(d.open.credit)} $CREDIT · goes out ${d.open.eta ? until(d.open.eta) : 'any minute'}</span></div><div class="tk-stripes" aria-hidden="true"></div></div>`
+    : '';
+  const next = s.queued_wallets && p.next_at
+    ? `<div class="tk-next">${d.open ? 'After it' : 'Up next'}: <b>Batch #${p.next_no}</b> · ${until(p.next_at)} <span class="note">(a batch about every ${p.minutes} min, ${cr(p.size)} wallets each)</span></div>`
+    : !s.wallets ? '' : !s.queued_wallets && !d.open ? '<div class="tk-next">Everyone who claimed so far got the airdrop. New claims join the queue: <b>/claimcredit</b></div>' : '';
+  $('#tkNow').innerHTML = now + next;
+  // the live list is not redrawn while rows are still coming in one by one (it would cut their entrance)
+  if (tk.tab !== 'live' || (!tk.reveal && !tk.pending.length)) paintTkList();
+  tk.first = false;
+}
+
+// the live feed: tk.shown is what the list shows (newest first); rows new since the last poll wait in tk.pending and
+// come in one by one, about a second apart (faster when many wait), so a batch of 100 runs down the list
+const LIVE_MAX = 100;
+const rowKey = (r) => `${r.batch}:${r.wallet}`;
+function takeRecent(d) {
+  if (tk.first) { tk.shown = d.recent.slice(0, LIVE_MAX); return; }
+  const known = new Set([...tk.shown, ...tk.pending].map(rowKey));
+  const fresh = d.recent.filter((r) => !known.has(rowKey(r))).reverse(); // oldest first, so the newest ends on top
+  if (!fresh.length) return;
+  tk.pending.push(...fresh);
+  if (tk.pending.length > 400) { // the page slept through a lot: catch up without the show
+    tk.shown = d.recent.slice(0, LIVE_MAX);
+    tk.pending = [];
+    return;
+  }
+  revealNext();
+}
+function revealNext() {
+  if (tk.reveal || !tk.pending.length) return;
+  const wait = Math.max(150, Math.min(1000, 90000 / tk.pending.length));
+  tk.reveal = setTimeout(() => {
+    tk.reveal = null;
+    const r = tk.pending.shift();
+    const list = $('#tkList');
+    if (!r || !list) return;
+    tk.shown.unshift(r);
+    if (tk.shown.length > LIVE_MAX) tk.shown.length = LIVE_MAX;
+    if (tk.tab === 'live') {
+      list.querySelector('.empty')?.remove();
+      list.insertAdjacentHTML('afterbegin', liveRow(r, true));
+      const rows = list.querySelectorAll('.tk-row');
+      if (rows.length > LIVE_MAX) rows[rows.length - 1].remove();
+      $('#tkCount').textContent = `latest ${tk.shown.length}`;
+    }
+    paintTkNumbers();
+    revealNext();
+  }, wait);
+}
+// the totals, less what is still waiting to be shown
+function paintTkNumbers() {
+  const s = tk.data?.totals;
+  if (!s || !$('#tkTiles')) return;
+  const shownBatches = new Set(tk.shown.map((r) => r.batch));
+  const waitBatches = new Set(tk.pending.filter((r) => !shownBatches.has(r.batch)).map((r) => r.batch));
+  const sentW = Math.max(0, s.sent_wallets - tk.pending.length);
+  const sentC = Math.max(0, s.sent_credit - tk.pending.reduce((a, r) => a + r.amount, 0));
+  const tiles = [
+    ['Wallets sent', `${cr(sentW)}<small> / ${cr(s.wallets)}</small>`],
+    ['$CREDIT sent', `${crShort(sentC)}<small> / ${crShort(s.credit)}</small>`],
+    ['Batches', cr(Math.max(0, s.batches_sent - waitBatches.size))],
+    ['In queue', `${cr(s.queued_wallets)}<small> wallets</small>`],
+  ];
+  $('#tkTiles').innerHTML = tiles.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  const frac = s.credit ? sentC / s.credit : 0;
+  $('#tkBlocks').querySelectorAll('i').forEach((b, i) => b.style.setProperty('--f', `${Math.max(0, Math.min(1, frac * 10 - i)) * 100}%`));
+  $('#tkPct').textContent = pctText(sentC, s.credit || 1);
+  $('#tkProgNote').textContent = s.credit ? `${cr(sentC)} of ${cr(s.credit)} $CREDIT claimed so far is airdropped` : 'Nothing claimed yet';
+}
+function liveRow(r, fresh = false) {
+  const mine = tk.wallet && r.wallet === tk.wallet;
+  return `<a class="tk-row${fresh ? ' new' : ''}${mine ? ' mine' : ''}" href="${walletLink(r)}" target="_blank" rel="noopener" title="${esc(r.wallet)}">
+    <span class="tk-b">#${r.batch}</span><span class="tk-w">${esc(shortW(r.wallet))}${mine ? ' <small>you</small>' : ''}</span>
+    <span class="tk-a">+${cr(r.amount)}</span><span class="tk-t">${r.at ? ago(r.at) : ''}</span><span class="tk-go" aria-hidden="true">↗</span></a>`;
+}
+
+function paintTkList() {
+  const d = tk.data;
+  const list = $('#tkList');
+  if (!d || !list) return;
+  if (tk.tab === 'live') {
+    // redrawn from tk.shown: new rows are added one by one by revealNext, not here
+    const rows = tk.shown;
+    $('#tkCount').textContent = rows.length ? `latest ${rows.length}` : '';
+    list.innerHTML = rows.map((r) => liveRow(r)).join('') || `<div class="empty">${d.open ? `Batch #${d.open.no} goes out next. Wallets show up here one by one as it lands.`
+      : d.totals.wallets ? `The first batch goes out ${d.token.ca ? 'any minute' : 'right after the launch'}. ${cr(d.totals.queued_wallets)} wallets are in the queue.`
+        : 'No claims yet. Burn MCP NFTs in your AI (/burnmcp), then claim to your wallet (/claimcredit).'}</div>`;
+    return;
+  }
+  if (tk.tab === 'batches') {
+    const bs = d.batches;
+    $('#tkCount').textContent = d.totals.batches_sent ? `${cr(d.totals.batches_sent)} sent` : '';
+    list.innerHTML = bs.map((b) => {
+      const links = b.txs.map((s, i) => `<a href="${solscan('tx', s)}" target="_blank" rel="noopener" class="tk-tx">${b.txs.length === 1 ? 'View transaction' : `Tx ${i + 1}`} ↗</a>`);
+      const extra = b.tx_count > b.txs.length ? `<span class="note">+${cr(b.tx_count - b.txs.length)} more</span>` : '';
+      return `<div class="tk-batch${b.status === 'sending' ? ' open' : ''}">
+        <div class="tk-batch-top"><b class="px">Batch #${b.no}</b>${b.status === 'sending' ? '<span class="pill wait">Next</span>' : '<span class="pill ok">Sent</span>'}
+          <span class="tk-batch-n">${cr(b.wallets)} wallet${b.wallets === 1 ? '' : 's'} · ${cr(b.credit)} $CREDIT</span>
+          <span class="note tk-batch-t">${b.sent_at ? `${hhmm(b.sent_at)} · ${ago(b.sent_at)}` : `started ${ago(b.created_at)}`}</span></div>
+        ${links.length ? `<div class="tk-txs">${links.slice(0, 8).join('')}${links.length > 8 ? `<details><summary class="note">${links.length - 8} more transactions</summary><div class="tk-txs">${links.slice(8).join('')}</div></details>` : ''}${extra}</div>` : ''}
+      </div>`;
+    }).join('') || '<div class="empty">No batch sent yet.</div>';
+    return;
+  }
+  // the queue: the batch being sent, then everyone waiting, in order
+  const open = d.open ? d.open.lines.map((l) => ({ ...l, sending: true })) : [];
+  const q = d.queue;
+  $('#tkCount').textContent = d.totals.queued_wallets ? `${cr(d.totals.queued_wallets)} waiting` : '';
+  const row = (r) => {
+    const mine = tk.wallet && r.wallet === tk.wallet;
+    return `<a class="tk-row q${mine ? ' mine' : ''}" href="${solscan('account', r.wallet)}" target="_blank" rel="noopener" title="${esc(r.wallet)}">
+      <span class="tk-b">${r.sending ? `#${d.open.no}` : `${r.pos}.`}</span><span class="tk-w">${esc(shortW(r.wallet))}${mine ? ' <small>you</small>' : ''}</span>
+      <span class="tk-a">${cr(r.amount)}</span><span class="tk-t">${r.sending ? `next · ${d.open.eta ? until(d.open.eta) : 'any minute'}` : `batch #${r.batch} · ${until(r.eta)}`}</span><span class="tk-go" aria-hidden="true">↗</span></a>`;
+  };
+  list.innerHTML = (open.length ? `<div class="tk-sub-h">Batch #${d.open.no} · goes out next</div>${open.map(row).join('')}${d.open.wallets > open.length ? `<div class="note tk-more">+${cr(d.open.wallets - open.length)} more in this batch</div>` : ''}` : '')
+    + (q.length ? `<div class="tk-sub-h">Waiting</div>${q.map(row).join('')}${d.totals.queued_wallets > q.length ? `<div class="note tk-more">+${cr(d.totals.queued_wallets - q.length)} more waiting. Find your wallet above to see your place.</div>` : ''}` : '')
+    || '<div class="empty">Nobody is waiting.</div>';
+}
+
+// repaint: also redraw the list, so the wallet's rows are marked (not on every poll: it would cut the new rows' flash)
+async function loadWallet(repaint = false) {
+  const w = tk.wallet;
+  if (!w) return;
+  let r;
+  try {
+    r = await api(`/credit/airdrop/wallet/${encodeURIComponent(w)}`);
+  } catch {
+    if (w === tk.wallet && !tk.walletData) $('#tkMine').innerHTML = '<div class="tk-card bad">Could not look it up. Try again in a moment.</div>';
+    return;
+  }
+  if (w !== tk.wallet || !$('#tkMine')) return;
+  tk.walletData = r;
+  const parts = [];
+  for (const b of r.sent_batches) {
+    const link = b.tx ? solscan('tx', b.tx) : b.txs.length === 1 ? solscan('tx', b.txs[0]) : `${solscan('account', r.wallet)}#transfers`;
+    parts.push(`<div class="tk-st ok"><span class="pill ok">Airdropped</span><div><b>${cr(b.amount)} $CREDIT</b>${b.batch ? ` in batch #${b.batch}` : ''}${b.at ? ` · ${hhmm(b.at)}, ${ago(b.at)}` : ''}
+      <div><a href="${link}" target="_blank" rel="noopener">${b.tx || b.txs.length === 1 ? 'View the transaction' : 'See it on Solscan'} ↗</a></div></div></div>`);
+  }
+  if (r.sending) parts.push(`<div class="tk-st"><span class="pill wait">Next batch</span><div><b>${cr(r.sending.amount)} $CREDIT</b> in batch #${r.sending.batch}, the next to go out (${r.sending.eta ? until(r.sending.eta) : 'any minute'}).</div></div>`);
+  if (r.queued) parts.push(`<div class="tk-st"><span class="pill">In queue</span><div><b>${cr(r.queued.amount)} $CREDIT</b> · <b>#${cr(r.queued.pos)}</b> in line · batch #${r.queued.batch} · ${until(r.queued.eta)} <span class="note">(around ${hhmm(r.queued.eta)}, an estimate)</span></div></div>`);
+  $('#tkMine').innerHTML = `<div class="tk-card"><div class="tk-card-h"><span>Wallet</span> <a class="mono-link" href="${solscan('account', r.wallet)}" target="_blank" rel="noopener">${esc(shortW(r.wallet))} ↗</a>
+      <button class="tk-x" id="tkClear" aria-label="Clear">×</button></div>
+    ${r.found ? parts.join('') : `<div class="tk-st"><div>No claim to this wallet yet. Burn MCP NFTs in your AI (<b>/burnmcp</b>), then claim your $CREDIT to this wallet (<b>/claimcredit</b>).</div></div>`}</div>`;
+  $('#tkClear').onclick = () => { tk.wallet = ''; tk.walletData = null; $('#tkWallet').value = ''; $('#tkMine').innerHTML = ''; saveWallet(''); paintTkList(); };
+  if (repaint) paintTkList();
 }
 
 // ---------- an NFT's page ----------
@@ -1306,6 +1722,7 @@ async function route() {
   const section = pathPart === '/connect' ? '' : pathPart === '/tokens' ? 'tokens' : /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer'
     : /^\/(collections|c\/|nft\/|launch|admin)/.test(pathPart) ? 'collections' : /^\/lost-deposit/.test(pathPart) ? '' : 'market';
   stopMintPage();
+  stopTokens();
   document.querySelectorAll('[data-nav]').forEach((a) => {
     if (a.dataset.nav === section) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -1316,7 +1733,7 @@ async function route() {
   if ((mm = pathPart.match(/^\/tx\/(\d+)/))) return renderTx(mm[1]);
   if ((mm = pathPart.match(/^\/a\/(mcp_[1-9A-HJ-NP-Za-km-z]{12}|treasury|escrow)\b/))) return renderAddress(mm[1]);
   if (pathPart === '/connect') return renderConnect();
-  if (pathPart === '/tokens') return renderTokens();
+  if (pathPart === '/tokens') return renderTokens(query);
   if (pathPart === '/launch') return window.MCP_LAUNCH.renderLaunch();
   if (pathPart === '/admin') return window.MCP_LAUNCH.renderAdmin();
   if (pathPart === '/collections') return renderCollections();

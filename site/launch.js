@@ -258,15 +258,17 @@
     };
     const field = (id, label, attrs = '') => `<label style="display:grid;gap:4px"><span class="note">${label}</span>
       <input id="${id}" ${attrs} style="background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:9px 10px;font:inherit"></label>`;
-    app.innerHTML = `<div class="wrap"><div class="ex-head"><div><h1 class="px">Lost deposits</h1>
+    app.innerHTML = `<div class="wrap">
+      <div class="ex-head"><div><h1 class="px">$CREDIT airdrop</h1>
+      <p>Batch by batch, shown live on <a href="/tokens">/tokens</a>. <b>Make next batch</b> takes the oldest pending claims (one line per wallet), <b>Copy lines</b> gives <code>wallet,amount</code> for the multisender. After sending, paste the transaction signatures or Solscan links and press <b>Mark sent</b>; wallets that failed go back to the queue. One batch is open at a time.</p></div></div>
+      <div id="ab" class="note">Loading…</div>
+      <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Lost deposits</h2>
       <p>Reports from <a href="/lost-deposit">/lost-deposit</a>. Each shows whose deposit address it is (as the person typed it: check on Solscan where the transaction really went) and whether that transaction was already credited. Crediting is still done by hand; a report moves no money.</p></div>
       <div class="tabs" role="tablist" id="ldTabs" style="margin-left:auto">${[['new', 'New'], ['all', 'All']].map(([k, v]) => `<button class="tab" role="tab" data-ld="${k}" aria-selected="${k === 'new'}">${v}</button>`).join('')}</div></div>
       <div id="ld" class="note">Loading…</div>
       <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">$CREDIT claims</h2>
-      <p>Burns (<b>/burnmcp</b>) give $CREDIT for MCP NFTs. A claim (<b>/claimcredit</b>) takes all of an account's $CREDIT to the Solana wallet it gave, for a fee in $MCP. <b>Copy all</b> copies the pending claims as <code>wallet,amount</code> lines, one per wallet, for the airdrop; after the airdrop, mark them sent.</p></div>
-      <button class="btn red" id="crCopy" style="margin-left:auto" disabled>Copy all</button></div>
+      <p>Burns (<b>/burnmcp</b>) give $CREDIT for MCP NFTs. A claim (<b>/claimcredit</b>) takes all of an account's $CREDIT to the Solana wallet it gave, for a fee in $MCP. Claims go out in the airdrop batches above.</p></div></div>
       <div id="crOut" class="note" aria-live="polite" style="margin:0 0 8px"></div>
-      <textarea id="crText" readonly hidden rows="8" style="width:100%;background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:10px;font:12px ui-monospace,Menlo,monospace;margin:0 0 10px"></textarea>
       <div id="cr" class="note">Loading…</div>
       <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Free $CREDIT drops</h2>
       <p>A code people type in their AI chat (<b>/mcpcredit FREE1000</b>, or "FREE 1000 $CREDIT") for a fixed amount of $CREDIT, once per account. With tasks the AI asks for them and a screenshot first; then it gives the airdrop card to post on X, and the $CREDIT is added after a screenshot of that post. It goes through the chat's promo-code tool, so nobody has to reconnect the connector. The AI only looks at screenshots: an edited one can pass.</p></div></div>
@@ -316,6 +318,7 @@
     loadBackups();
     loadClaims('new');
     loadCredit();
+    loadAirdrop();
     loadDrops();
     wireDrops();
     $('#ldTabs').onclick = (e) => {
@@ -494,78 +497,148 @@
     });
   }
 
-  // $CREDIT: what burns and drops gave, and the claims to airdrop. Copy all remembers exactly which claims it copied,
-  // and "Mark sent" marks those: a claim that comes in after the copy is never marked by mistake.
+  // $CREDIT: what burns and drops gave, and every claim with its batch. Sending goes through the batches (loadAirdrop).
   let crData = null;
-  let copied = null; // { ids, count } of the last Copy all
   async function loadCredit() {
     const el = $('#cr');
     if (!el) return;
     try { crData = await send('GET', '/admin/credit'); } catch (e) { el.textContent = e.message; return; }
     const t = crData.totals;
     const n = (v) => Number(v || 0).toLocaleString('en-US');
-    const wallets = crData.airdrop ? crData.airdrop.split('\n').length : 0;
-    $('#crCopy').disabled = !wallets;
-    $('#crCopy').textContent = wallets ? `Copy all (${n(wallets)} wallet${wallets === 1 ? '' : 's'})` : 'Copy all';
     const PILL = { pending: 'wait', sent: 'ok', void: 'bad' };
     el.innerHTML = `<div class="tiles" style="margin:0 0 12px">${[['Burned NFTs', n(t.burned_nfts)], ['$CREDIT given', `${n(t.issued + t.drop_credit)}${t.drops ? ` <small>· ${n(t.drops)} free drops</small>` : ''}`], ['Not claimed yet', n(t.unclaimed)],
       ['Pending claims', `${n(t.pending)} <small>· ${n(t.pending_credit)}</small>`], ['Sent', `${n(t.sent)} <small>· ${n(t.sent_credit)}</small>`], ['Claim fees', `${fmt(t.fees)} <small>$MCP</small>`]]
       .map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px"><button class="btn ghost" id="crSent" ${copied?.ids.length ? '' : 'disabled'}>${copied?.ids.length ? `Mark the ${n(copied.ids.length)} copied claims as sent` : 'Mark copied as sent'}</button>
-        <span class="note">${copied ? 'Only the claims in the last Copy all.' : 'Press Copy all first.'}</span></div>
       <table class="txs"><thead><tr><th>#</th><th>Account</th><th>Wallet</th><th style="text-align:right">$CREDIT</th><th>Status</th><th></th></tr></thead><tbody>
       ${crData.claims.map((c) => `<tr><td>#${c.id}<div class="note">${esc(new Date(c.at).toLocaleString())}</div></td>
         <td><a class="addr" href="/a/${esc(c.addr)}">${esc(c.addr)}</a><div class="note">@${esc(c.handle)}</div></td>
         <td><a class="mono-link" href="https://solscan.io/account/${encodeURIComponent(c.wallet)}" target="_blank" rel="noopener">${esc(c.wallet)}</a></td>
         <td class="num">${n(c.amount)}</td>
-        <td><span class="pill ${PILL[c.status] || 'wait'}">${esc(c.status)}</span></td>
+        <td><span class="pill ${PILL[c.status] || 'wait'}">${esc(c.status)}</span>${c.batch ? `<div class="note">batch #${c.batch}${c.tx ? ` · <a href="https://solscan.io/tx/${encodeURIComponent(c.tx)}" target="_blank" rel="noopener">tx</a>` : ''}</div>` : ''}</td>
         <td style="text-align:right"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${c.status === 'void' ? ''
           : c.status === 'sent' ? `<button class="btn ghost" data-crid="${c.id}" data-crto="pending" style="padding:4px 8px">Undo</button>`
-          : `<button class="btn ghost" data-crid="${c.id}" data-crto="sent" style="padding:4px 8px">Sent</button><button class="btn ghost" data-crvoid="${c.id}" style="padding:4px 8px">Void</button>`}</div></td></tr>`).join('')
+          : c.batch ? '' : `<button class="btn ghost" data-crvoid="${c.id}" style="padding:4px 8px">Void</button>`}</div></td></tr>`).join('')
         || '<tr><td colspan="6" class="note">No claims yet.</td></tr>'}
-      </tbody></table>${crData.claims.length >= 1000 ? '<p class="note">Showing the newest 1,000 claims; Copy all has every pending one.</p>' : ''}`;
-    const mark = async (ids, status) => {
-      try { const r = await send('POST', '/admin/credit/mark', { ids, status }); $('#crOut').textContent = `${n(r.updated)} marked ${status}.`; } catch (e) { alert(e.message); }
-      loadCredit();
-    };
-    $('#crSent').onclick = () => {
-      if (!copied?.ids.length) return;
-      if (!window.confirm(`Mark the ${copied.ids.length} claims of the last Copy all (${copied.count} wallets) as sent? Do it after that airdrop went out.`)) return;
-      const ids = copied.ids;
-      copied = null;
-      mark(ids, 'sent');
-    };
-    el.querySelectorAll('[data-crid]').forEach((b) => b.onclick = () => {
-      const to = b.dataset.crto;
-      if (to === 'pending' && !window.confirm(`Put claim #${b.dataset.crid} back to pending? It will be in the next Copy all, so it may be paid twice.`)) return;
+      </tbody></table>${crData.claims.length >= 1000 ? '<p class="note">Showing the newest 1,000 claims.</p>' : ''}`;
+    el.querySelectorAll('[data-crid]').forEach((b) => b.onclick = async () => {
+      if (!window.confirm(`Put claim #${b.dataset.crid} back in the queue? Do it only if that wallet did not get its airdrop: it will be sent again in a later batch.`)) return;
       b.disabled = true;
-      mark([Number(b.dataset.crid)], to);
+      try { const r = await send('POST', '/admin/credit/mark', { ids: [Number(b.dataset.crid)], status: 'pending' }); $('#crOut').textContent = `${n(r.updated)} back in the queue.`; } catch (e) { alert(e.message); }
+      loadCredit();
+      loadAirdrop();
     });
     el.querySelectorAll('[data-crvoid]').forEach((b) => b.onclick = async () => {
       if (!window.confirm(`Void claim #${b.dataset.crvoid}? Its $CREDIT goes back to the account (the fee stays paid). Use it for a claim made by mistake.`)) return;
       b.disabled = true;
       try { const r = await send('POST', `/admin/credit/void/${b.dataset.crvoid}`); $('#crOut').textContent = `Claim #${r.id} void: ${n(r.returned)} $CREDIT back on the account.`; } catch (e) { alert(e.message); }
       loadCredit();
+      loadAirdrop();
     });
   }
-  document.addEventListener('click', async (e) => {
-    if (e.target.id !== 'crCopy' || !crData?.airdrop) return;
-    const lines = crData.airdrop;
-    const count = lines.split('\n').length;
-    copied = { ids: crData.airdrop_ids.slice(), count };
-    $('#crText').value = lines;
-    try {
-      await navigator.clipboard.writeText(lines);
-      $('#crOut').textContent = `Copied ${count.toLocaleString('en-US')} line${count === 1 ? '' : 's'} (wallet,amount), ${copied.ids.length.toLocaleString('en-US')} claims.`;
-      $('#crText').hidden = true;
-    } catch {
-      $('#crOut').textContent = 'Copy it from the box below.';
-      $('#crText').hidden = false;
-      $('#crText').select();
-    }
-    const btn = $('#crSent');
-    if (btn) { btn.disabled = false; btn.textContent = `Mark the ${copied.ids.length.toLocaleString('en-US')} copied claims as sent`; }
-  });
+
+  // the airdrop, batch by batch; and the token's CA (set once)
+  const taStyle = 'width:100%;background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:10px;font:12px ui-monospace,Menlo,monospace';
+  async function loadAirdrop() {
+    const el = $('#ab');
+    if (!el) return;
+    let d;
+    try { d = await send('GET', '/admin/airdrop'); } catch (e) { el.textContent = e.message; return; }
+    const n = (v) => Number(v || 0).toLocaleString('en-US');
+    const tok = d.token.ca
+      ? `<div class="panel" style="margin:0 0 14px"><h2 style="font-size:15px">Token <span class="pill ok">set</span></h2>
+          <div class="kv"><span>CA</span><span><code style="word-break:break-all">${esc(d.token.ca)}</code></span><span>Buy link</span><span><a href="${esc(d.token.url)}" target="_blank" rel="noopener">${esc(d.token.url)}</a></span></div>
+          <p class="note">Shown on /tokens. It can't be changed here; to change it, in the Supabase SQL editor: <code>delete from app_meta where key = 'credit_token';</code></p></div>`
+      : `<div class="panel" style="margin:0 0 14px"><h2 style="font-size:15px">Token CA <span class="pill wait">not set</span></h2>
+          <p class="note">When the token is live, paste its contract address. /tokens shows it with Copy and the pump.fun button right away. It is set once: after that only the database can change it.</p>
+          <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end">
+            <label style="display:grid;gap:4px"><span class="note">CA (the token's mint address)</span><input id="abCa" autocomplete="off" spellcheck="false" style="background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:9px 10px;font:inherit"></label>
+            <label style="display:grid;gap:4px"><span class="note">Buy link (empty: its pump.fun page)</span><input id="abUrl" placeholder="https://pump.fun/coin/…" autocomplete="off" spellcheck="false" style="background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:9px 10px;font:inherit"></label>
+            <button class="btn red" id="abCaGo" style="justify-content:center;padding:12px">Set CA</button></div></div>`;
+    const o = d.open;
+    const open = o
+      ? `<div class="panel" style="margin:0 0 14px;border-color:var(--cream)"><h2 style="font-size:18px">Batch #${o.no} <span class="pill wait">open</span></h2>
+          <div class="kv"><span>Wallets</span><span>${n(o.wallets)}</span><span>$CREDIT</span><span>${n(o.credit)}</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn red" id="abCopy">Copy lines (${n(o.wallets)})</button><span class="note" id="abCopyOut" aria-live="polite" style="align-self:center"></span></div>
+          <textarea id="abLines" readonly rows="6" style="${taStyle}">${esc(o.text)}</textarea>
+          <label style="display:grid;gap:4px"><span class="note">Optional: the Solscan links (or signatures) of the multisender's transactions, one per line. Without them each wallet on /tokens links to its own Solscan page, where the transfer shows.</span>
+            <textarea id="abSent" rows="3" style="${taStyle}" placeholder="https://solscan.io/tx/…"></textarea></label>
+          <label style="display:grid;gap:4px"><span class="note">Optional: wallets that failed, one per line. They go back to the queue, in their place.</span>
+            <textarea id="abFailed" rows="2" style="${taStyle}"></textarea></label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><button class="btn red" id="abSentGo" style="padding:12px 18px">✓ Batch #${o.no} sent</button>
+            <label style="display:grid;gap:4px"><span class="note">then the next batch of</span><input id="abNext" type="number" min="0" max="1000" step="1" value="${Number(o.size) || Number(d.size)}" inputmode="numeric" style="width:110px;background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:9px 10px;font:inherit"></label>
+            <span class="note" style="align-self:center">wallets (0: none)</span>
+            <button class="btn ghost" id="abCancel" style="margin-left:auto">Cancel batch</button></div></div>`
+      : `<div class="panel" style="margin:0 0 14px"><h2 style="font-size:18px">Next batch</h2>
+          <div class="kv"><span>Waiting</span><span>${n(d.queue.wallets)} wallets · ${n(d.queue.credit)} $CREDIT</span></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+            <label style="display:grid;gap:4px"><span class="note">Wallets in the batch</span><input id="abSize" type="number" min="1" max="1000" step="1" value="${Number(d.size)}" inputmode="numeric" style="width:140px;background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:9px 10px;font:inherit"></label>
+            <button class="btn red" id="abMake" ${d.queue.wallets ? '' : 'disabled'}>Make next batch</button></div></div>`;
+    const rows = d.batches.filter((b) => b.status === 'sent');
+    el.innerHTML = `<div id="abOut" class="note" aria-live="polite" style="margin:0 0 8px"></div>${tok}${open}
+      ${rows.length ? `<table class="txs"><thead><tr><th>Batch</th><th style="text-align:right">Wallets</th><th style="text-align:right">$CREDIT</th><th>Transactions</th><th>Sent</th><th></th></tr></thead><tbody>
+        ${rows.map((b) => `<tr><td>#${b.no}</td><td class="num">${n(b.wallets)}</td><td class="num">${n(b.credit)}</td>
+          <td>${b.txs.slice(0, 3).map((x) => `<a class="mono-link" href="https://solscan.io/tx/${encodeURIComponent(x)}" target="_blank" rel="noopener">${esc(x.slice(0, 8))}…</a>`).join(' ')}${b.txs.length > 3 ? ` <span class="note">+${b.txs.length - 3}</span>` : ''}</td>
+          <td class="note">${b.sent_at ? esc(new Date(b.sent_at).toLocaleString()) : ''}</td>
+          <td style="text-align:right"><button class="btn ghost" data-abfix="${b.id}" data-abno="${b.no}" style="padding:4px 8px">Add links / failed</button></td></tr>`).join('')}
+      </tbody></table>
+      <div id="abFix" hidden class="panel" style="margin-top:10px"><h2 style="font-size:15px" id="abFixT"></h2>
+        <label style="display:grid;gap:4px"><span class="note">More signatures or Solscan links (one per line), or a multisender's report</span><textarea id="abFixSent" rows="3" style="${taStyle}"></textarea></label>
+        <label style="display:grid;gap:4px"><span class="note">Wallets that did NOT get it (one per line): back to the queue, sent again in a later batch</span><textarea id="abFixFailed" rows="2" style="${taStyle}"></textarea></label>
+        <div><button class="btn red" id="abFixGo">Save</button></div></div>` : '<p class="note">No batch sent yet.</p>'}`;
+    const out = (t) => { $('#abOut').textContent = t; };
+    const after = () => { loadAirdrop(); loadCredit(); };
+    if ($('#abCaGo')) $('#abCaGo').onclick = async (e) => {
+      const ca = $('#abCa').value.trim();
+      const url = $('#abUrl').value.trim();
+      if (!ca) return;
+      if (!window.confirm(`Set the $CREDIT CA to\n\n${ca}\n\n${url ? `Buy link: ${url}` : `Buy link: https://pump.fun/coin/${ca}`}\n\nIt shows on /tokens right away and can't be changed from here. Check every character.`)) return;
+      e.target.disabled = true;
+      try { await send('POST', '/admin/airdrop/token', { ca, url }); out('CA set: it is on /tokens now.'); } catch (x) { alert(x.message); }
+      loadAirdrop();
+    };
+    if ($('#abMake')) $('#abMake').onclick = async (e) => {
+      e.target.disabled = true;
+      try { const b = await send('POST', '/admin/airdrop/batch', { size: Number($('#abSize').value) }); out(`Batch #${b.no}: ${n(b.wallets)} wallets, ${n(b.credit)} $CREDIT. Copy the lines and send them.`); } catch (x) { alert(x.message); }
+      after();
+    };
+    if ($('#abCopy')) $('#abCopy').onclick = async () => {
+      const lines = o.text;
+      try { await navigator.clipboard.writeText(lines); $('#abCopyOut').textContent = `Copied ${n(o.wallets)} lines (wallet,amount).`; } catch { $('#abLines').select(); $('#abCopyOut').textContent = 'Copy it from the box below.'; }
+    };
+    if ($('#abSentGo')) $('#abSentGo').onclick = async (e) => {
+      const sent = $('#abSent').value;
+      const failed = $('#abFailed').value;
+      if (!window.confirm(`Batch #${o.no} went out? It shows on /tokens now.${failed.trim() ? ' The failed wallets go back to the queue.' : ''}`)) return;
+      e.target.disabled = true;
+      try {
+        const r = await send('POST', `/admin/airdrop/batch/${o.id}/sent`, { sent, failed, next: Number($('#abNext').value) || 0 });
+        out(`Batch #${r.no} sent: ${n(r.wallets)} wallets${r.txs.length ? `, ${n(r.txs.length)} transaction link${r.txs.length === 1 ? '' : 's'}` : ''}.${r.failed ? ` ${n(r.failed)} back in the queue.` : ''}${r.unknown ? ` ${n(r.unknown)} lines named wallets that are not in this batch: ignored.` : ''}${r.next ? ` Next: batch #${r.next.no}, ${n(r.next.wallets)} wallets, ready to copy.` : ''}`);
+      } catch (x) { alert(x.message); e.target.disabled = false; return; }
+      after();
+    };
+    if ($('#abCancel')) $('#abCancel').onclick = async (e) => {
+      if (!window.confirm(`Cancel batch #${o.no}? Only if you sent NOTHING of it: its ${n(o.wallets)} wallets go back to the queue.`)) return;
+      e.target.disabled = true;
+      try { const r = await send('POST', `/admin/airdrop/batch/${o.id}/cancel`); out(`Batch #${r.no} cancelled: ${n(r.returned)} claims back in the queue.`); } catch (x) { alert(x.message); }
+      after();
+    };
+    el.querySelectorAll('[data-abfix]').forEach((b) => b.onclick = () => {
+      $('#abFix').hidden = false;
+      $('#abFix').dataset.id = b.dataset.abfix;
+      $('#abFixT').textContent = `Batch #${b.dataset.abno}`;
+      $('#abFixSent').focus();
+    });
+    if ($('#abFixGo')) $('#abFixGo').onclick = async (e) => {
+      const failed = $('#abFixFailed').value;
+      if (failed.trim() && !window.confirm('Send these wallets back to the queue? They will be sent again in a later batch: only if they did not get it.')) return;
+      e.target.disabled = true;
+      try {
+        const r = await send('POST', `/admin/airdrop/batch/${$('#abFix').dataset.id}/sent`, { sent: $('#abFixSent').value, failed });
+        out(`Batch #${r.no}: ${n(r.added)} new link${r.added === 1 ? '' : 's'}, ${n(r.failed)} back in the queue.${r.unknown ? ` ${n(r.unknown)} lines named wallets not in this batch: ignored.` : ''}`);
+      } catch (x) { alert(x.message); e.target.disabled = false; return; }
+      after();
+    };
+  }
 
   // free $CREDIT drops: code, $CREDIT each, uses, tasks; pause, resume, change uses or tasks
   async function loadDrops() {
