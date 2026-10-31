@@ -663,15 +663,12 @@ async function renderCollection(slug, query) {
         <div class="cta">${canMint ? `<a class="btn red" href="${claudeLink(mintQ)}" target="_blank" rel="noopener">Mint in Claude</a>
           <a class="btn ghost" href="${gptLink(mintQ)}" target="_blank" rel="noopener">Mint in ChatGPT</a>` : ''}
           <span class="note" style="align-self:center">${fmt(c.mint_price)} $MCP · a random one · up to ${c.mint_limit} per account</span></div></div></section>
-    <div class="c-tiles">${[
-      ['Supply', c.supply.toLocaleString('en-US')], ['Minted', c.minted.toLocaleString('en-US')], ['Holders', c.holders],
-      ['Floor', c.trading_open === false ? 'after sell-out' : c.floor != null ? `${fmt(c.floor)} <small>$MCP</small>` : '—'], ['Mint price', `${fmt(c.mint_price)} <small>$MCP</small>`],
-      ['Per account', c.mint_limit], ['Volume', `${fmt(c.volume)} <small>$MCP</small>`],
-    ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
+    <div class="c-tiles" id="cTiles">${cTiles(c)}</div>
     <div class="bar">
       <div class="tabs" role="tablist">${cTabs.map(([k, v]) => `<button class="tab" role="tab" data-cstatus="${k}">${v}</button>`).join('')}</div>
       <select id="cSort" aria-label="Sort"><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="recent">Recently listed</option><option value="id">Number</option></select>
       <span class="count" id="cCount"></span>
+      <button class="btn ghost refresh" id="cRefresh" type="button" title="Refresh the collection" aria-label="Refresh the collection"><span class="spin" aria-hidden="true">↻</span> Refresh</button>
     </div>
     <div class="c-body">
       <aside class="filters" aria-label="Traits"><div class="fh"><b class="px">Traits</b><button class="btn ghost" id="cClear" style="padding:3px 8px;font-size:11px">Clear</button></div>
@@ -690,6 +687,19 @@ async function renderCollection(slug, query) {
   });
   $('#cClear').onclick = () => { cState.traits.clear(); app.querySelectorAll('[data-trait]').forEach((cb) => { cb.checked = false; }); loadCollectionGrid(); };
   $('#cMore').onclick = () => loadCollectionGrid(true);
+  // new listings, sales, floor and holders without reloading the page; filters and traits stay as they are
+  $('#cRefresh').onclick = async () => {
+    const b = $('#cRefresh');
+    if (b.classList.contains('busy')) return;
+    b.classList.add('busy');
+    const slug = cState.slug;
+    try {
+      const [fresh] = await Promise.all([api('/collections/' + encodeURIComponent(slug)), loadCollectionGrid()]);
+      if (slug === cState.slug && $('#cTiles')) $('#cTiles').innerHTML = cTiles(fresh);
+      b.title = `Updated ${new Date().toLocaleTimeString()}`;
+    } catch {}
+    b.classList.remove('busy');
+  };
   $('#cChips').onclick = (e) => {
     const b = e.target.closest('[data-untrait]');
     if (!b) return;
@@ -701,7 +711,18 @@ async function renderCollection(slug, query) {
   await loadCollectionGrid();
 }
 
+// the numbers above a collection's NFTs
+function cTiles(c) {
+  return [
+    ['Supply', c.supply.toLocaleString('en-US')], ['Minted', c.minted.toLocaleString('en-US')], ['Holders', c.holders],
+    ['Floor', c.trading_open === false ? 'after sell-out' : c.floor != null ? `${fmt(c.floor)} <small>$MCP</small>` : '—'], ['Mint price', `${fmt(c.mint_price)} <small>$MCP</small>`],
+    ['Per account', c.mint_limit], ['Volume', `${fmt(c.volume)} <small>$MCP</small>`],
+  ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+}
+
+let cRun = 0;
 async function loadCollectionGrid(more = false) {
+  const run = ++cRun; // a newer load (filter, Refresh) wins over answers still on their way
   document.querySelectorAll('[data-cstatus]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.cstatus === cState.status)));
   $('#cSort').value = cState.sort;
   if (!more) cState.offset = 0;
@@ -709,7 +730,7 @@ async function loadCollectionGrid(more = false) {
   for (const t of cState.traits) q.append('trait', t);
   const slug = cState.slug;
   const r = await api(`/collections/${encodeURIComponent(slug)}/nfts?${q}`);
-  if (slug !== cState.slug || !$('#cGrid')) return; // the page changed meanwhile
+  if (slug !== cState.slug || !$('#cGrid') || run !== cRun) return; // the page or the filters changed meanwhile
   cState.offset += r.items.length;
   cState.total = r.total;
   $('#cCount').textContent = `${r.total.toLocaleString('en-US')} item${r.total === 1 ? '' : 's'}`;
