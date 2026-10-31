@@ -277,6 +277,8 @@ table.txs a.tx { color: var(--cream); }
 .crumbs a { color: var(--dim); }
 .nftpage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 14px 0 22px; }
 .nftpage .art img { width: 100%; aspect-ratio: 1; border: 2px solid var(--edge); background: var(--panel); }
+.nftpage .art .dl { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.nftpage .art .dl .note { font-size: 12px; }
 .nftpage .info { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .nftpage h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); line-height: 1.05; }
 .ttable { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); border-top: 1px solid var(--edge); border-left: 1px solid var(--edge); }
@@ -382,9 +384,10 @@ const RARITIES = ['Common', 'Rare', 'Epic', 'Legendary', 'Ultra-Rare'];
 if (!RARITIES.includes(state.rarity)) state.rarity = '';
 const MARKET_SORTS = [['price_asc', 'Price: low to high'], ['price_desc', 'Price: high to low'], ['recent', 'Recently listed'], ['id', 'Number']];
 const rarClass = (r) => String(r || '').toLowerCase().replace(/[^a-z]+/g, '-');
-// 28x28 pixel art comes at its native size and is scaled up sharp; other pictures come full size
+// 28x28 pixel art comes at its native size and is scaled up sharp; other pictures come full size.
+// n.big is the picture to download: 1008 px for the market's own pixel NFTs, the NFT's page shows that one
 const pic = (n, big = false) => n.pixel
-  ? `<img class="pix" src="${n.image}" alt="${esc(n.name)}" loading="lazy" width="256" height="256">`
+  ? `<img class="pix" src="${big && n.big ? n.big : n.image}" alt="${esc(n.name)}" loading="lazy" width="256" height="256">`
   : `<img class="smooth" src="${big ? n.image : n.thumb}" alt="${esc(n.name)}" loading="lazy" width="256" height="256">`;
 const minted = (n) => n.minted_at;
 // what to type in the chat for this NFT ("MCP #42" is enough in MCP; other collections add the NFT's number)
@@ -742,6 +745,35 @@ async function loadCollectionGrid(more = false) {
 }
 
 // ---------- an NFT's page ----------
+// "MCP #42" → MCP-42.png
+const fileName = (n) => `${String(n.name || `NFT ${n.id}`).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'nft'}.png`;
+// a pixel picture that has no big copy on the CDN (launchpad collections): scale it up sharp in the browser, then save
+document.addEventListener('click', async (e) => {
+  const a = e.target.closest('a[data-upscale]');
+  if (!a) return;
+  e.preventDefault();
+  try {
+    const img = new Image();
+    img.src = a.href;
+    await img.decode();
+    const f = Math.max(1, Math.floor(1024 / Math.max(img.naturalWidth, img.naturalHeight)));
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth * f;
+    c.height = img.naturalHeight * f;
+    const x = c.getContext('2d');
+    x.imageSmoothingEnabled = false;
+    x.drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+    const url = URL.createObjectURL(blob);
+    const save = Object.assign(document.createElement('a'), { href: url, download: a.getAttribute('download') || 'nft.png' });
+    document.body.append(save);
+    save.click();
+    save.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch {
+    window.open(a.href, '_blank', 'noopener');
+  }
+});
 async function renderNft(id) {
   const app = $('#app');
   app.innerHTML = '<div class="wrap"><div class="note" style="padding:30px 0">Loading…</div></div>';
@@ -768,7 +800,9 @@ async function renderNft(id) {
   app.innerHTML = `<div class="wrap">
     <div class="crumbs"><a href="/collections">Collections</a> / <a href="/c/${esc(n.collection)}">${esc(n.collection_name)}</a> / ${esc(n.name)}</div>
     <div class="nftpage">
-      <div class="art">${pic(n, true).replace(' loading="lazy" width="256" height="256"', '')}</div>
+      <div class="art">${pic(n, true).replace(' loading="lazy" width="256" height="256"', '')}
+        <div class="dl"><a class="btn ghost" href="${esc(n.big || n.image)}" download="${esc(fileName(n))}"${n.pixel && (n.big || n.image) === n.image ? ' data-upscale' : ''}>Download PNG</a>
+          <span class="note">${n.big && n.big !== n.image ? '1008 × 1008 px' : 'full size'}</span></div></div>
       <div class="info">
         <div>${n.rarity ? `<span class="rar ${rarClass(n.rarity)}">${esc(n.rarity)}</span>` : ''}<h1 class="px">${esc(n.name)}</h1>
           <div style="color:var(--dim)"><a href="/c/${esc(n.collection)}">${esc(n.collection_name)}</a> · ${n.owner_addr ? `owned by ${who(n.owner_addr, n.owner_name)}` : 'not minted yet'}</div></div>
@@ -1087,6 +1121,7 @@ document.addEventListener('click', async (e) => {
 const CHAT_COMMANDS = [
   ['/mcpcredit', '[code]', 'Start here: your balance, the mint and all commands; with a code, your free mint'],
   ['/mcpmint', '[code]', 'With a code: your free mint ("/mcpmint with code EARLY"). Without one: mint for 5 $MCP'],
+  ['/mcpchat', '', 'The holders-only group chat on X: your invite link, if you hold an MCP NFT'],
   ['/help-mcp', '', 'All commands'],
   ['/balance-mcp', '', 'Balance, MCP address, your NFTs and recent activity'],
   ['/deposit-mcp', '', 'Your Solana address for USDC/USDT top-ups; run it again after sending to check'],
