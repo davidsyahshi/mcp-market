@@ -275,7 +275,7 @@
         ${field('dpAmount', '$CREDIT per account', 'type="number" min="1" step="1" value="1000" inputmode="numeric"')}
         ${field('dpUses', 'Uses (accounts)', 'type="number" min="1" max="100000" step="1" value="5000" inputmode="numeric"')}
         ${field('dpFollow', 'Task: follow (optional)', 'placeholder="https://x.com/mcpmarkets" autocomplete="off" spellcheck="false"')}
-        ${field('dpTweet', 'Task: like + RT post (optional)', 'placeholder="https://x.com/mcpmarkets/status/…" autocomplete="off" spellcheck="false"')}
+        ${field('dpTweet', 'Task: like + RT + comment on post (optional)', 'placeholder="https://x.com/mcpmarkets/status/…" autocomplete="off" spellcheck="false"')}
         <button class="btn red" id="dpGo" style="justify-content:center;padding:12px">Make drop</button>
       </div>
       <div id="dpOut" class="note" aria-live="polite" style="margin:10px 0"></div>
@@ -576,7 +576,7 @@
     const n = (v) => Number(v || 0).toLocaleString('en-US');
     el.innerHTML = `<table class="txs"><thead><tr><th>Code</th><th style="text-align:right">$CREDIT each</th><th style="text-align:right">Cards / done / max</th><th>Status</th><th></th></tr></thead><tbody>
       ${list.map((d) => `<tr><td><code>${esc(d.code)}</code><div class="note">type: /mcpcredit ${esc(d.code)}</div>
-        ${d.follow_url || d.tweet_url ? `<div class="note">tasks: ${d.follow_url ? `follow <a href="${esc(d.follow_url)}" target="_blank" rel="noopener">${esc(d.follow_url.replace(/^https:\/\//, ''))}</a>` : ''}${d.follow_url && d.tweet_url ? ' · ' : ''}${d.tweet_url ? `like + RT <a href="${esc(d.tweet_url)}" target="_blank" rel="noopener">post</a>` : ''}</div>` : '<div class="note">no tasks</div>'}</td>
+        ${d.follow_url || d.tweet_url ? `<div class="note">tasks: ${d.follow_url ? `follow <a href="${esc(d.follow_url)}" target="_blank" rel="noopener">${esc(d.follow_url.replace(/^https:\/\//, ''))}</a>` : ''}${d.follow_url && d.tweet_url ? ' · ' : ''}${d.tweet_url ? `like + RT + comment <a href="${esc(d.tweet_url)}" target="_blank" rel="noopener">post</a>` : ''}</div>` : '<div class="note">no tasks</div>'}</td>
         <td class="num">${n(d.amount)}</td>
         <td class="num"><b>${n(d.used)}</b> / ${n(d.done)} / ${n(d.max_uses)}</td>
         <td>${pill(d.status === 'active' ? (d.used >= d.max_uses ? 'used up' : 'live') : 'paused')}</td>
@@ -596,7 +596,7 @@
       } else if (a === 'tasks') {
         const f = window.prompt(`${b.dataset.dp}: X account to follow (https://x.com/name), empty for none`, b.dataset.follow);
         if (f == null) return;
-        const t = window.prompt(`${b.dataset.dp}: post to like + RT (https://x.com/name/status/…), empty for none`, b.dataset.tweet);
+        const t = window.prompt(`${b.dataset.dp}: post to like + RT + comment (https://x.com/name/status/…), empty for none`, b.dataset.tweet);
         if (t == null) return;
         body = { follow_url: f.trim(), tweet_url: t.trim() };
       } else {
