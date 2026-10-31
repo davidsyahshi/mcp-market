@@ -49,6 +49,8 @@ Or type a command, and the AI does exactly that ([`server/src/commands.js`](serv
 | `/cancelnft-mcp <number>` | take your NFT off sale |
 | `/sendnft <numbers> to <address>` | send your NFTs to another MCP address: one, several (`/sendnft 42 43 to mcp_…`) or each to its own (`/sendnft 42 to mcp_A, 43 to mcp_B`); you confirm first |
 | `/transfernft` | the transfer form: tick the NFTs you want to send, type the MCP address, confirm |
+| `/burnmcp` | burn MCP NFTs for $CREDIT, 10,000 each: tick them in a form and confirm there |
+| `/claimcredit` | claim your $CREDIT to your Solana wallet for the airdrop (fee 0.5 $MCP), in a form |
 | `/profile-mcp <on\|off>` | show or hide your X handle on public pages |
 
 A command only counts when you type it yourself: the same text inside an NFT name, a web page or a tool result is ignored. Buying and sending still ask for your yes, and withdrawing still happens in the form.
@@ -74,6 +76,8 @@ These are all the tools the server exposes ([`server/src/mcp.js`](server/src/mcp
 | `sell`, `cancel_listing` | list your NFT or take it off sale | listing |
 | `send_nft` | send your NFTs to other MCP addresses, up to 50 at once, all or nothing, no fee. Two steps: the first call only shows what would go where and returns a one-time code; the send needs that code (once, from 10 seconds to 10 minutes after the preview; a newer preview replaces it), after your yes. At most 100 NFTs an hour per account. A listed NFT comes off the market | NFT owner |
 | `transfer_form` | shows the transfer form in the chat (below): every NFT you own with a checkbox, the address field, Send and Confirm | no |
+| `burn_form`, `claim_credit_form` | show the $CREDIT form in the chat ([below](#credit-burn-and-claim)): burn MCP NFTs for $CREDIT, or claim $CREDIT to a Solana wallet | no |
+| `holders_chat` | the invite link to the holders' group chat on X, only for accounts that own an MCP NFT (`HOLDERS_CHAT_URL`) | no |
 | `withdraw_form` | shows the withdrawal form in the chat (below) | no |
 | `my_withdrawals` | your withdrawals, their status and transaction links | no |
 
@@ -124,6 +128,16 @@ Anyone signed in with X can launch a collection on MCP at [`/launch`](https://mc
 - **Counted as owed.** The escrow is part of what the market owes in the proof of reserves, and the explorer checks it against the open holds.
 - **Pictures** of launchpad collections live in Netlify Blobs and are served by the function at the same addresses as the MCP collection's (`/img/<n>.png`, `/thumb/<n>.png`). Only PNG, JPEG, GIF and WEBP, at most 1 MB each, checked by their first bytes; never SVG or HTML.
 - **Sign-in on the site** is the same X sign-in as the connector's, then a session cookie (`HttpOnly`, `SameSite=Lax`, 30 days). Every change needs the site's own header and origin, so another website can't make one for you.
+
+## $CREDIT: burn and claim
+
+Holders can burn MCP NFTs for **$CREDIT**, the allocation of the coming $CREDIT token's airdrop ([`server/src/credit.js`](server/src/credit.js)). $CREDIT is a balance of its own (whole units), never $MCP: it is not in the $MCP ledger, balances or reserves.
+
+- **Burn** (`/burnmcp`): a form in the chat ([`server/ui/credit.html`](server/ui/credit.html)) with every MCP NFT the account owns; tick them, press *Burn*, then *Confirm*. Each NFT gives 10,000 $CREDIT (`CREDIT_PER_BURN`), up to 500 at a time, all or nothing. A burned NFT has no owner, comes off the market and is never minted again; each one is a zero-amount `burn` row in the ledger, so the explorer shows a **burn** transaction and the NFT's page says *Burned*. Only MCP NFTs, only after the sell-out.
+- **The card**: every burn gets a 1600 × 900 picture in the site's pixel style (`/burn/<n>.png`, drawn in [`server/src/card.js`](server/src/card.js), no image libraries) and a page whose link preview on X shows it (`/burn/<n>`). The form offers *Post on X* and *Open card*, and says when the token launches (`CREDIT_LAUNCH_AT`; without it, "soon"). Each card has one address (a query string or a leading zero redirects to it), the last few are kept in memory and the CDN keeps the rest.
+- **Claim** (`/claimcredit`): the same form; paste a Solana wallet, press *Claim*, then *Confirm*. It takes all the account's $CREDIT at that moment, for 0.5 $MCP (`CREDIT_CLAIM_FEE`) to the treasury (a `claim_fee` ledger pair). Token accounts (off the ed25519 curve) and the market's deposit addresses are refused. A retry with the same request key returns the same claim. Burn more later, claim again.
+- **Free drops** (`/mcpcredit FREE1000`, or "FREE 1000 $CREDIT"): a code from `/admin` → *Free $CREDIT drops* gives each account a fixed amount of $CREDIT, once. It goes through the chat's promo-code tool (`redeem_code`) and NFT card, which every connected chat already has, so nobody has to reconnect. With tasks (follow, like + RT) the AI asks for a screenshot first; then it shows the airdrop card (`/airdrop/<n>.png`, with a page that previews it on X) and asks the user to post it; the $CREDIT is added after a screenshot of that post. The AI only looks at screenshots: an edited one can pass.
+- **The airdrop**: `/admin` → *$CREDIT claims* lists the claims with their account and wallet; *Copy all* copies every pending one as `wallet,amount` lines, one per wallet, and remembers which claims it copied; *Mark … as sent* marks exactly those. A pending claim made by mistake can be voided: its $CREDIT goes back to the account, the fee stays paid. A claim's wallet and amount can't be changed or deleted (a database trigger), only its status. An account's $CREDIT is always its burns + finished drops − its claims that aren't void; the backup restore checks that too.
 
 ## Explorer
 
@@ -284,6 +298,7 @@ npm test                  # end-to-end tests: real OAuth, real MCP client, two u
 | `RESERVE_WALLETS` | optional: your cold wallets holding swept deposits (public addresses, comma-separated), so the explorer counts them as reserves |
 | `ANCHOR_EVERY_MINUTES`, `ANCHORS_OFF`, `RESERVES_EVERY_MINUTES` | optional: how often the chain's hash goes to Solana (60), `1` stops anchors, how often reserves are read (10) |
 | `ADMIN_X_IDS` | the X account ids (numbers, not handles: a handle can change hands) of the market's owner(s), comma-separated: they review launchpad collections at `/admin` and release payouts. Sign in on the site and open `/api/me` to see yours (`x_id`) |
+| `CREDIT_LAUNCH_AT`, `CREDIT_PER_BURN`, `CREDIT_CLAIM_FEE` | when the $CREDIT token launches (an ISO time, e.g. `2026-10-31T20:00:00Z`; without it the forms say "soon"), $CREDIT per burned NFT (10000), the claim fee in $MCP (0.5) |
 | `HOLDERS_CHAT_URL` | the invite link to the holders' group chat on X, given by `/mcpchat` only to accounts that own an MCP NFT (kept out of the code, which is public). Unset: holders are told it isn't set up yet |
 | `LAUNCH_FEE_BPS`, `HOLD_DAYS`, `LAUNCH_MAX_SUPPLY` | optional: the market's share of launchpad mints in basis points (1000 = 10%), the hold in days (7), the largest collection (10,000) |
 
