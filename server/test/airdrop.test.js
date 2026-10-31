@@ -98,20 +98,21 @@ test('signatures and wallets from what the owner pastes', () => {
   assert.deepEqual(ad.parseWallets(`${w}\n${w}, nope`), [w]);
 });
 
-test('batches: oldest first, one line per wallet, one open at a time; sent with signatures; failed wallets back in the queue', async () => {
+test('batches: smallest totals first (the biggest last), one line per wallet, one open at a time; sent with signatures; failed wallets back in the queue', async () => {
   await drain();
   const shared = wallet();
+  const big = await claimer(undefined, 9);
   const a = await claimer(shared, 1);
-  const b = await claimer(undefined, 2);
-  const c = await claimer(undefined, 1);
-  // the same wallet again (another account): its claims go together, at the place of its first one
-  const a2 = await claimer(shared, 3);
+  const b = await claimer(undefined, 3);
+  const c = await claimer(undefined, 6);
+  // the same wallet again (another account): its claims go together, by their total
+  const a2 = await claimer(shared, 1);
   const b1 = await ad.makeBatch(db, 2);
   assert.equal(b1.wallets, 2);
-  assert.deepEqual(b1.lines.map((l) => l.wallet), [shared, b.w]);
-  assert.equal(b1.lines[0].amount, 40_000);
+  assert.deepEqual(b1.lines.map((l) => l.wallet), [shared, b.w], 'the smallest totals, not the oldest claim (90,000) first');
+  assert.equal(b1.lines[0].amount, 20_000);
   assert.deepEqual(b1.lines[0].claims, [a.c.id, a2.c.id]);
-  assert.equal(b1.text, `${shared},40000\n${b.w},20000`);
+  assert.equal(b1.text, `${shared},20000\n${b.w},30000`);
   await assert.rejects(ad.makeBatch(db, 5), /Batch #\d+ is still open/);
   // a claim in an open batch can't be voided; one in the queue can
   await assert.rejects(credit.voidClaim(db, a.c.id), /in an airdrop batch/);
@@ -119,28 +120,30 @@ test('batches: oldest first, one line per wallet, one open at a time; sent with 
   let f = (await get('/api/credit/airdrop')).body;
   assert.equal(f.open.no, b1.no);
   assert.equal(f.open.wallets, 2);
-  assert.deepEqual(f.queue.map((q) => q.wallet), [c.w]);
+  assert.deepEqual(f.queue.map((q) => q.wallet), [c.w, big.w]);
   assert.equal(f.queue[0].batch, b1.no + 1);
   let s = (await get(`/api/credit/airdrop/wallet/${shared}`)).body;
-  assert.deepEqual([s.found, s.total, s.sending.batch, s.sending.amount, s.queued], [true, 40_000, b1.no, 40_000, null]);
+  assert.deepEqual([s.found, s.total, s.sending.batch, s.sending.amount, s.queued], [true, 20_000, b1.no, 20_000, null]);
   // sent: needs a signature; a wallet that failed goes back to the queue, ahead of newer claims
   await assert.rejects(ad.markBatchSent(db, b1.id, { sent: sig(), failed: `${shared}\n${b.w}` }), /cancel the batch/);
   const t1 = sig();
   const own = sig();
-  const r = await ad.markBatchSent(db, b1.id, { sent: `https://solscan.io/tx/${t1}\n${shared},40000,${own}`, failed: b.w });
+  const r = await ad.markBatchSent(db, b1.id, { sent: `https://solscan.io/tx/${t1}\n${shared},20000,${own}`, failed: b.w });
   assert.deepEqual([r.status, r.wallets, r.failed, r.added], ['sent', 1, 1, 2]);
   assert.deepEqual(r.txs, [t1, own]);
   f = (await get('/api/credit/airdrop')).body;
   assert.equal(f.open, null);
-  assert.deepEqual(f.queue.map((q) => q.wallet), [b.w, c.w], 'the failed wallet keeps its place');
+  assert.deepEqual(f.queue.map((q) => q.wallet), [b.w, c.w, big.w], 'the failed wallet keeps its place');
   assert.equal(f.recent[0].wallet, shared);
   assert.equal(f.recent[0].tx, own, "the wallet's own signature");
   assert.equal(f.batches[0].no, b1.no);
   assert.deepEqual(f.batches[0].txs, [t1, own]);
   s = (await get(`/api/credit/airdrop/wallet/${shared}`)).body;
-  assert.deepEqual([s.sent, s.sent_batches[0].batch, s.sent_batches[0].tx, s.sending, s.queued], [40_000, b1.no, own, null, null]);
+  assert.deepEqual([s.sent, s.sent_batches[0].batch, s.sent_batches[0].tx, s.sending, s.queued], [20_000, b1.no, own, null, null]);
   s = (await get(`/api/credit/airdrop/wallet/${c.w}`)).body;
-  assert.deepEqual([s.queued.pos, s.queued.batch, s.queued.amount], [2, b1.no + 1, 10_000]);
+  assert.deepEqual([s.queued.pos, s.queued.batch, s.queued.amount], [2, b1.no + 1, 60_000]);
+  s = (await get(`/api/credit/airdrop/wallet/${big.w}`)).body;
+  assert.deepEqual([s.queued.pos, s.queued.batch], [3, b1.no + 2], 'the biggest goes last');
   assert.ok(new Date(s.queued.eta) > new Date(Date.now() + 4 * 60e3), 'about a batch interval after the last one');
   // more signatures later, and a wallet that turned out not to have got it
   const t2 = sig();
@@ -151,7 +154,7 @@ test('batches: oldest first, one line per wallet, one open at a time; sent with 
   // cancel: an open batch only; its claims go back, its number is used again
   const b2 = await ad.makeBatch(db, 100);
   assert.equal(b2.no, b1.no + 1);
-  assert.equal((await ad.cancelBatch(db, b2.id)).returned, 4);
+  assert.equal((await ad.cancelBatch(db, b2.id)).returned, 5);
   const b3 = await ad.makeBatch(db, 100);
   assert.equal(b3.no, b2.no);
   await assert.rejects(ad.cancelBatch(db, b1.id), /was sent/);
