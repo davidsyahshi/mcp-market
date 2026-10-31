@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { upscalePng } from './png.js';
 
 export const ARCHIVES = [
   { file: 'mcp-images.tar.gz', dir: 'images' },
@@ -65,4 +66,26 @@ export function unpackCollection(root, { dist } = {}) {
 export function ensureUnpacked(root) {
   const have = ARCHIVES.every(({ dir }) => fs.existsSync(path.join(root, 'collection', dir, '1.png')));
   return have ? null : unpackCollection(root);
+}
+
+// The 28x28 pixel pictures at 1008 px (36x, sharp), for downloading and sharing: /big/<id>.png. Only for pixel NFTs
+// (px in collection.json); the others' /img/<id>.png is already full size. Built into dist/big, served by the CDN.
+export const BIG_PX = 1008;
+export function bigImage(png) {
+  const width = png.readUInt32BE(16);
+  if (!(width > 0) || BIG_PX % width) throw new Error(`a ${width} px picture doesn't scale to ${BIG_PX} px`);
+  return upscalePng(png, BIG_PX / width);
+}
+export function makeBigImages(root, outDir) {
+  const { items } = JSON.parse(fs.readFileSync(path.join(root, 'collection', 'collection.json'), 'utf8'));
+  fs.rmSync(outDir, { recursive: true, force: true });
+  fs.mkdirSync(outDir, { recursive: true });
+  let n = 0;
+  for (const it of items) {
+    if (!it.px) continue;
+    const name = `${Number(it.id)}.png`;
+    fs.writeFileSync(path.join(outDir, name), bigImage(fs.readFileSync(path.join(root, 'collection', 'images', name))));
+    n++;
+  }
+  return n;
 }

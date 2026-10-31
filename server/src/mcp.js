@@ -197,6 +197,26 @@ export function buildMcpServer(db, userId, opts) {
     annotations: read,
   }, async () => ok(text(helpText(publicUrl))));
 
+  // /mcpchat: the invite link to the holders' group chat on X, only for accounts that own an MCP NFT. The link lives in
+  // HOLDERS_CHAT_URL (Netlify), not in this public code, so it isn't one search away for everyone else.
+  const chatUrl = String(opts.holdersChatUrl ?? process.env.HOLDERS_CHAT_URL ?? '').trim();
+  tool('holders_chat', {
+    title: 'Holders chat',
+    description: 'The MCP holders\' group chat on X (Twitter). Call it when the user types /mcpchat (also "mcpchat" or "/mcpchat for holders") ' +
+      'or asks for the holders chat. An account that owns at least one MCP NFT gets the invite link; others are told how to get access.',
+    annotations: read,
+  }, async () => {
+    const [{ n }] = await db.query(`select count(*)::int as n from nfts n join collections c on c.id = n.collection_id
+      where n.owner_id = $1 and c.slug = $2`, [userId, m.OWN_COLLECTION]);
+    if (!n) {
+      return ok(text('The holders chat is only for MCP holders, and this account has no MCP NFT yet.\n' +
+        `Buy one to get access: /market-mcp shows the cheapest first (or ${publicUrl}). Then type /mcpchat again.`));
+    }
+    if (!/^https:\/\/\S+$/.test(chatUrl)) return ok(text(`You hold ${n} MCP NFT${n === 1 ? '' : 's'}, but the holders chat link isn't set up yet. Try again later.`));
+    return ok(text(`You hold ${n} MCP NFT${n === 1 ? '' : 's'}: welcome to the holders chat on X.\nJoin here: ${chatUrl}\n\n` +
+      'The link is for holders only, so please don\'t post it publicly.'));
+  });
+
   // apps that support MCP prompts show the commands in their menu; picking one puts the command in the chat
   for (const c of COMMANDS) {
     const argsSchema = Object.fromEntries((c.args || []).map((a) => {

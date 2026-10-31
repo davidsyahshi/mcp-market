@@ -1,5 +1,6 @@
 // The HTTP app: the MCP endpoint for AI chats, OAuth sign-in, the public preview API, the Helius deposit
 // webhook, the manual credit endpoint and (locally) the preview site. Runs as a normal Node server (index.js) or as one Netlify function (lambda.js).
+import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import express from 'express';
@@ -19,6 +20,7 @@ import * as claims from './claims.js';
 import * as lp from './launchpad.js';
 import { defaultStorage, defaultBackupStore, sniffImage } from './storage.js';
 import { runBackup, lastBackup, keyTime, KEY_RE } from './backup.js';
+import { bigImage } from './assets.js';
 
 const sameSecret = (given, key) => {
   if (!key || typeof given !== 'string') return false;
@@ -103,8 +105,10 @@ export async function createApp(opts) {
   api.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   // amounts in the public API are plain numbers of $MCP (1 $MCP = $1)
   const num = units;
-  // /img/<id>.png is the full picture (28x28 pixel art at its native size when pixel is true), /thumb/<id>.png 252 px
-  const shape = (n) => ({ ...n, price: num(n.price), image: `/img/${n.id}.png`, thumb: `/thumb/${n.id}.png`,
+  // /img/<id>.png is the full picture (28x28 pixel art at its native size when pixel is true), /thumb/<id>.png 252 px,
+  // big: the picture to download, /big/<id>.png (1008 px) for the market's own pixel NFTs, otherwise /img (already full size)
+  const bigOf = (n) => (n.pixel && n.collection === m.OWN_COLLECTION ? `/big/${n.id}.png` : `/img/${n.id}.png`);
+  const shape = (n) => ({ ...n, price: num(n.price), image: `/img/${n.id}.png`, thumb: `/thumb/${n.id}.png`, big: bigOf(n),
     ...(n.activity ? { activity: n.activity.map((a) => ({ ...a, price: num(a.price) })) } : {}) });
   const str = (v) => (typeof v === 'string' ? v : undefined);
   const intOr = (v, d = null) => (/^\d{1,15}$/.test(String(v ?? '')) ? Number(v) : d);
@@ -410,6 +414,16 @@ export async function createApp(opts) {
   if (serveStatic) {
     app.use('/img', express.static(path.join(collectionDir, 'images'), { maxAge: '1d' }));
     app.use('/thumb', express.static(thumbsDir, { maxAge: '1d' }));
+    // the 1008 px pictures: built into dist/big for the CDN, made on the fly here
+    app.get(/^\/big\/(\d{1,9})\.png$/, async (req, res, next) => {
+      let png;
+      try {
+        png = bigImage(await fs.promises.readFile(path.join(collectionDir, 'images', `${Number(req.params[0])}.png`)));
+      } catch {
+        return next();
+      }
+      res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }).send(png);
+    });
     app.use(express.static(path.join(root, 'site')));
     // the site's pages (/c/mcp, /nft/42, ...) are all index.html; on Netlify netlify.toml does the same
     app.get(SITE_PAGES, (req, res) => res.sendFile(path.join(root, 'site', 'index.html')));

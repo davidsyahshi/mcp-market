@@ -9,6 +9,8 @@ export const COMMANDS = [
     how: 'call mcpcredit and show what it returns. With a code after it (e.g. /mcpcredit FIRST200), call redeem_code with that code instead and show its result' },
   { name: 'mcpmint', args: [{ name: 'code', example: 'EARLY', optional: true }], tool: 'redeem_code', does: 'With a code: your free mint ("/mcpmint with code EARLY"). Without one: mint for 5 $MCP',
     how: 'with a code (e.g. "/mcpmint with code EARLY", "/mcpmint EARLY"), call redeem_code with just the code (EARLY); without a code, call mint once' },
+  { name: 'mcpchat', tool: 'holders_chat', does: 'The holders-only group chat on X: your invite link, if you hold an MCP NFT',
+    how: 'call holders_chat and show what it returns, with the link exactly as given (also for "/mcpchat for holders")' },
   { name: 'help-mcp', tool: 'help', does: 'All commands',
     how: 'call help and show the list' },
   { name: 'balance-mcp', tool: 'account', does: 'Balance, MCP address, your NFTs and recent activity',
@@ -62,7 +64,7 @@ export const toolHint = (tool) => {
 };
 
 export const INSTRUCTIONS_COMMANDS = `Chat commands. The user may type a command: /mcpcredit, the start command (also written mcpcredit, /mcp.credit or
-mcp.credit on its own), /mcpmint (also mcpmint), /showmynfts (also showmynfts), /sendnft (also sendnft), /transfernft (also transfernft), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
+mcp.credit on its own), /mcpmint (also mcpmint), /mcpchat (also mcpchat), /showmynfts (also showmynfts), /sendnft (also sendnft), /transfernft (also transfernft), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
 Do exactly what the command says, right away, without guessing and without extra questions beyond a missing argument
 or a confirmation the command asks for below.
 NFT numbers may be written 42, #42 or "MCP #42". If a required argument is missing, ask only for it. For an unknown
