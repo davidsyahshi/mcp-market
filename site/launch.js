@@ -262,6 +262,24 @@
       <p>Reports from <a href="/lost-deposit">/lost-deposit</a>. Each shows whose deposit address it is (as the person typed it: check on Solscan where the transaction really went) and whether that transaction was already credited. Crediting is still done by hand; a report moves no money.</p></div>
       <div class="tabs" role="tablist" id="ldTabs" style="margin-left:auto">${[['new', 'New'], ['all', 'All']].map(([k, v]) => `<button class="tab" role="tab" data-ld="${k}" aria-selected="${k === 'new'}">${v}</button>`).join('')}</div></div>
       <div id="ld" class="note">Loading…</div>
+      <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">$CREDIT claims</h2>
+      <p>Burns (<b>/burnmcp</b>) give $CREDIT for MCP NFTs. A claim (<b>/claimcredit</b>) takes all of an account's $CREDIT to the Solana wallet it gave, for a fee in $MCP. <b>Copy all</b> copies the pending claims as <code>wallet,amount</code> lines, one per wallet, for the airdrop; after the airdrop, mark them sent.</p></div>
+      <button class="btn red" id="crCopy" style="margin-left:auto" disabled>Copy all</button></div>
+      <div id="crOut" class="note" aria-live="polite" style="margin:0 0 8px"></div>
+      <textarea id="crText" readonly hidden rows="8" style="width:100%;background:var(--bg);color:var(--cream);border:2px solid var(--edge);padding:10px;font:12px ui-monospace,Menlo,monospace;margin:0 0 10px"></textarea>
+      <div id="cr" class="note">Loading…</div>
+      <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Free $CREDIT drops</h2>
+      <p>A code people type in their AI chat (<b>/mcpcredit FREE1000</b>, or "FREE 1000 $CREDIT") for a fixed amount of $CREDIT, once per account. With tasks the AI asks for them and a screenshot first; then it gives the airdrop card to post on X, and the $CREDIT is added after a screenshot of that post. It goes through the chat's promo-code tool, so nobody has to reconnect the connector. The AI only looks at screenshots: an edited one can pass.</p></div></div>
+      <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end">
+        ${field('dpCode', 'Code', 'placeholder="FREE1000" maxlength="32" autocomplete="off" spellcheck="false"')}
+        ${field('dpAmount', '$CREDIT per account', 'type="number" min="1" step="1" value="1000" inputmode="numeric"')}
+        ${field('dpUses', 'Uses (accounts)', 'type="number" min="1" max="100000" step="1" value="5000" inputmode="numeric"')}
+        ${field('dpFollow', 'Task: follow (optional)', 'placeholder="https://x.com/mcpmarkets" autocomplete="off" spellcheck="false"')}
+        ${field('dpTweet', 'Task: like + RT post (optional)', 'placeholder="https://x.com/mcpmarkets/status/…" autocomplete="off" spellcheck="false"')}
+        <button class="btn red" id="dpGo" style="justify-content:center;padding:12px">Make drop</button>
+      </div>
+      <div id="dpOut" class="note" aria-live="polite" style="margin:10px 0"></div>
+      <div id="dp" class="note">Loading…</div>
       <div class="ex-head" style="margin-top:28px"><div><h2 class="px" style="margin:0">Team mint</h2>
       <p>Free MCP NFTs, picked at random, outside the per-account mint limit. In the explorer they show as <b>team mint</b>.</p></div></div>
       <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end">
@@ -297,6 +315,9 @@
       <div id="bk" class="note">Loading…</div><div style="height:60px"></div></div>`;
     loadBackups();
     loadClaims('new');
+    loadCredit();
+    loadDrops();
+    wireDrops();
     $('#ldTabs').onclick = (e) => {
       const b = e.target.closest('[data-ld]');
       if (!b) return;
@@ -471,6 +492,139 @@
       try { await send('POST', `/admin/deposit-claims/${b.dataset.cl}`, { status, note }); } catch (e) { alert(e.message); }
       loadClaims();
     });
+  }
+
+  // $CREDIT: what burns and drops gave, and the claims to airdrop. Copy all remembers exactly which claims it copied,
+  // and "Mark sent" marks those: a claim that comes in after the copy is never marked by mistake.
+  let crData = null;
+  let copied = null; // { ids, count } of the last Copy all
+  async function loadCredit() {
+    const el = $('#cr');
+    if (!el) return;
+    try { crData = await send('GET', '/admin/credit'); } catch (e) { el.textContent = e.message; return; }
+    const t = crData.totals;
+    const n = (v) => Number(v || 0).toLocaleString('en-US');
+    const wallets = crData.airdrop ? crData.airdrop.split('\n').length : 0;
+    $('#crCopy').disabled = !wallets;
+    $('#crCopy').textContent = wallets ? `Copy all (${n(wallets)} wallet${wallets === 1 ? '' : 's'})` : 'Copy all';
+    const PILL = { pending: 'wait', sent: 'ok', void: 'bad' };
+    el.innerHTML = `<div class="tiles" style="margin:0 0 12px">${[['Burned NFTs', n(t.burned_nfts)], ['$CREDIT given', `${n(t.issued + t.drop_credit)}${t.drops ? ` <small>· ${n(t.drops)} free drops</small>` : ''}`], ['Not claimed yet', n(t.unclaimed)],
+      ['Pending claims', `${n(t.pending)} <small>· ${n(t.pending_credit)}</small>`], ['Sent', `${n(t.sent)} <small>· ${n(t.sent_credit)}</small>`], ['Claim fees', `${fmt(t.fees)} <small>$MCP</small>`]]
+      .map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px"><button class="btn ghost" id="crSent" ${copied?.ids.length ? '' : 'disabled'}>${copied?.ids.length ? `Mark the ${n(copied.ids.length)} copied claims as sent` : 'Mark copied as sent'}</button>
+        <span class="note">${copied ? 'Only the claims in the last Copy all.' : 'Press Copy all first.'}</span></div>
+      <table class="txs"><thead><tr><th>#</th><th>Account</th><th>Wallet</th><th style="text-align:right">$CREDIT</th><th>Status</th><th></th></tr></thead><tbody>
+      ${crData.claims.map((c) => `<tr><td>#${c.id}<div class="note">${esc(new Date(c.at).toLocaleString())}</div></td>
+        <td><a class="addr" href="/a/${esc(c.addr)}">${esc(c.addr)}</a><div class="note">@${esc(c.handle)}</div></td>
+        <td><a class="mono-link" href="https://solscan.io/account/${encodeURIComponent(c.wallet)}" target="_blank" rel="noopener">${esc(c.wallet)}</a></td>
+        <td class="num">${n(c.amount)}</td>
+        <td><span class="pill ${PILL[c.status] || 'wait'}">${esc(c.status)}</span></td>
+        <td style="text-align:right"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${c.status === 'void' ? ''
+          : c.status === 'sent' ? `<button class="btn ghost" data-crid="${c.id}" data-crto="pending" style="padding:4px 8px">Undo</button>`
+          : `<button class="btn ghost" data-crid="${c.id}" data-crto="sent" style="padding:4px 8px">Sent</button><button class="btn ghost" data-crvoid="${c.id}" style="padding:4px 8px">Void</button>`}</div></td></tr>`).join('')
+        || '<tr><td colspan="6" class="note">No claims yet.</td></tr>'}
+      </tbody></table>${crData.claims.length >= 1000 ? '<p class="note">Showing the newest 1,000 claims; Copy all has every pending one.</p>' : ''}`;
+    const mark = async (ids, status) => {
+      try { const r = await send('POST', '/admin/credit/mark', { ids, status }); $('#crOut').textContent = `${n(r.updated)} marked ${status}.`; } catch (e) { alert(e.message); }
+      loadCredit();
+    };
+    $('#crSent').onclick = () => {
+      if (!copied?.ids.length) return;
+      if (!window.confirm(`Mark the ${copied.ids.length} claims of the last Copy all (${copied.count} wallets) as sent? Do it after that airdrop went out.`)) return;
+      const ids = copied.ids;
+      copied = null;
+      mark(ids, 'sent');
+    };
+    el.querySelectorAll('[data-crid]').forEach((b) => b.onclick = () => {
+      const to = b.dataset.crto;
+      if (to === 'pending' && !window.confirm(`Put claim #${b.dataset.crid} back to pending? It will be in the next Copy all, so it may be paid twice.`)) return;
+      b.disabled = true;
+      mark([Number(b.dataset.crid)], to);
+    });
+    el.querySelectorAll('[data-crvoid]').forEach((b) => b.onclick = async () => {
+      if (!window.confirm(`Void claim #${b.dataset.crvoid}? Its $CREDIT goes back to the account (the fee stays paid). Use it for a claim made by mistake.`)) return;
+      b.disabled = true;
+      try { const r = await send('POST', `/admin/credit/void/${b.dataset.crvoid}`); $('#crOut').textContent = `Claim #${r.id} void: ${n(r.returned)} $CREDIT back on the account.`; } catch (e) { alert(e.message); }
+      loadCredit();
+    });
+  }
+  document.addEventListener('click', async (e) => {
+    if (e.target.id !== 'crCopy' || !crData?.airdrop) return;
+    const lines = crData.airdrop;
+    const count = lines.split('\n').length;
+    copied = { ids: crData.airdrop_ids.slice(), count };
+    $('#crText').value = lines;
+    try {
+      await navigator.clipboard.writeText(lines);
+      $('#crOut').textContent = `Copied ${count.toLocaleString('en-US')} line${count === 1 ? '' : 's'} (wallet,amount), ${copied.ids.length.toLocaleString('en-US')} claims.`;
+      $('#crText').hidden = true;
+    } catch {
+      $('#crOut').textContent = 'Copy it from the box below.';
+      $('#crText').hidden = false;
+      $('#crText').select();
+    }
+    const btn = $('#crSent');
+    if (btn) { btn.disabled = false; btn.textContent = `Mark the ${copied.ids.length.toLocaleString('en-US')} copied claims as sent`; }
+  });
+
+  // free $CREDIT drops: code, $CREDIT each, uses, tasks; pause, resume, change uses or tasks
+  async function loadDrops() {
+    const el = $('#dp');
+    if (!el) return;
+    let list;
+    try { list = await send('GET', '/admin/drops'); } catch (e) { el.textContent = e.message; return; }
+    const n = (v) => Number(v || 0).toLocaleString('en-US');
+    el.innerHTML = `<table class="txs"><thead><tr><th>Code</th><th style="text-align:right">$CREDIT each</th><th style="text-align:right">Cards / done / max</th><th>Status</th><th></th></tr></thead><tbody>
+      ${list.map((d) => `<tr><td><code>${esc(d.code)}</code><div class="note">type: /mcpcredit ${esc(d.code)}</div>
+        ${d.follow_url || d.tweet_url ? `<div class="note">tasks: ${d.follow_url ? `follow <a href="${esc(d.follow_url)}" target="_blank" rel="noopener">${esc(d.follow_url.replace(/^https:\/\//, ''))}</a>` : ''}${d.follow_url && d.tweet_url ? ' · ' : ''}${d.tweet_url ? `like + RT <a href="${esc(d.tweet_url)}" target="_blank" rel="noopener">post</a>` : ''}</div>` : '<div class="note">no tasks</div>'}</td>
+        <td class="num">${n(d.amount)}</td>
+        <td class="num"><b>${n(d.used)}</b> / ${n(d.done)} / ${n(d.max_uses)}</td>
+        <td>${pill(d.status === 'active' ? (d.used >= d.max_uses ? 'used up' : 'live') : 'paused')}</td>
+        <td style="text-align:right"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn ghost" data-dp="${esc(d.code)}" data-da="${d.status === 'active' ? 'pause' : 'resume'}" style="padding:4px 8px">${d.status === 'active' ? 'Pause' : 'Resume'}</button>
+          <button class="btn ghost" data-dp="${esc(d.code)}" data-da="uses" data-used="${Number(d.used)}" data-max="${Number(d.max_uses)}" style="padding:4px 8px">Change uses</button>
+          <button class="btn ghost" data-dp="${esc(d.code)}" data-da="tasks" data-follow="${esc(d.follow_url || '')}" data-tweet="${esc(d.tweet_url || '')}" style="padding:4px 8px">Tasks</button></div></td></tr>`).join('')
+        || '<tr><td colspan="5" class="note">No drops yet.</td></tr>'}
+      </tbody></table><p class="note" style="margin:6px 0 0">Cards: accounts that did the tasks and got the card (each takes a use). Done: posted it and got the $CREDIT.</p>`;
+    el.querySelectorAll('[data-dp]').forEach((b) => b.onclick = async () => {
+      const a = b.dataset.da;
+      let body;
+      if (a === 'uses') {
+        const v = window.prompt(`How many accounts can get ${b.dataset.dp}? (${b.dataset.used} already did)`, b.dataset.max);
+        if (v == null) return;
+        body = { uses: Math.floor(Number(v)) };
+      } else if (a === 'tasks') {
+        const f = window.prompt(`${b.dataset.dp}: X account to follow (https://x.com/name), empty for none`, b.dataset.follow);
+        if (f == null) return;
+        const t = window.prompt(`${b.dataset.dp}: post to like + RT (https://x.com/name/status/…), empty for none`, b.dataset.tweet);
+        if (t == null) return;
+        body = { follow_url: f.trim(), tweet_url: t.trim() };
+      } else {
+        body = { status: a === 'pause' ? 'paused' : 'active' };
+      }
+      b.disabled = true;
+      try { await send('POST', `/admin/drops/${encodeURIComponent(b.dataset.dp)}`, body); } catch (e) { alert(e.message); }
+      loadDrops();
+    });
+  }
+  function wireDrops() {
+    const out = $('#dpOut');
+    $('#dpGo').onclick = async () => {
+      const code = $('#dpCode').value.trim().toUpperCase();
+      const amount = Math.floor(Number($('#dpAmount').value));
+      const uses = Math.floor(Number($('#dpUses').value));
+      if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code)) { out.textContent = 'Code: 3 to 32 letters, digits, - or _.'; return; }
+      $('#dpGo').disabled = true;
+      try {
+        const d = await send('POST', '/admin/drops', { code, amount, uses, follow_url: $('#dpFollow').value.trim(), tweet_url: $('#dpTweet').value.trim() });
+        out.innerHTML = `Made <code>${esc(d.code)}</code>: ${Number(d.amount).toLocaleString('en-US')} $CREDIT each, for ${Number(d.max_uses).toLocaleString('en-US')} accounts. In the chat: <code>/mcpcredit ${esc(d.code)}</code>`;
+        $('#dpCode').value = '';
+        loadDrops();
+      } catch (e) {
+        out.innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`;
+      }
+      $('#dpGo').disabled = false;
+    };
   }
 
   async function loadBackups() {

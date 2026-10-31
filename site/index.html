@@ -235,6 +235,7 @@ table.txs a.tx { color: var(--cream); }
 .type { text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
 .type.deposit { color: #7AE582; } .type.withdrawal { color: var(--red); } .type.buy { color: #FFE600; }
 .type.mint { color: var(--cream); } .type.refund, .type.faucet { color: var(--dim); } .type.payout { color: #7AE582; } .type.transfer { color: #8AB4FF; }
+.type.burn { color: #FF7A1A; } .type.claim { color: var(--dim); }
 .plus { color: #7AE582; } .minus { color: var(--cream); }
 .more { display: flex; justify-content: center; padding: 16px 0 50px; }
 .wallets { display: grid; gap: 4px; font-size: 12px; max-height: 180px; overflow: auto; }
@@ -277,6 +278,14 @@ table.txs a.tx { color: var(--cream); }
 .crumbs a { color: var(--dim); }
 .nftpage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 14px 0 22px; }
 .nftpage .art img { width: 100%; aspect-ratio: 1; border: 2px solid var(--edge); background: var(--panel); }
+.soon { min-height: calc(100vh - 230px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; padding: 48px 0; }
+.soon svg { width: 72px; height: 84px; image-rendering: pixelated; }
+.soon h1 { margin: 0; font-size: clamp(30px, 7.4vw, 92px); line-height: 1.04; letter-spacing: .01em; }
+.soon h1 .tk { color: var(--red); }
+.soon .tag { color: var(--dim); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; border: 2px solid var(--edge); padding: 6px 12px; }
+.soon .cur { color: var(--red); animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .soon .cur { animation: none; } }
 .nftpage .art .dl { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .nftpage .art .dl .note { font-size: 12px; }
 .nftpage .info { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -339,7 +348,7 @@ a.nftl img { width: 22px; height: 22px; border: 1px solid var(--edge); }
 <header class="top">
   <div class="wrap">
     <a class="brand" href="/"><img class="pix" src="/logo.png" alt=""><b class="px">MCP</b></a>
-    <nav class="main" aria-label="Main"><a href="/" data-nav="market">Market</a><a href="/collections" data-nav="collections">Collections</a><a href="/explorer" data-nav="explorer">Explorer</a></nav>
+    <nav class="main" aria-label="Main"><a href="/" data-nav="market">Market</a><a href="/collections" data-nav="collections">Collections</a><a href="/explorer" data-nav="explorer">Explorer</a><a href="/tokens" data-nav="tokens">Tokens</a></nav>
     <span class="spacer"></span>
     <a class="btn red" id="connectBtn" href="/connect"><span class="long">Connect to your AI</span><span class="short">Connect</span></a>
   </div>
@@ -395,7 +404,7 @@ const nftRef = (n) => (n.collection && n.collection !== 'mcp' ? `${n.name} (NFT 
 
 function card(n) {
   const price = n.price != null ? `<div class="price">${fmt(n.price)} <small style="color:var(--dim)">$MCP</small></div>`
-    : `<div class="price na">${minted(n) ? 'not for sale' : 'mintable'}</div>`;
+    : `<div class="price na">${n.burned_at ? 'burned' : minted(n) ? 'not for sale' : 'mintable'}</div>`;
   return `<a class="card" href="/nft/${n.id}">
     ${pic(n)}
     <div class="meta">
@@ -565,7 +574,7 @@ async function loadStats() {
   el.innerHTML = [
     ['Floor', stats.floor != null ? `${fmt(stats.floor)} <small>$MCP</small>` : '—'],
     ['Minted', `${stats.minted.toLocaleString('en-US')}<small>/${stats.supply.toLocaleString('en-US')}</small>`],
-    ['Mint price', `${fmt(stats.mint_price)} <small>$MCP</small>`],
+    stats.burned > 0 && stats.trading_open !== false ? ['Burned', stats.burned.toLocaleString('en-US')] : ['Mint price', `${fmt(stats.mint_price)} <small>$MCP</small>`],
     ['Listed', stats.listed], ['Holders', stats.holders], ['Volume', `${fmt(stats.volume)} <small>$MCP</small>`],
   ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
 }
@@ -718,6 +727,7 @@ async function renderCollection(slug, query) {
 function cTiles(c) {
   return [
     ['Supply', c.supply.toLocaleString('en-US')], ['Minted', c.minted.toLocaleString('en-US')], ['Holders', c.holders],
+    ...(c.burned > 0 ? [['Burned', c.burned.toLocaleString('en-US')]] : []),
     ['Floor', c.trading_open === false ? 'after sell-out' : c.floor != null ? `${fmt(c.floor)} <small>$MCP</small>` : '—'], ['Mint price', `${fmt(c.mint_price)} <small>$MCP</small>`],
     ['Per account', c.mint_limit], ['Volume', `${fmt(c.volume)} <small>$MCP</small>`],
   ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
@@ -742,6 +752,17 @@ async function loadCollectionGrid(more = false) {
   if (more) $('#cGrid').insertAdjacentHTML('beforeend', html);
   else $('#cGrid').innerHTML = html || '<div class="empty">Nothing matches these filters.</div>';
   $('#cMore').hidden = cState.offset >= r.total;
+}
+
+// ---------- tokens: closed until the $CREDIT token is live ----------
+function renderTokens() {
+  // a pixel padlock: body red, shackle cream
+  const lock = `<svg viewBox="0 0 12 14" shape-rendering="crispEdges" aria-hidden="true"><path fill="#F5F1E8" d="M3 1h6v1h-6zM2 2h2v4h-2zM8 2h2v4h-2z"/>
+    <path fill="#FF2A1F" d="M1 6h10v8h-10z"/><path fill="#0B0B0B" d="M5 8h2v1h-2zM5 9h2v2h-2z"/></svg>`;
+  $('#app').innerHTML = `<div class="wrap"><section class="soon" aria-labelledby="soonT">${lock}
+    <span class="tag px">Tokens · closed for now</span>
+    <h1 class="px" id="soonT"><span class="tk">$CREDIT</span> IS GOING<br>LIVE SOON<span class="cur" aria-hidden="true">_</span></h1>
+  </section></div>`;
 }
 
 // ---------- an NFT's page ----------
@@ -781,8 +802,10 @@ async function renderNft(id) {
   try { n = await api('/nfts/' + id); } catch { app.innerHTML = `<div class="wrap"><div class="empty">There is no NFT #${esc(id)}.</div></div>`; return; }
   const ref = nftRef(n);
   const frozen = n.collection_status === 'frozen';
-  const q = n.price != null ? `Buy ${ref} for ${n.price} $MCP` : !minted(n) ? (n.collection === 'mcp' ? 'Mint me an MCP NFT' : `Mint me an NFT from the ${n.collection_name} collection (${n.collection})`) : `Show me ${ref}`;
-  const action = frozen ? `<div class="big" style="font-size:18px">Collection frozen</div><div style="color:var(--dim);font-size:12px">The MCP team stopped minting and trading in ${esc(n.collection_name)}.</div>`
+  const burnt = n.burned_at ? (n.activity || []).find((a) => a.type === 'burn') : null;
+  const q = n.burned_at ? `Show me ${ref}` : n.price != null ? `Buy ${ref} for ${n.price} $MCP` : !minted(n) ? (n.collection === 'mcp' ? 'Mint me an MCP NFT' : `Mint me an NFT from the ${n.collection_name} collection (${n.collection})`) : `Show me ${ref}`;
+  const action = n.burned_at ? `<div class="big" style="font-size:18px">Burned</div><div style="color:var(--dim);font-size:12px">Burned for $CREDIT${burnt ? ` by ${who(burnt.from_addr, burnt.from_name)}` : ''}. It is gone for good.</div>`
+    : frozen ? `<div class="big" style="font-size:18px">Collection frozen</div><div style="color:var(--dim);font-size:12px">The MCP team stopped minting and trading in ${esc(n.collection_name)}.</div>`
     : n.price != null
     ? `<div class="big">${fmt(n.price)} <small style="color:var(--dim)">$MCP</small></div>
        <div class="acts"><a class="btn red" href="${claudeLink(q)}" target="_blank" rel="noopener">Buy in Claude</a>
@@ -794,6 +817,8 @@ async function renderNft(id) {
       : `<div class="big" style="font-size:18px">Not for sale</div><div style="color:var(--dim);font-size:12px">Owned by ${who(n.owner_addr, n.owner_name)}.</div>`;
   const act = (a) => a.type === 'mint'
     ? `<tr><td><span class="type mint">${a.team ? 'team mint' : a.free ? 'free mint' : 'mint'}</span></td><td>${who(a.to_addr, a.to_name)}</td><td class="num">${a.team || a.free ? 'free' : `${fmt(a.price)} <small style="color:var(--dim)">$MCP</small>`}</td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`
+    : a.type === 'burn'
+    ? `<tr><td><span class="type burn">burn</span></td><td>${who(a.from_addr, a.from_name)}</td><td class="num note">for $CREDIT</td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`
     : a.type === 'transfer'
     ? `<tr><td><span class="type transfer">transfer</span></td><td>${who(a.from_addr, a.from_name)} → ${who(a.to_addr, a.to_name)}</td><td class="num note">sent</td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`
     : `<tr><td><span class="type buy">sale</span></td><td>${who(a.from_addr, a.from_name)} → ${who(a.to_addr, a.to_name)}</td><td class="num">${fmt(a.price)} <small style="color:var(--dim)">$MCP</small></td><td class="hide-sm note">${ago(a.at)}</td><td><a class="tx" href="/tx/${a.tx}">#${a.tx}</a></td></tr>`;
@@ -805,7 +830,7 @@ async function renderNft(id) {
           <span class="note">${n.big && n.big !== n.image ? '1008 × 1008 px' : 'full size'}</span></div></div>
       <div class="info">
         <div>${n.rarity ? `<span class="rar ${rarClass(n.rarity)}">${esc(n.rarity)}</span>` : ''}<h1 class="px">${esc(n.name)}</h1>
-          <div style="color:var(--dim)"><a href="/c/${esc(n.collection)}">${esc(n.collection_name)}</a> · ${n.owner_addr ? `owned by ${who(n.owner_addr, n.owner_name)}` : 'not minted yet'}</div></div>
+          <div style="color:var(--dim)"><a href="/c/${esc(n.collection)}">${esc(n.collection_name)}</a> · ${n.owner_addr ? `owned by ${who(n.owner_addr, n.owner_name)}` : n.burned_at ? 'burned' : 'not minted yet'}</div></div>
         <div class="pricebox">${action}
           <div class="cmd">or type <code>${esc(q)}</code><button class="btn ghost" data-copy="${esc(q)}" style="padding:4px 8px">Copy</button></div></div>
         <div class="ttable">${n.attributes.map((a) => `<a href="/c/${esc(n.collection)}?t=${encodeURIComponent(a.trait_type + ':' + a.value)}" title="All with ${esc(a.trait_type)}: ${esc(a.value)}">
@@ -842,6 +867,11 @@ function txSummary(t) {
     const to = tr.recipients === 1 && tr.to[0] ? who(tr.to[0].account, tr.to[0].name) : `${tr.recipients} accounts`;
     return { what: `${who(tr.from, tr.from_name)} sent ${tr.count > 1 ? `${tr.count} NFTs, first ${nftLink(t.nft)},` : nftLink(t.nft)} to ${to}`, amount: 'no sale', unit: '' };
   }
+  if (t.type === 'burn' && t.burn) {
+    const b = t.burn;
+    return { what: `${who(b.account, b.name)} burned ${b.count > 1 ? `${b.count} NFTs, first ${nftLink(t.nft)},` : nftLink(t.nft)} for ${Number(b.credit).toLocaleString('en-US')} $CREDIT${b.id ? ` · <a href="/burn/${b.id}">card</a>` : ''}`, amount: 'burned', unit: '' };
+  }
+  if (t.type === 'claim') { const e = find('claim_fee'); if (e) return { what: `${who(e.account, e.name)} claimed $CREDIT to a Solana wallet (fee)`, amount: usd(e.amount), unit: '$MCP', cls: 'minus' }; }
   if (t.type === 'free mint') { const e = find('free_mint'); return { what: `${who(e.account, e.name)} got ${nftLink(t.nft)} free with a code`, amount: 'free', unit: '' }; }
   if (t.type === 'mint') { const mn = find('mint'); return { what: `${who(mn.account, mn.name)} minted ${nftLink(t.nft)}${find('hold', false) ? ' · held for the creator' : ''}`, amount: usd(-mn.amount), unit: '$MCP' }; }
   if (t.type === 'payout') { const e = find('payout'); return { what: `escrow → ${who(e.account, e.name)}, creator of ${t.collection ? `<a href="/c/${esc(t.collection.slug)}">${esc(t.collection.name)}</a>` : 'a collection'}`, amount: `+${usd(e.amount)}`, unit: '$MCP', cls: 'plus' }; }
@@ -887,8 +917,8 @@ async function loadTxs(tbodyId, moreId, addr, type = '') {
 }
 
 // the type filter above a transaction table; the choice stays in the address (?type=mint) so it can be shared
-const TX_FILTERS = [['', 'All'], ['mint', 'Mints'], ['buy', 'Sales'], ['transfer', 'Transfers'], ['deposit', 'Deposits'], ['withdrawal', 'Withdrawals']];
-const TX_FILTERS_ACCOUNT = [['', 'All'], ['mint', 'Mints'], ['buy', 'Bought'], ['sell', 'Sold'], ['transfer', 'Transfers'], ['deposit', 'Deposits'], ['withdrawal', 'Withdrawals']];
+const TX_FILTERS = [['', 'All'], ['mint', 'Mints'], ['buy', 'Sales'], ['transfer', 'Transfers'], ['burn', 'Burns'], ['deposit', 'Deposits'], ['withdrawal', 'Withdrawals']];
+const TX_FILTERS_ACCOUNT = [['', 'All'], ['mint', 'Mints'], ['buy', 'Bought'], ['sell', 'Sold'], ['transfer', 'Transfers'], ['burn', 'Burns'], ['deposit', 'Deposits'], ['withdrawal', 'Withdrawals']];
 const txTypeNow = (list) => { const t = new URLSearchParams(location.search).get('type') || ''; return list.some(([k]) => k === t) ? t : ''; };
 function txFilter(id, list, current) {
   return `<div class="tabs tx-filter" role="tablist" id="${id}" aria-label="Show only">${list.map(([k, v]) =>
@@ -1138,6 +1168,8 @@ const CHAT_COMMANDS = [
   ['/cancelnft-mcp', '<number>', 'Take your NFT off sale'],
   ['/sendnft', '<numbers> to <address>', 'Send your NFTs to another MCP address: one, several ("/sendnft 42 43 to mcp_…") or each to its own; you confirm first'],
   ['/transfernft', '', 'The transfer form: tick the NFTs you want to send, type the MCP address, confirm'],
+  ['/burnmcp', '', 'Burn MCP NFTs for $CREDIT, 10,000 each: tick them in a form and confirm there'],
+  ['/claimcredit', '', 'Claim your $CREDIT to your Solana wallet for the airdrop (fee 0.5 $MCP), in a form'],
   ['/profile-mcp', '<on|off>', 'Show or hide your X handle on public pages'],
 ];
 document.addEventListener('click', async (e) => {
@@ -1271,7 +1303,7 @@ async function route() {
   const pathPart = location.pathname.replace(/\/+$/, '') || '/';
   const query = location.search.slice(1);
   let mm;
-  const section = pathPart === '/connect' ? '' : /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer'
+  const section = pathPart === '/connect' ? '' : pathPart === '/tokens' ? 'tokens' : /^\/(explorer|tx\/|a\/|u\/)/.test(pathPart) ? 'explorer'
     : /^\/(collections|c\/|nft\/|launch|admin)/.test(pathPart) ? 'collections' : /^\/lost-deposit/.test(pathPart) ? '' : 'market';
   stopMintPage();
   document.querySelectorAll('[data-nav]').forEach((a) => {
@@ -1284,6 +1316,7 @@ async function route() {
   if ((mm = pathPart.match(/^\/tx\/(\d+)/))) return renderTx(mm[1]);
   if ((mm = pathPart.match(/^\/a\/(mcp_[1-9A-HJ-NP-Za-km-z]{12}|treasury|escrow)\b/))) return renderAddress(mm[1]);
   if (pathPart === '/connect') return renderConnect();
+  if (pathPart === '/tokens') return renderTokens();
   if (pathPart === '/launch') return window.MCP_LAUNCH.renderLaunch();
   if (pathPart === '/admin') return window.MCP_LAUNCH.renderAdmin();
   if (pathPart === '/collections') return renderCollections();
@@ -1298,7 +1331,7 @@ async function route() {
 }
 // Pages have plain addresses (/c/mcp, /nft/42, /explorer): Netlify serves index.html for them (netlify.toml) and the
 // page draws itself. Links inside the site change the address without reloading.
-const SITE_PATH = /^\/($|market$|mint$|lost-deposit$|collections$|connect$|explorer$|launch$|admin$|(c|nft|tx|a|u)\/[^/?#]+)/;
+const SITE_PATH = /^\/($|market$|mint$|lost-deposit$|collections$|connect$|explorer$|tokens$|launch$|admin$|(c|nft|tx|a|u)\/[^/?#]+)/;
 function go(path, { replace = false } = {}) {
   if (replace) history.replaceState(null, '', path); else history.pushState(null, '', path);
   route();
