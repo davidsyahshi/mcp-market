@@ -128,6 +128,11 @@
   .tasks li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: var(--rl); padding: 10px 12px; counter-increment: t; }
   .tasks li::before { content: counter(t); flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--cherry); color: var(--ink); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
   .tasks li b { flex: 1; font-weight: 600; }
+  /* a free $CREDIT airdrop: its card, the steps to confirm it */
+  .drop { display: flex; flex-direction: column; gap: 12px; }
+  .drop .card { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: var(--rl); background: #0D0D0F; box-shadow: 0 0 0 1px var(--line); image-rendering: pixelated; }
+  .drop .amt { font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 26px; font-weight: 700; }
+  .drop .amt i { font-style: normal; color: var(--cherry); }
   .note { margin: 0; padding: 10px 12px; border-radius: var(--r); font-size: 13px; }
   .note.warn { background: var(--warn-bg); color: var(--warn); }
   .note.ok { background: var(--ok-bg); color: var(--ok); }
@@ -241,10 +246,24 @@ function renderTasks() {
   const d = data;
   header(d.title || 'Free mint', d.subtitle || '', d.badge);
   $('view').replaceChildren(
-    el('p', { class: 'sub', style: 'margin:0 0 10px', text: 'Before you get your free mint:' }),
+    el('p', { class: 'sub', style: 'margin:0 0 10px', text: d.intro || 'Before you get your free mint:' }),
     el('ol', { class: 'tasks' }, ...(d.tasks || []).map((t) => el('li', {},
       el('b', { text: t.text }), el('button', { class: 'ghost', type: 'button', text: 'Open on X', onclick: () => open(t.url) })))),
     d.note ? el('p', { class: 'note warn', style: 'margin-top:12px', text: d.note }) : null);
+}
+
+// a free $CREDIT airdrop: the card to post (step 'post') or the confirmed amount (step 'done')
+function renderDrop() {
+  const d = data;
+  header(d.title || 'FREE $CREDIT', d.subtitle || '', d.badge);
+  const src = (typeof pics.drop === 'string' && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(pics.drop) ? pics.drop : '') || ours(d.image_url) || '';
+  $('view').replaceChildren(el('div', { class: 'drop' },
+    src ? el('img', { class: 'card', src, alt: d.title || 'Airdrop card', width: 640, height: 360 }) : null,
+    d.amount ? el('div', { class: 'amt' }, `${fmt(d.amount)} `, el('i', { text: '$CREDIT' })) : null,
+    d.steps?.length ? el('ol', { class: 'tasks' }, ...d.steps.map((t) => el('li', {}, el('b', { text: t })))) : null,
+    el('div', { class: 'actions' },
+      ...(d.share || []).map((x, i) => el('button', { class: i ? 'ghost' : 'primary', type: 'button', text: x.label, onclick: () => open(x.url) }))),
+    d.note ? el('p', { class: `note ${d.done ? 'ok' : 'warn'}`, text: d.note }) : null));
 }
 
 function renderGallery() {
@@ -269,9 +288,11 @@ function renderGallery() {
 function render() {
   $('loading').hidden = true;
   const d = data;
-  if (d.note && d.view !== 'tasks') note(d.note, 'ok'); else note('');
+  if (d.note && d.view !== 'tasks' && d.view !== 'drop') note(d.note, 'ok'); else note('');
   if (d.view === 'tasks') {
     renderTasks();
+  } else if (d.view === 'drop') {
+    renderDrop();
   } else if (d.view === 'one' && d.items?.[0]) {
     const n = d.items[0];
     header(d.title || n.name, d.subtitle || n.collection_name, d.badge);

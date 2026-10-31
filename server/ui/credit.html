@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MCP $CREDIT</title>
+<!--
+  The $CREDIT form shown inside the chat (an MCP App), two views: Burn (tick MCP NFTs, Burn, Confirm: each gives
+  $CREDIT) and Claim (paste a Solana wallet, Claim, Confirm: all the $CREDIT goes to it in the airdrop). The assistant
+  only opens it (burn_form, claim_credit_form); the person presses the buttons here. The server inlines the MCP Apps
+  SDK in place of the marker in the script below (server/src/ui.js). Pictures come from the site (the resource's CSP).
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --cherry: #FF2A1F;
+    --ink: #0B0B0B;
+    --fg: var(--color-text-primary, #141413);
+    --fg2: var(--color-text-secondary, #3D3D3A);
+    --fg3: var(--color-text-tertiary, #73726C);
+    --bg: var(--color-background-primary, #FFFFFF);
+    --bg2: var(--color-background-secondary, #F5F4ED);
+    --line: var(--color-border-tertiary, rgba(31, 30, 29, .15));
+    --line2: var(--color-border-primary, rgba(31, 30, 29, .4));
+    --ring: var(--color-ring-primary, rgba(20, 20, 19, .7));
+    --danger: var(--color-text-danger, #7F2C28);
+    --danger-bg: var(--color-background-danger, #F7ECEC);
+    --ok: var(--color-text-success, #265B19);
+    --ok-bg: var(--color-background-success, #E9F1DC);
+    --warn: var(--color-text-warning, #5A4815);
+    --warn-bg: var(--color-background-warning, #F6EEDF);
+    --r: var(--border-radius-md, 8px);
+    --rl: var(--border-radius-lg, 10px);
+    --sans: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+    --mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    --pad-t: 16px; --pad-r: 16px; --pad-b: 16px; --pad-l: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fg: var(--color-text-primary, #FAF9F5);
+      --fg2: var(--color-text-secondary, #C2C0B6);
+      --fg3: var(--color-text-tertiary, #9C9A92);
+      --bg: var(--color-background-primary, #1F1E1D);
+      --bg2: var(--color-background-secondary, #262624);
+      --line: var(--color-border-tertiary, rgba(222, 220, 209, .15));
+      --line2: var(--color-border-primary, rgba(222, 220, 209, .4));
+      --ring: var(--color-ring-primary, rgba(250, 249, 245, .7));
+      --danger: var(--color-text-danger, #EE8884);
+      --danger-bg: var(--color-background-danger, #602A28);
+      --ok: var(--color-text-success, #7AB948);
+      --ok-bg: var(--color-background-success, #1B4614);
+      --warn: var(--color-text-warning, #D1A041);
+      --warn-bg: var(--color-background-warning, #483A0F);
+    }
+  }
+  :root[data-theme="dark"] {
+    --fg: var(--color-text-primary, #FAF9F5);
+    --fg2: var(--color-text-secondary, #C2C0B6);
+    --fg3: var(--color-text-tertiary, #9C9A92);
+    --bg: var(--color-background-primary, #1F1E1D);
+    --bg2: var(--color-background-secondary, #262624);
+    --line: var(--color-border-tertiary, rgba(222, 220, 209, .15));
+    --line2: var(--color-border-primary, rgba(222, 220, 209, .4));
+    --ring: var(--color-ring-primary, rgba(250, 249, 245, .7));
+    --danger: var(--color-text-danger, #EE8884);
+    --danger-bg: var(--color-background-danger, #602A28);
+    --ok: var(--color-text-success, #7AB948);
+    --ok-bg: var(--color-background-success, #1B4614);
+    --warn: var(--color-text-warning, #D1A041);
+    --warn-bg: var(--color-background-warning, #483A0F);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body {
+    font-family: var(--sans);
+    font-size: var(--font-text-sm-size, 14px);
+    line-height: var(--font-text-sm-line-height, 1.4);
+    color: var(--fg);
+    padding: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+    -webkit-text-size-adjust: 100%;
+  }
+  main { display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+  [hidden] { display: none !important; }
+
+  header { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 38px; height: 32px; border-radius: var(--r); overflow: hidden; flex: none; display: block; }
+  .logo svg { width: 100%; height: 100%; display: block; }
+  .ttl { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .ttl b { font-size: var(--font-heading-sm-size, 14px); font-weight: var(--font-weight-semibold, 600); letter-spacing: .06em; text-transform: uppercase; }
+  .ttl small { color: var(--fg3); font-size: var(--font-text-xs-size, 12px); font-family: var(--mono); overflow-wrap: anywhere; }
+  .views { display: flex; gap: 4px; flex: none; }
+  .views button { min-height: 32px; padding: 0 12px; border: 1px solid var(--line2); border-radius: var(--border-radius-full, 999px); background: transparent; color: var(--fg); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .views button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+  .hero { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .hero .num { font-family: var(--mono); font-size: var(--font-heading-xl-size, 28px); font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .hero .unit { font-family: var(--mono); font-weight: 700; color: var(--cherry); }
+  .label { color: var(--fg3); font-size: var(--font-text-xs-size, 12px); text-transform: uppercase; letter-spacing: .06em; }
+  .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .bar .count { flex: 1; min-width: 140px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bar .count small { color: var(--fg3); font-weight: 400; }
+  .chip { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid var(--line2); border-radius: var(--border-radius-full, 999px); background: transparent; color: var(--fg); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .find { flex: none; width: 120px; min-height: 32px; border: 1px solid var(--line2); border-radius: var(--border-radius-full, 999px); background: transparent; color: var(--fg); font: inherit; font-size: 13px; padding: 0 12px; }
+  .find:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 360px; overflow-y: auto; padding: 2px; }
+  .tile { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--rl); background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+  .tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .tile img { width: 100%; aspect-ratio: 1; border-radius: 6px; background: var(--bg2); display: block; object-fit: cover; }
+  .tile img.px { image-rendering: pixelated; }
+  .tile .nm { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .rr { font-size: 11px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .ck { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; background: rgba(0, 0, 0, .35); box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); display: flex; align-items: center; justify-content: center; }
+  .tile .ck svg { width: 14px; height: 14px; display: none; }
+  .tile.on { border-color: var(--cherry); box-shadow: 0 0 0 1px var(--cherry); }
+  .tile.on .ck { background: var(--cherry); border-color: var(--cherry); }
+  .tile.on .ck svg { display: block; }
+  .tile .tag { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 700; letter-spacing: .04em; background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 2px 6px; }
+  .more { display: flex; justify-content: center; }
+  .locked .bar, .locked .grid, .locked .more { pointer-events: none; opacity: .6; }
+
+  .field { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line2); border-radius: var(--rl); padding: 4px 12px; background: transparent; }
+  .field:focus-within { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font-family: var(--mono); font-size: 15px; font-weight: 500; padding: 9px 0; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.primary, button.ghost { min-height: 44px; border-radius: var(--rl); font: inherit; font-weight: var(--font-weight-semibold, 600); font-size: 15px; cursor: pointer; padding: 0 16px; }
+  button.primary { flex: 1; border: 0; background: var(--cherry); color: var(--ink); }
+  button.ghost { border: 1px solid var(--line2); background: transparent; color: var(--fg); }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+  .note { margin: 0; padding: 10px 12px; border-radius: var(--r); font-size: 13px; }
+  .note.warn { background: var(--warn-bg); color: var(--warn); }
+  .note.err { background: var(--danger-bg); color: var(--danger); }
+  .note.ok { background: var(--ok-bg); color: var(--ok); }
+  .fine { margin: 0; color: var(--fg3); font-size: var(--font-text-xs-size, 12px); }
+  .mono { font-family: var(--mono); overflow-wrap: anywhere; }
+
+  .done { display: flex; flex-direction: column; gap: 8px; }
+  .done .big { display: flex; align-items: center; gap: 8px; font-size: var(--font-heading-lg-size, 20px); font-weight: var(--font-weight-semibold, 600); }
+  .card { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--rl); display: block; background: #0D0D0F; border: 1px solid var(--line); }
+  .launch { font-family: var(--mono); font-size: 13px; }
+
+  .claims { display: flex; flex-direction: column; gap: 4px; }
+  .claims div { display: flex; gap: 8px; font-size: 12px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+  .claims .st { margin-left: auto; }
+  .claims .st { color: var(--fg3); white-space: nowrap; }
+
+  .sk { height: 14px; border-radius: 6px; background: var(--bg2); }
+  .sk.w60 { width: 60%; } .sk.w40 { width: 40%; } .sk.h96 { height: 96px; border-radius: var(--rl); }
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite">
+  <header>
+    <span class="logo"><svg viewBox="0 0 19 16" shape-rendering="crispEdges" aria-hidden="true"><rect width="19" height="16" fill="#FF2A1F"/><path fill="#F5F1E8" d="M8 1h8v1h-8zM6 2h11v1h-11zM5 3h13v1h-13zM5 4h13v1h-13zM5 5h3v1h-3zM10 5h4v1h-4zM16 5h2v1h-2zM5 6h13v1h-13zM5 7h13v1h-13zM8 10h8v1h-8zM8 11h8v1h-8zM9 12h6v1h-6zM9 13h1v1h-1zM13 13h1v1h-1zM9 14h1v1h-1zM13 14h1v1h-1z"/><path fill="#B5B2AB" d="M17 2h1v1h-1zM18 3h1v1h-1zM18 4h1v1h-1zM18 5h1v1h-1zM18 6h1v1h-1zM18 7h1v1h-1zM6 8h12v1h-12zM10 13h1v1h-1zM14 13h1v1h-1zM10 14h1v1h-1zM14 14h1v1h-1z"/><path fill="#0B0B0B" d="M3 9h14v1h-14zM2 10h2v1h-2zM1 11h1v1h-1z"/><path fill="#363636" d="M17 9h1v1h-1zM2 11h1v1h-1z"/></svg></span>
+    <div class="ttl"><b id="title">$CREDIT</b><small id="from">your MCP address</small></div>
+    <div class="views" role="group" aria-label="View"><button type="button" id="vBurn" aria-pressed="false">Burn</button><button type="button" id="vClaim" aria-pressed="false">Claim</button></div>
+  </header>
+
+  <section id="loading" aria-label="Loading">
+    <div class="sk w40"></div><div class="sk h96" style="margin-top:10px"></div><div class="sk w60" style="margin-top:10px"></div>
+  </section>
+
+  <!-- burn: tick NFTs, Burn, Confirm -->
+  <section id="burn" hidden>
+    <div class="hero"><span class="num" id="bEach">10,000</span><span class="unit">$CREDIT</span><span class="fine">for each MCP NFT you burn</span></div>
+    <div class="bar" style="margin-top:12px">
+      <span class="count" id="count">0 selected</span>
+      <input class="find" id="find" placeholder="Find #…" autocomplete="off" aria-label="Find an NFT by number or name">
+      <button class="chip" id="all" type="button">Select all</button>
+      <button class="chip" id="none" type="button">Clear</button>
+    </div>
+    <div class="grid" id="grid" role="group" aria-label="Your MCP NFTs" style="margin-top:10px"></div>
+    <div class="more" id="moreWrap" hidden style="margin-top:8px"><button class="chip" id="more" type="button">Load more</button></div>
+    <p class="note err" id="burnErr" style="margin-top:10px" role="alert" hidden></p>
+    <div class="actions" style="margin-top:12px" id="goActs"><button class="primary" id="go" disabled>Burn</button></div>
+    <p class="note warn" id="confirmBurn" style="margin-top:12px" hidden></p>
+    <div class="actions" style="margin-top:12px" id="confirmActs" hidden>
+      <button class="ghost" id="no">Cancel</button><button class="primary" id="yes">Confirm</button>
+    </div>
+    <p class="fine" id="bLimits" style="margin-top:10px"></p>
+  </section>
+
+  <!-- what the burn did, with the card to post -->
+  <section id="burned" class="done" hidden>
+    <div class="big"><span aria-hidden="true">🔥</span><span id="rHead"></span></div>
+    <div id="rBody"></div>
+    <img class="card" id="rCard" alt="Your burn card">
+    <div class="launch" id="rLaunch"></div>
+    <div class="actions"><button class="primary" id="share">Post on X</button><button class="ghost" id="openCard">Open card</button></div>
+    <div class="actions"><button class="ghost" id="toClaim">Claim $CREDIT</button><button class="ghost" id="again">Burn more</button></div>
+  </section>
+
+  <!-- claim: paste the wallet, Claim, Confirm -->
+  <section id="claim" hidden>
+    <span class="label">$CREDIT to claim</span>
+    <div class="hero"><span class="num" id="cBal">0</span><span class="unit">$CREDIT</span></div>
+    <p class="fine" id="cFrom"></p>
+    <div id="cNone" hidden style="margin-top:10px">
+      <p class="note warn">No $CREDIT to claim yet. Burn MCP NFTs for it first.</p>
+      <div class="actions" style="margin-top:10px"><button class="primary" id="toBurn">Burn NFTs</button></div>
+    </div>
+    <div id="cForm" style="margin-top:12px">
+      <span class="label" id="wLabel">Your Solana wallet</span>
+      <label class="field" style="margin-top:4px"><input id="wallet" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Phantom, Solflare, Backpack…" aria-labelledby="wLabel"></label>
+      <p class="note err" id="walletErr" style="margin-top:10px" hidden></p>
+      <p class="fine" id="fee" style="margin-top:8px"></p>
+      <p class="note err" id="claimErr" style="margin-top:10px" role="alert" hidden></p>
+      <div class="actions" style="margin-top:12px" id="cGoActs"><button class="primary" id="cGo" disabled>Claim</button></div>
+      <p class="note warn" id="confirmClaim" style="margin-top:12px" hidden></p>
+      <div class="actions" style="margin-top:12px" id="cConfirmActs" hidden>
+        <button class="ghost" id="cNo">Cancel</button><button class="primary" id="cYes">Confirm</button>
+      </div>
+    </div>
+    <div style="margin-top:14px" id="cListWrap" hidden><span class="label">Your claims</span><div class="claims" id="cList" style="margin-top:6px"></div></div>
+    <p class="launch" id="cLaunch" style="margin-top:12px"></p>
+  </section>
+
+  <!-- what the claim did -->
+  <section id="claimed" class="done" hidden>
+    <div class="big"><span class="mono" aria-hidden="true">✓</span><span id="kHead"></span></div>
+    <div id="kBody"></div>
+    <div class="launch" id="kLaunch"></div>
+    <div class="actions"><button class="ghost" id="kBack">Back</button></div>
+  </section>
+
+  <p class="note" id="msg" hidden></p>
+</main>
+
+<script type="module">
+/*MCP_APPS_SDK*/
+
+const $ = (id) => document.getElementById(id);
+const TOKEN = 'mcp-market/credit-token';
+const WALLET = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const textOf = (r) => (r?.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+const EXPIRED = 'This form has expired. Ask the assistant to open it again: /burnmcp or /claimcredit.';
+const CHECK = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5l3 3 6-6.5" fill="none" stroke="#0B0B0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const n0 = (v) => Number(v || 0).toLocaleString('en-US');
+const mcp = (v) => `${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })} $MCP`;
+const short = (w) => (w && w.length > 12 ? `${w.slice(0, 4)}…${w.slice(-4)}` : w || '');
+
+let st = null;            // the latest state from the server
+let view = null;          // 'burn' | 'claim'
+let nfts = [];            // the NFTs loaded so far
+const picked = new Set(); // ticked NFT numbers
+let token = null;         // the form's pass
+let busy = false;
+let burned = null;        // what this form burned last
+let claimed = null;       // what this form claimed last
+let armedAt = 0;          // Confirm works only a moment after it appears: a double click can't confirm
+let asked = false;        // asked the server for a pass at least once
+let pendingBurn = null;   // the NFT numbers fixed when Burn was pressed: Confirm burns exactly these
+let pendingClaim = null;  // { wallet, key } fixed when Claim was pressed
+const TTL_MS = 2 * 3600e3, MIN_AGE_MS = 5000;
+
+const app = new McpApps.App({ name: 'MCP $CREDIT', version: '1.0.0' }, {}, { autoResize: true });
+
+function applyContext(ctx) {
+  if (!ctx) return;
+  if (ctx.theme) McpApps.applyDocumentTheme(ctx.theme);
+  if (ctx.styles?.variables) McpApps.applyHostStyleVariables(ctx.styles.variables);
+  if (ctx.styles?.css?.fonts) McpApps.applyHostFonts(ctx.styles.css.fonts);
+  const s = ctx.safeAreaInsets;
+  if (s) {
+    const r = document.documentElement.style;
+    r.setProperty('--pad-t', `${Math.max(16, s.top)}px`);
+    r.setProperty('--pad-r', `${Math.max(16, s.right)}px`);
+    r.setProperty('--pad-b', `${Math.max(16, s.bottom)}px`);
+    r.setProperty('--pad-l', `${Math.max(16, s.left)}px`);
+  }
+}
+
+const show = (id, on) => { $(id).hidden = !on; };
+function message(text, kind = 'err') {
+  const el = $('msg');
+  el.textContent = text || '';
+  el.className = `note ${kind}`;
+  el.hidden = !text;
+}
+const say = (id, text) => { $(id).textContent = text || ''; $(id).hidden = !text; };
+let skew = 0; // server clock minus this device's clock
+const tokenOk = () => !!token && Number(String(token).split('.')[0]) > Date.now() + skew + 5000;
+const arm = () => { armedAt = Date.now() + 700; };
+const armed = () => Date.now() >= armedAt;
+// only our own site's pages and pictures (https), and X's post page for sharing
+const siteOrigin = () => { try { return new URL(st?.site || '').origin; } catch { return null; } };
+const ours = (u) => { try { const x = new URL(u); return siteOrigin() && x.origin === siteOrigin() && (x.protocol === 'https:' || x.hostname === 'localhost') ? x.href : ''; } catch { return ''; } };
+const shareOk = (u) => { try { const x = new URL(u); return x.protocol === 'https:' && x.hostname === 'x.com' && x.pathname === '/intent/post' ? x.href : ''; } catch { return ''; } };
+const limit = () => (st ? Number(st.max) || 0 : 0);
+const launchLine = () => st?.credit?.launch_line || 'The $CREDIT token launches soon.';
+
+// ---------- calls to our server, made only by this form ----------
+
+const expOf = (t) => Number(String(t || '').split('.')[0]) || 0;
+function takeToken(r) {
+  const t = r?._meta?.[TOKEN] || r?.structuredContent?.form_token;
+  if (typeof t !== 'string' || !/^\d{13}\.[0-9a-f]{64}$/.test(t)) return;
+  if (!tokenOk() || expOf(token) < Date.now() + skew + 600_000) token = t;
+}
+async function callTool(name, args = {}) {
+  const r = await app.callServerTool({ name, arguments: args });
+  takeToken(r);
+  const at = Number(r?.structuredContent?.state?.issued_at);
+  if (at) skew = at - Date.now();
+  return r;
+}
+async function refresh(offset = 0, check = null) {
+  try {
+    const r = await callTool('credit_form_state', { offset, ...(check ? { check } : {}) });
+    asked = true;
+    const s = r?.structuredContent?.state;
+    if (s) setState(s, { append: offset > 0 });
+    else if (!st) { show('loading', false); message(textOf(r) || 'The form is not available right now.'); }
+    return r;
+  } catch {
+    asked = true;
+    if (!st) { show('loading', false); message('Could not load. Ask the assistant to open the form again.'); }
+    else { if (!tokenOk()) message('Could not get the form ready. Ask the assistant to open it again.', 'warn'); render(); }
+    return null;
+  }
+}
+// a pass works a few seconds after it was issued: wait for that if it is brand new
+async function waitPass() {
+  const young = MIN_AGE_MS - (Date.now() + skew - (expOf(token) - TTL_MS));
+  if (young > 0) await new Promise((r) => setTimeout(r, young + 300));
+}
+
+// ---------- state and views ----------
+
+function setState(s, { append = false } = {}) {
+  if (!s || s.v !== 1) return;
+  st = s;
+  show('loading', false);
+  $('from').textContent = s.address || '';
+  const fresh = Array.isArray(s.nfts) ? s.nfts : [];
+  if (append) {
+    const have = new Set(nfts.map((n) => n.id));
+    nfts = nfts.concat(fresh.filter((n) => !have.has(n.id)));
+  } else {
+    nfts = fresh;
+    const ids = new Set(nfts.map((n) => n.id));
+    for (const id of [...picked]) if (!ids.has(id) && Number(s.total) <= nfts.length) picked.delete(id);
+  }
+  render();
+}
+
+function setView(v) {
+  if (busy || pendingBurn || pendingClaim) return;
+  view = v;
+  burned = v === 'burn' ? burned : null;
+  claimed = v === 'claim' ? claimed : null;
+  render();
+}
+
+function render() {
+  if (!st) return;
+  $('vBurn').disabled = $('vClaim').disabled = !!(busy || pendingBurn || pendingClaim);
+  $('vBurn').setAttribute('aria-pressed', String(view === 'burn'));
+  $('vClaim').setAttribute('aria-pressed', String(view === 'claim'));
+  $('title').textContent = view === 'claim' ? 'Claim $CREDIT' : 'Burn for $CREDIT';
+  message(tokenOk() || !asked ? '' : EXPIRED, 'warn');
+  show('burn', view === 'burn' && !burned);
+  show('burned', view === 'burn' && !!burned);
+  show('claim', view === 'claim' && !claimed);
+  show('claimed', view === 'claim' && !!claimed);
+  if (view === 'burn') { if (burned) renderBurned(); else renderBurn(); }
+  else if (claimed) renderClaimed();
+  else renderClaim();
+}
+
+// ---------- burn ----------
+
+function tile(n) {
+  const on = picked.has(n.id);
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `tile${on ? ' on' : ''}`;
+  b.dataset.id = String(n.id);
+  b.setAttribute('role', 'checkbox');
+  b.setAttribute('aria-checked', on ? 'true' : 'false');
+  b.title = n.name;
+  const img = document.createElement('img');
+  img.src = ours(n.image_url);
+  img.alt = '';
+  img.loading = 'lazy';
+  if (n.pixel) img.className = 'px';
+  const ck = document.createElement('span');
+  ck.className = 'ck';
+  ck.innerHTML = CHECK;
+  b.append(img, ck, Object.assign(document.createElement('span'), { className: 'nm', textContent: n.name }),
+    Object.assign(document.createElement('span'), { className: 'rr', textContent: n.rarity || '' }));
+  if (n.listed != null) b.append(Object.assign(document.createElement('span'), { className: 'tag', textContent: 'LISTED', title: 'For sale now: burning takes it off the market' }));
+  b.addEventListener('click', () => toggle(n.id));
+  return b;
+}
+function visible() {
+  const q = $('find').value.trim().toLowerCase().replace(/^#/, '');
+  if (!q) return nfts;
+  return nfts.filter((n) => String(n.id) === q || String(n.id).startsWith(q) || n.name.toLowerCase().includes(q));
+}
+function renderGrid() {
+  const list = visible();
+  $('grid').replaceChildren(...list.map(tile));
+  if (!list.length) $('grid').append(Object.assign(document.createElement('p'), { className: 'fine', textContent: nfts.length ? 'Nothing matches.' : 'No MCP NFTs to burn. Mint or buy one: /market-mcp' }));
+}
+function toggle(id) {
+  if (busy || pendingBurn) return;
+  if (picked.has(id)) picked.delete(id);
+  else if (picked.size < limit()) picked.add(id);
+  else { say('burnErr', `At most ${limit()} at once: burn these, then the rest.`); return; }
+  say('burnErr', '');
+  const b = $('grid').querySelector(`[data-id="${id}"]`);
+  if (b) { b.classList.toggle('on', picked.has(id)); b.setAttribute('aria-checked', picked.has(id) ? 'true' : 'false'); }
+  updateBurn();
+}
+function updateBurn() {
+  const n = picked.size;
+  const each = Number(st.credit?.per_nft) || 0;
+  const listed = nfts.filter((x) => picked.has(x.id) && x.listed != null).length;
+  $('count').replaceChildren(`${n} selected`, Object.assign(document.createElement('small'), {
+    textContent: ` of ${n0(st.total)}${n ? ` · ${n0(n * each)} $CREDIT` : ''}${listed ? ` · ${listed} listed, will come off the market` : ''}` }));
+  const closed = st.burn_open === false;
+  $('go').disabled = !n || busy || !tokenOk() || closed;
+  $('go').textContent = closed ? 'Burning is closed' : n ? `Burn ${n} NFT${n === 1 ? '' : 's'} for ${n0(n * each)} $CREDIT` : 'Burn';
+  $('all').disabled = busy || !nfts.length || closed;
+  if (closed) say('burnErr', st.burn_closed || 'Burning is closed right now.');
+}
+function renderBurn() {
+  $('bEach').textContent = n0(st.credit?.per_nft);
+  renderGrid();
+  show('moreWrap', nfts.length < Number(st.total));
+  $('bLimits').textContent = `Burned NFTs are gone for good: no undo. Up to ${n0(st.max)} at a time. You have ${n0(st.credit?.balance)} $CREDIT. ${launchLine()}`;
+  updateBurn();
+}
+function closeBurnConfirm() {
+  pendingBurn = null;
+  $('vBurn').disabled = $('vClaim').disabled = false;
+  $('burn').classList.remove('locked');
+  show('confirmActs', false); show('confirmBurn', false); show('goActs', true);
+  $('find').disabled = false;
+}
+function renderBurned() {
+  const b = burned;
+  $('rHead').textContent = `Burnt ${n0(b.count)} NFT${b.count === 1 ? '' : 's'}`;
+  $('rBody').replaceChildren(`${n0(b.count)} × ${n0(st.credit?.per_nft)} = `, Object.assign(document.createElement('b'), { className: 'mono', textContent: `${n0(b.credit)} $CREDIT` }),
+    ` credited. Your $CREDIT: ${n0(b.balance ?? st.credit?.balance)}.`);
+  const img = ours(b.image_url);
+  show('rCard', !!img);
+  if (img && $('rCard').getAttribute('src') !== img) $('rCard').src = img;
+  $('rLaunch').textContent = `${b.launch_line || launchLine()} Bind your wallet for it: Claim $CREDIT (or /claimcredit).`;
+  show('share', !!shareOk(b.share_url));
+  show('openCard', !!ours(b.card_url));
+}
+
+// ---------- claim ----------
+
+function walletCheck() {
+  const v = $('wallet').value.trim();
+  if (!v) return { ok: false };
+  if (!WALLET.test(v)) return { ok: false, err: 'A Solana address is 32 to 44 letters and digits. Copy it from your wallet.' };
+  if (/^mcp_/i.test(v)) return { ok: false, err: 'That is an MCP address. Paste your Solana wallet address.' };
+  return { ok: true, v };
+}
+function renderClaim() {
+  const c = st.credit || {};
+  $('cBal').textContent = n0(c.balance);
+  $('cFrom').textContent = c.burned ? `From ${n0(c.burned)} burned NFT${c.burned === 1 ? '' : 's'}${c.earned > c.balance ? ` (${n0(c.earned - c.balance)} already claimed)` : ''}.` : '';
+  const has = Number(c.balance) > 0;
+  show('cNone', !has); show('cForm', has);
+  const claims = Array.isArray(c.claims) ? c.claims : [];
+  show('cListWrap', claims.length > 0);
+  $('cList').replaceChildren(...claims.map((k) => {
+    const row = document.createElement('div');
+    row.append(Object.assign(document.createElement('span'), { textContent: `#${k.id} · ${n0(k.amount)} $CREDIT → ` }),
+      Object.assign(document.createElement('span'), { className: 'mono', textContent: short(k.wallet), title: k.wallet }),
+      Object.assign(document.createElement('span'), { className: 'st', textContent: k.status === 'sent' ? 'sent' : 'in the airdrop' }));
+    return row;
+  }));
+  $('cLaunch').textContent = launchLine();
+  updateClaim();
+}
+function updateClaim() {
+  const c = st.credit || {};
+  const w = walletCheck();
+  say('walletErr', w.err || '');
+  const short0 = Number(c.mcp_balance) < Number(c.fee);
+  $('fee').textContent = `Fee: ${mcp(c.fee)} from your balance (${mcp(c.mcp_balance)}).${short0 ? ' Top up first: /deposit-mcp' : ''}`;
+  $('cGo').disabled = !w.ok || busy || !tokenOk() || !(Number(c.balance) > 0) || short0;
+  $('cGo').textContent = Number(c.balance) > 0 ? `Claim ${n0(c.balance)} $CREDIT` : 'Claim';
+}
+function closeClaimConfirm() {
+  pendingClaim = null;
+  $('vBurn').disabled = $('vClaim').disabled = false;
+  show('cConfirmActs', false); show('confirmClaim', false); show('cGoActs', true);
+  $('wallet').disabled = false;
+}
+function renderClaimed() {
+  const k = claimed;
+  $('kHead').textContent = `Claimed ${n0(k.amount)} $CREDIT`;
+  $('kBody').replaceChildren('To ', Object.assign(document.createElement('b'), { className: 'mono', textContent: k.wallet }),
+    `. It arrives with the $CREDIT airdrop. Fee paid: ${mcp(k.fee)}. Claim #${k.id}.`);
+  $('kLaunch').textContent = k.launch_line || launchLine();
+}
+
+// ---------- actions ----------
+
+$('vBurn').addEventListener('click', () => setView('burn'));
+$('vClaim').addEventListener('click', () => setView('claim'));
+$('toBurn').addEventListener('click', () => setView('burn'));
+$('toClaim').addEventListener('click', () => { burned = null; setView('claim'); });
+$('kBack').addEventListener('click', () => { claimed = null; render(); });
+$('find').addEventListener('input', renderGrid);
+$('all').addEventListener('click', () => {
+  if (busy || pendingBurn) return;
+  for (const n of visible()) { if (picked.size >= limit()) break; picked.add(n.id); }
+  renderGrid(); updateBurn();
+});
+$('none').addEventListener('click', () => { if (busy || pendingBurn) return; picked.clear(); say('burnErr', ''); renderGrid(); updateBurn(); });
+$('more').addEventListener('click', async () => {
+  if (pendingBurn) return;
+  $('more').disabled = true;
+  await refresh(nfts.length);
+  $('more').disabled = false;
+});
+
+$('go').addEventListener('click', () => {
+  if (!picked.size || busy || pendingBurn) return;
+  pendingBurn = [...picked].sort((x, y) => x - y);
+  const n = pendingBurn.length;
+  const total = n * (Number(st.credit?.per_nft) || 0);
+  $('yes').textContent = `Confirm: burn ${n} NFT${n === 1 ? '' : 's'}`;
+  $('confirmBurn').textContent = `Burn ${n} NFT${n === 1 ? '' : 's'} for ${n0(total)} $CREDIT? They are gone for good: they can't be sold, sent or brought back.`;
+  $('find').disabled = true;
+  $('burn').classList.add('locked');
+  show('goActs', false); show('confirmBurn', true); show('confirmActs', true);
+  $('vBurn').disabled = $('vClaim').disabled = true;
+  arm();
+  $('no').focus();
+});
+$('no').addEventListener('click', closeBurnConfirm);
+
+$('yes').addEventListener('click', async () => {
+  if (!pendingBurn || busy || !armed()) return;
+  const ids = pendingBurn;
+  busy = true;
+  say('burnErr', '');
+  $('yes').disabled = true; $('no').disabled = true;
+  const label = $('yes').textContent;
+  $('yes').textContent = 'Burning…';
+  const done = (b) => {
+    burned = b;
+    picked.clear();
+    closeBurnConfirm();
+    render();
+    tellAssistant(`The user burned ${b.count} MCP NFT${b.count === 1 ? '' : 's'} in the burn form` +
+      `${b.nfts?.length ? ` (${b.nfts.map((x) => `#${Number(x.id)}`).join(', ')})` : ''} for ${n0(b.credit)} $CREDIT, credited; their $CREDIT is now ${n0(b.balance)}.` +
+      `${b.card_url ? ` Their burn card: ${b.card_url}` : ''} ${b.launch_line || ''} They bind a wallet for it with /claimcredit.`);
+  };
+  try {
+    await waitPass();
+    let r = await callTool('burn_form_submit', { nft_ids: ids, form_token: token || '' });
+    if (r?.structuredContent?.retry_ms) {
+      await new Promise((res) => setTimeout(res, Number(r.structuredContent.retry_ms) + 300));
+      r = await callTool('burn_form_submit', { nft_ids: ids, form_token: token || '' });
+    }
+    if (r?.structuredContent?.burned) {
+      const s = r.structuredContent.state;
+      if (s?.v === 1) { st = s; nfts = Array.isArray(s.nfts) ? s.nfts : []; } else nfts = nfts.filter((x) => !ids.includes(x.id));
+      done(r.structuredContent.burned);
+      if (s?.v !== 1) refresh(); // the burn went through but the new numbers didn't come with it
+    } else if (r?.structuredContent?.refused) {
+      closeBurnConfirm();
+      say('burnErr', textOf(r) || 'Nothing was burned.');
+      if (/expired|Only the form/.test(textOf(r))) await refresh();
+    } else {
+      await check(ids);
+    }
+  } catch {
+    await check(ids); // the answer got lost on the way
+  } finally {
+    busy = false;
+    $('yes').disabled = false; $('no').disabled = false;
+    if ($('yes').textContent === 'Burning…') $('yes').textContent = label;
+    if (st && view === 'burn' && !burned) updateBurn();
+  }
+
+  // all of them burned or none: ask the server
+  async function check(list) {
+    say('burnErr', 'Not sure it went through. Checking…');
+    const r = await refresh(0, list);
+    const map = r?.structuredContent?.burned;
+    if (!map) { closeBurnConfirm(); say('burnErr', 'Could not check whether it went through. Look at your NFTs before burning again.'); return; }
+    const at = list.map((id) => map[String(id)]);
+    if (at.every((x) => x === 'burned')) {
+      say('burnErr', '');
+      const b = r.structuredContent.burn; // the burn that took these NFTs
+      const each = Number(st?.credit?.per_nft) || 0;
+      const card = b?.card_url || null;
+      done({ count: list.length, credit: b?.credit ?? list.length * each, balance: st?.credit?.balance, nfts: list.map((id) => ({ id })),
+        card_url: card, image_url: card ? `${card}.png` : null, share_url: null, launch_line: st?.credit?.launch_line });
+    } else if (at.every((x) => x === 'yours')) {
+      closeBurnConfirm();
+      say('burnErr', 'Not burned: the NFTs are still yours. Try again.');
+    } else {
+      closeBurnConfirm();
+      say('burnErr', 'Some of these NFTs are no longer yours. Check your NFTs before burning again.');
+    }
+  }
+});
+
+$('wallet').addEventListener('input', () => { say('claimErr', ''); updateClaim(); });
+$('cGo').addEventListener('click', () => {
+  const w = walletCheck();
+  if (!w.ok || busy || pendingClaim || !(Number(st?.credit?.balance) > 0)) return;
+  const key = [...crypto.getRandomValues(new Uint8Array(18))].map((b) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'[b & 63]).join('');
+  pendingClaim = { wallet: w.v, key, expected: Number(st.credit.balance) };
+  $('cYes').textContent = `Confirm: claim ${n0(st.credit.balance)} $CREDIT`;
+  $('confirmClaim').replaceChildren(`All your ${n0(st.credit.balance)} $CREDIT go to `, Object.assign(document.createElement('b'), { className: 'mono', textContent: w.v }),
+    ` in the airdrop, for a fee of ${mcp(st.credit.fee)}. Check every character: the airdrop goes exactly there.`);
+  $('wallet').disabled = true;
+  show('cGoActs', false); show('confirmClaim', true); show('cConfirmActs', true);
+  $('vBurn').disabled = $('vClaim').disabled = true;
+  arm();
+  $('cNo').focus();
+});
+$('cNo').addEventListener('click', closeClaimConfirm);
+$('cYes').addEventListener('click', async () => {
+  if (!pendingClaim || busy || !armed()) return;
+  const { wallet, key, expected } = pendingClaim;
+  busy = true;
+  say('claimErr', '');
+  $('cYes').disabled = true; $('cNo').disabled = true;
+  const label = $('cYes').textContent;
+  $('cYes').textContent = 'Claiming…';
+  const send = () => callTool('claim_form_submit', { wallet, request_key: key, expected, form_token: token || '' });
+  try {
+    await waitPass();
+    let r;
+    // the same request key: a retry after a lost answer returns the same claim, never a second one
+    try { r = await send(); } catch { r = await send(); }
+    if (r?.structuredContent?.retry_ms) {
+      await new Promise((res) => setTimeout(res, Number(r.structuredContent.retry_ms) + 300));
+      r = await send();
+    }
+    if (r?.structuredContent?.claimed) {
+      if (r.structuredContent.state) st = r.structuredContent.state;
+      claimed = r.structuredContent.claimed;
+      closeClaimConfirm();
+      $('wallet').value = '';
+      render();
+      tellAssistant(`The user claimed ${n0(claimed.amount)} $CREDIT in the claim form to the Solana wallet ${claimed.wallet} (claim #${claimed.id}, fee ${mcp(claimed.fee)}). ` +
+        'It goes out with the $CREDIT airdrop.');
+    } else {
+      closeClaimConfirm();
+      say('claimErr', textOf(r) || 'Nothing was claimed.');
+      if (/expired|Only the form/.test(textOf(r))) await refresh();
+    }
+  } catch {
+    closeClaimConfirm();
+    say('claimErr', 'Could not reach MCP. Nothing was claimed twice: check "Your claims" below before trying again.');
+    await refresh();
+  } finally {
+    busy = false;
+    $('cYes').disabled = false; $('cNo').disabled = false;
+    if ($('cYes').textContent === 'Claiming…') $('cYes').textContent = label;
+    if (st && view === 'claim' && !claimed) updateClaim();
+  }
+});
+
+async function open(url) {
+  if (!url) return;
+  try {
+    const r = await app.openLink({ url });
+    if (r?.isError) message(url, 'ok');
+  } catch { message(url, 'ok'); }
+}
+$('share').addEventListener('click', () => open(shareOk(burned?.share_url)));
+$('openCard').addEventListener('click', () => open(ours(burned?.card_url)));
+$('again').addEventListener('click', async () => { burned = null; render(); await refresh(); });
+
+// lets the assistant say what happened without the user retyping it
+function tellAssistant(textMsg) {
+  if (!app.getHostCapabilities()?.updateModelContext) return;
+  app.updateModelContext({ content: [{ type: 'text', text: textMsg }] }).catch(() => {});
+}
+
+// ---------- talking to the chat app ----------
+
+app.ontoolresult = async (r) => {
+  takeToken(r);
+  const s = r?.structuredContent?.state;
+  if (s) {
+    if (!view) view = r.structuredContent.view === 'claim' ? 'claim' : 'burn';
+    setState(s);
+    // no pass came with the result (some apps drop _meta), or the chat was reopened later: fetch fresh ones
+    if (!tokenOk() || Date.now() - Number(s.issued_at || 0) > 60_000) await refresh();
+  } else {
+    show('loading', false);
+    message(textOf(r) || 'The form is not available right now.');
+  }
+};
+app.ontoolcancelled = () => { show('loading', false); message('Cancelled.', 'warn'); };
+app.onhostcontextchanged = applyContext;
+
+await app.connect();
+applyContext(app.getHostContext());
+</script>
+</body>
+</html>
