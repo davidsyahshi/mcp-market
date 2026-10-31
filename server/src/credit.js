@@ -198,6 +198,12 @@ export async function findDrop(db, input) {
 
 const clean = (v) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
 
+// a drop's tasks: a promo code's (follow, like + RT), and a comment under the same post
+export const dropTasks = (d) => [
+  ...m.promoTasks(d),
+  d.tweet_url ? { kind: 'comment', text: 'Comment on this post', url: d.tweet_url } : null,
+].filter(Boolean);
+
 // One account through a drop, a step per call: the tasks (if the code has any), then the card to post, then done.
 // proof: what the assistant saw on the screenshot the user sent for the step they are on. Returns { stage, ... }:
 // 'tasks' (do them, send a screenshot), 'post' (the card: post it, send a screenshot of the post), 'done' ($CREDIT added).
@@ -211,7 +217,7 @@ export async function redeemDrop(db, userId, code, { proof } = {}) {
     if (!d) fail(`There is no code "${code}". Check the spelling.`);
     const [c] = await t.query(`select *, extract(epoch from now() - shown_at)::float as ago from credit_drop_claims
       where code = $1 and user_id = $2`, [code, userId]);
-    const tasks = m.promoTasks(d);
+    const tasks = dropTasks(d);
     const base = { code, amount: Number(d.amount), max_uses: d.max_uses, tweet_url: d.tweet_url || null };
     if (c?.stage === 'done') return { ...base, stage: 'done', already: true, id: c.id, amount: Number(c.amount), balance: Number(u.credit_balance) };
     if (c?.stage === 'post') {

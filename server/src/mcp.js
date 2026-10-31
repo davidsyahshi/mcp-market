@@ -358,17 +358,25 @@ export function buildMcpServer(db, userId, opts) {
   // A free $CREDIT drop, one step per call of redeem_code (credit.redeemDrop): the social tasks, then the airdrop card
   // to post on X, then the $CREDIT. It answers through the promo-code tool and the NFT card that chats already have,
   // so it works without reconnecting the connector; the card picture also comes as an image for apps without the card.
+  const SHOT = { follow: 'following', like_rt: 'like + RT', comment: 'your comment' };
+  const NEED = { follow: 'the account followed', like_rt: 'the post liked and reposted', comment: "the user's own comment under the post" };
   const dropAnswer = async (d) => {
     const amt = credit.credits(d.amount);
     const head = { v: 1, items: [], title: `FREE ${amt} $CREDIT`, badge: 'Airdrop', subtitle: `Code ${d.code}` };
     const shown = (nfts, pics = {}) => (nftUi ? { structuredContent: { nfts: { ...head, ...nfts } }, _meta: { [PICS]: pics } } : {});
     if (d.stage === 'tasks') {
       const lines = d.tasks.map((t, i) => `${i + 1}. ${t.text}: ${t.url}`).join('\n');
-      const ask = d.proof_missing ? 'Do the tasks first, then send the screenshot again.' : 'Done? Send a screenshot as proof below.';
+      const kinds = d.tasks.map((t) => t.kind);
+      const n = kinds.length;
+      const ask = d.proof_missing
+        ? (n > 1 ? `Do all ${n} tasks first, then send the screenshots again.` : 'Do the task first, then send the screenshot again.')
+        : (n > 1 ? `Done all ${n}? Send one screenshot that shows them all, or a few (${kinds.map((k) => SHOT[k]).join(', ')}).` : 'Done? Send a screenshot as proof below.');
+      const need = kinds.map((k) => NEED[k]);
       return {
         ...ok(text(`FREE ${amt} $CREDIT airdrop 🎁 Before you get it:\n${lines}\n\n${ask}`),
-          text(`Note for the assistant, not for the user: show the message above as it is. When the user sends a screenshot that shows the post ` +
-            `liked and reposted${d.tasks.some((t) => t.kind === 'follow') ? ' and the account followed' : ''}, call redeem_code again with code ${d.code} and proof. Not before.`)),
+          text('Note for the assistant, not for the user: show the message above as it is. The user may send one screenshot or several. ' +
+            `When they show all of it (${need.join('; ')}), call redeem_code again with code ${d.code} and proof naming each. ` +
+            'If something is missing, say what and ask for a screenshot of it. Not before.')),
         ...shown({ view: 'tasks', intro: `Before you get your FREE ${amt} $CREDIT:`, subtitle: `Code ${d.code} · ${(d.left ?? 0).toLocaleString('en-US')} of ${d.max_uses.toLocaleString('en-US')} left`,
           tasks: d.tasks, note: ask }),
       };
