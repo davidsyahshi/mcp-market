@@ -370,8 +370,8 @@ export function buildMcpServer(db, userId, opts) {
       const n = kinds.length;
       const ask = d.proof_missing
         ? (n > 1 ? `Do all ${n} tasks first, then send the screenshots again.` : 'Do the task first, then send the screenshot again.')
-        : (n > 1 ? `Done all ${n}? Send one screenshot that shows them all, or a few (${kinds.map((k) => SHOT[k]).join(', ')}).` : 'Done? Send a screenshot as proof below.');
-      const need = kinds.map((k) => NEED[k]);
+        : (n > 1 ? `Done all ${n}? Send one screenshot that shows them all, or a few (${d.tasks.map((t) => t.shot || SHOT[t.kind]).join(', ')}).` : 'Done? Send a screenshot as proof below.');
+      const need = d.tasks.map((t) => t.need || NEED[t.kind]);
       return {
         ...ok(text(`FREE ${amt} $CREDIT airdrop 🎁 Before you get it:\n${lines}\n\n${ask}`),
           text('Note for the assistant, not for the user: show the message above as it is. The user may send one screenshot or several. ' +

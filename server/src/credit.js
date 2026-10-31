@@ -198,10 +198,17 @@ export async function findDrop(db, input) {
 
 const clean = (v) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
 
-// a drop's tasks: a promo code's (follow, like + RT), and a comment under the same post
+// A drop's tasks: follow each of its X accounts (up to DROP_FOLLOWS, e.g. the project and its founder, kept in
+// follow_url with a space between), like + RT its post, and comment under that post. shot / need: how the chat asks for
+// the screenshots and what the assistant has to see on them.
+export const DROP_FOLLOWS = 3;
+export const followList = (v) => String(v ?? '').split(/[\s,]+/).map((x) => x.trim().replace(/\/$/, '')).filter(Boolean);
+const handleOf = (url) => `@${url.split('/').pop()}`;
 export const dropTasks = (d) => [
-  ...m.promoTasks(d),
-  d.tweet_url ? { kind: 'comment', text: 'Comment on this post', url: d.tweet_url } : null,
+  ...followList(d.follow_url).map((url) => ({ kind: 'follow', text: `Follow ${handleOf(url)} on X`, url,
+    shot: `following ${handleOf(url)}`, need: `${handleOf(url)} followed` })),
+  d.tweet_url ? { kind: 'like_rt', text: 'Like + RT this post', url: d.tweet_url, shot: 'like + RT', need: 'the post liked and reposted' } : null,
+  d.tweet_url ? { kind: 'comment', text: 'Comment on this post', url: d.tweet_url, shot: 'your comment', need: "the user's own comment under the post" } : null,
 ].filter(Boolean);
 
 // One account through a drop, a step per call: the tasks (if the code has any), then the card to post, then done.
@@ -259,11 +266,16 @@ export async function drops(db) {
 }
 const dropLinks = ({ follow_url: f, tweet_url: tw }) => {
   const out = {};
-  for (const [k, v, post] of [['follow_url', f, false], ['tweet_url', tw, true]]) {
-    if (v == null) continue;
-    const x = String(v).trim().replace(/\/$/, '');
-    if (x && (!m.isXUrl(x) || /\/status\//.test(x) !== post)) fail(`${post ? 'Tweet' : 'Follow'} link: an x.com link to ${post ? 'a post, like https://x.com/name/status/123…' : 'an account, like https://x.com/name'}.`);
-    out[k] = x;
+  if (f != null) {
+    const list = [...new Set(followList(f))];
+    if (list.length > DROP_FOLLOWS) fail(`Follow: up to ${DROP_FOLLOWS} X accounts.`);
+    if (list.some((x) => !m.isXUrl(x) || /\/status\//.test(x))) fail('Follow links: x.com links to accounts, like https://x.com/name, with a space between.');
+    out.follow_url = list.join(' ');
+  }
+  if (tw != null) {
+    const x = String(tw).trim().replace(/\/$/, '');
+    if (x && (!m.isXUrl(x) || !/\/status\//.test(x))) fail('Tweet link: an x.com link to a post, like https://x.com/name/status/123….');
+    out.tweet_url = x;
   }
   return out;
 };
