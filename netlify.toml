@@ -110,3 +110,8 @@
   for = "/thumb/*"
   [headers.values]
     Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/big/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"

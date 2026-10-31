@@ -32,6 +32,7 @@ Or type a command, and the AI does exactly that ([`server/src/commands.js`](serv
 |---|---|
 | `/mcpcredit [code]` | start here: your balance, the mint and all commands; with a code, your free mint |
 | `/mcpmint [code]` | with a code: your free mint (`/mcpmint with code EARLY`); without one: mint for 5 $MCP |
+| `/mcpchat` | the holders-only group chat on X: your invite link, if you hold an MCP NFT |
 | `/help-mcp` | all commands |
 | `/balance-mcp` | balance, MCP address, your NFTs and recent activity |
 | `/deposit-mcp` | your Solana address for USDC/USDT top-ups; run it again after sending to check |
@@ -111,7 +112,7 @@ NFT images, site ──▶ CDN (static)
 
 - **Minting** gives a random NFT nobody has minted yet, for 5 $MCP, at most 5 per account (`MINT_PRICE_USD`, `MINT_LIMIT_PER_USER`). Mint money goes to the treasury. **Mint phase:** MCP NFTs can't be listed or bought until all 5,000 are minted; trading opens by itself with the last mint (`MCP_TRADING=open` opens it earlier).
 - **Metadata** is [`collection/collection.json`](collection/collection.json): every NFT's traits, public before anyone mints. The server loads it into the database on its first start.
-- **Pictures** ship as two archives, [`collection/mcp-images.tar.gz`](collection/mcp-images.tar.gz) (`/img/<n>.png`) and [`collection/mcp-thumbs.tar.gz`](collection/mcp-thumbs.tar.gz) (`/thumb/<n>.png`, 252 px), unpacked by the build ([`server/src/assets.js`](server/src/assets.js)). 4,618 of the 5,000 are 28×28 pixel art stored at their native size (the site scales them up without smoothing); the other render engines (ASCII, Mosaic, LED Wall, …) are stored at 1,008 px.
+- **Pictures** ship as two archives, [`collection/mcp-images.tar.gz`](collection/mcp-images.tar.gz) (`/img/<n>.png`) and [`collection/mcp-thumbs.tar.gz`](collection/mcp-thumbs.tar.gz) (`/thumb/<n>.png`, 252 px), unpacked by the build ([`server/src/assets.js`](server/src/assets.js)). 4,618 of the 5,000 are 28×28 pixel art stored at their native size (the site scales them up without smoothing); the other render engines (ASCII, Mosaic, LED Wall, …) are stored at 1,008 px. The build also makes a 1,008 px copy of each pixel one (`/big/<n>.png`, every pixel a 36×36 block, ~2 KB each, [`server/src/png.js`](server/src/png.js)): the NFT's page shows it and its Download button saves it.
 
 ## Launchpad
 
@@ -213,7 +214,8 @@ server/src/
   mcp.js      the tools listed above, and the withdrawal form as an MCP App
   ui.js       builds the withdrawal form with the MCP Apps SDK built in (pinned by sha256)
   market.js   rules: collections, balances, mint, listings, buys, trait filters, MCP addresses
-  assets.js   unpacks the NFT picture archives for the build
+  assets.js   unpacks the NFT picture archives for the build and makes the 1,008 px copies
+  png.js      reads and scales PNGs (sharp pixels), no dependencies
   explorer.js public explorer: hash chain, Solana anchors, proof of reserves
   withdrawals.js payouts: limits, hot wallet, never-twice sending, refunds
   tx.js       Solana transaction building and signing
@@ -282,6 +284,7 @@ npm test                  # end-to-end tests: real OAuth, real MCP client, two u
 | `RESERVE_WALLETS` | optional: your cold wallets holding swept deposits (public addresses, comma-separated), so the explorer counts them as reserves |
 | `ANCHOR_EVERY_MINUTES`, `ANCHORS_OFF`, `RESERVES_EVERY_MINUTES` | optional: how often the chain's hash goes to Solana (60), `1` stops anchors, how often reserves are read (10) |
 | `ADMIN_X_IDS` | the X account ids (numbers, not handles: a handle can change hands) of the market's owner(s), comma-separated: they review launchpad collections at `/admin` and release payouts. Sign in on the site and open `/api/me` to see yours (`x_id`) |
+| `HOLDERS_CHAT_URL` | the invite link to the holders' group chat on X, given by `/mcpchat` only to accounts that own an MCP NFT (kept out of the code, which is public). Unset: holders are told it isn't set up yet |
 | `LAUNCH_FEE_BPS`, `HOLD_DAYS`, `LAUNCH_MAX_SUPPLY` | optional: the market's share of launchpad mints in basis points (1000 = 10%), the hold in days (7), the largest collection (10,000) |
 
 Deposits start working once `HELIUS_API_KEY` and `DEPOSIT_POOL_KEY` are set (and deployed) and the pool CSV is imported; the scheduled function registers the Helius webhook within 5 minutes of the first address handed out.
