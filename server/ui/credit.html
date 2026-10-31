@@ -116,6 +116,7 @@
   .tile.on { border-color: var(--cherry); box-shadow: 0 0 0 1px var(--cherry); }
   .tile.on .ck { background: var(--cherry); border-color: var(--cherry); }
   .tile.on .ck svg { display: block; }
+  .tile .cr { font-size: 11px; font-weight: 700; color: var(--cherry); font-family: var(--mono); white-space: nowrap; }
   .tile .tag { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 700; letter-spacing: .04em; background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 2px 6px; }
   .more { display: flex; justify-content: center; }
   .locked .bar, .locked .grid, .locked .more { pointer-events: none; opacity: .6; }
@@ -167,6 +168,7 @@
   <!-- burn: tick NFTs, Burn, Confirm -->
   <section id="burn" hidden>
     <div class="hero"><span class="num" id="bEach">10,000</span><span class="unit">$CREDIT</span><span class="fine">for each MCP NFT you burn</span></div>
+    <p class="fine" id="bRarity" style="margin-top:4px"></p>
     <div class="bar" style="margin-top:12px">
       <span class="count" id="count">0 selected</span>
       <input class="find" id="find" placeholder="Find #…" autocomplete="off" aria-label="Find an NFT by number or name">
@@ -392,7 +394,8 @@ function tile(n) {
   ck.className = 'ck';
   ck.innerHTML = CHECK;
   b.append(img, ck, Object.assign(document.createElement('span'), { className: 'nm', textContent: n.name }),
-    Object.assign(document.createElement('span'), { className: 'rr', textContent: n.rarity || '' }));
+    Object.assign(document.createElement('span'), { className: 'rr', textContent: n.rarity || '' }),
+    Object.assign(document.createElement('span'), { className: 'cr', textContent: `${n0(creditOf(n))}`, title: `${n0(creditOf(n))} $CREDIT when burned` }));
   if (n.listed != null) b.append(Object.assign(document.createElement('span'), { className: 'tag', textContent: 'LISTED', title: 'For sale now: burning takes it off the market' }));
   b.addEventListener('click', () => toggle(n.id));
   return b;
@@ -417,20 +420,25 @@ function toggle(id) {
   if (b) { b.classList.toggle('on', picked.has(id)); b.setAttribute('aria-checked', picked.has(id) ? 'true' : 'false'); }
   updateBurn();
 }
+// $CREDIT for the ticked NFTs: each by its rarity (the server says how much)
+const creditOf = (n) => Number(n?.credit) || Number(st?.credit?.per_nft) || 0;
+const pickedCredit = (ids) => ids.reduce((sum, id) => sum + creditOf(nfts.find((x) => x.id === id)), 0);
 function updateBurn() {
   const n = picked.size;
-  const each = Number(st.credit?.per_nft) || 0;
+  const sum = pickedCredit([...picked]);
   const listed = nfts.filter((x) => picked.has(x.id) && x.listed != null).length;
   $('count').replaceChildren(`${n} selected`, Object.assign(document.createElement('small'), {
-    textContent: ` of ${n0(st.total)}${n ? ` · ${n0(n * each)} $CREDIT` : ''}${listed ? ` · ${listed} listed, will come off the market` : ''}` }));
+    textContent: ` of ${n0(st.total)}${n ? ` · ${n0(sum)} $CREDIT` : ''}${listed ? ` · ${listed} listed, will come off the market` : ''}` }));
   const closed = st.burn_open === false;
   $('go').disabled = !n || busy || !tokenOk() || closed;
-  $('go').textContent = closed ? 'Burning is closed' : n ? `Burn ${n} NFT${n === 1 ? '' : 's'} for ${n0(n * each)} $CREDIT` : 'Burn';
+  $('go').textContent = closed ? 'Burning is closed' : n ? `Burn ${n} NFT${n === 1 ? '' : 's'} for ${n0(sum)} $CREDIT` : 'Burn';
   $('all').disabled = busy || !nfts.length || closed;
   if (closed) say('burnErr', st.burn_closed || 'Burning is closed right now.');
 }
 function renderBurn() {
   $('bEach').textContent = n0(st.credit?.per_nft);
+  const x = st.credit?.rarity_x || {};
+  $('bRarity').textContent = Object.entries(x).filter(([, v]) => v > 1).map(([r, v]) => `${r} ${v}x (${n0(v * st.credit.per_nft)})`).join(' · ');
   renderGrid();
   show('moreWrap', nfts.length < Number(st.total));
   $('bLimits').textContent = `Burned NFTs are gone for good: no undo. Up to ${n0(st.max)} at a time. You have ${n0(st.credit?.balance)} $CREDIT. ${launchLine()}`;
@@ -446,7 +454,7 @@ function closeBurnConfirm() {
 function renderBurned() {
   const b = burned;
   $('rHead').textContent = `Burnt ${n0(b.count)} NFT${b.count === 1 ? '' : 's'}`;
-  $('rBody').replaceChildren(`${n0(b.count)} × ${n0(st.credit?.per_nft)} = `, Object.assign(document.createElement('b'), { className: 'mono', textContent: `${n0(b.credit)} $CREDIT` }),
+  $('rBody').replaceChildren(`${n0(b.count)} NFT${b.count === 1 ? '' : 's'} = `, Object.assign(document.createElement('b'), { className: 'mono', textContent: `${n0(b.credit)} $CREDIT` }),
     ` credited. Your $CREDIT: ${n0(b.balance ?? st.credit?.balance)}.`);
   const img = ours(b.image_url);
   show('rCard', !!img);
@@ -531,7 +539,7 @@ $('go').addEventListener('click', () => {
   if (!picked.size || busy || pendingBurn) return;
   pendingBurn = [...picked].sort((x, y) => x - y);
   const n = pendingBurn.length;
-  const total = n * (Number(st.credit?.per_nft) || 0);
+  const total = pickedCredit(pendingBurn);
   $('yes').textContent = `Confirm: burn ${n} NFT${n === 1 ? '' : 's'}`;
   $('confirmBurn').textContent = `Burn ${n} NFT${n === 1 ? '' : 's'} for ${n0(total)} $CREDIT? They are gone for good: they can't be sold, sent or brought back.`;
   $('find').disabled = true;
@@ -598,9 +606,8 @@ $('yes').addEventListener('click', async () => {
     if (at.every((x) => x === 'burned')) {
       say('burnErr', '');
       const b = r.structuredContent.burn; // the burn that took these NFTs
-      const each = Number(st?.credit?.per_nft) || 0;
       const card = b?.card_url || null;
-      done({ count: list.length, credit: b?.credit ?? list.length * each, balance: st?.credit?.balance, nfts: list.map((id) => ({ id })),
+      done({ count: list.length, credit: b?.credit ?? pickedCredit(list), balance: st?.credit?.balance, nfts: list.map((id) => ({ id })),
         card_url: card, image_url: card ? `${card}.png` : null, share_url: null, launch_line: st?.credit?.launch_line });
     } else if (at.every((x) => x === 'yours')) {
       closeBurnConfirm();
