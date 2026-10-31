@@ -269,6 +269,7 @@ export function buildMcpServer(db, userId, opts) {
       news = recent.length ? 'Deposits in the last 24 hours:\n' + recent.map(line).join('\n') + '\nNothing newer yet.'
         : 'No deposits yet. A transfer usually shows up within a minute after it is sent; ask me to check again.';
       if (r.error) news += '\n(The Solana network did not answer just now. Nothing is lost: deposits are also picked up automatically.)';
+      news += `\nSent it more than 10 minutes ago and still nothing? Report it here: ${publicUrl}/lost-deposit`;
     }
     const testNote = deposits.cluster === 'devnet'
       ? '\n\nTEST SERVER: this is Solana devnet, not real money. Free devnet USDC: https://faucet.circle.com (pick Solana Devnet) and send it to the address above.'

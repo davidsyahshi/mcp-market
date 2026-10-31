@@ -14,7 +14,8 @@ import { toMicro, units, MoneyError } from './money.js';
 import { createDeposits } from './deposits.js';
 import { createWithdrawals } from './withdrawals.js';
 import { withdrawUi } from './ui.js';
-import { createExplorer } from './explorer.js';
+import { createExplorer, TX_TYPES } from './explorer.js';
+import * as claims from './claims.js';
 import * as lp from './launchpad.js';
 import { defaultStorage, defaultBackupStore, sniffImage } from './storage.js';
 import { runBackup, lastBackup, keyTime, KEY_RE } from './backup.js';
@@ -27,7 +28,7 @@ const sameSecret = (given, key) => {
 };
 
 // the website's own pages: index.html draws them (site/index.html, route()); keep in step with netlify.toml
-export const SITE_PAGES = /^\/(market|collections|connect|explorer|launch|admin|(c|nft|tx|a|u)\/[A-Za-z0-9_-]{1,64})\/?$/;
+export const SITE_PAGES = /^\/(market|mint|lost-deposit|collections|connect|explorer|launch|admin|(c|nft|tx|a|u)\/[A-Za-z0-9_-]{1,64})\/?$/;
 
 export async function createApp(opts) {
   const { db } = opts;
@@ -311,6 +312,8 @@ export async function createApp(opts) {
       res.status(500).json({ error: String(e.message || e) });
     }
   });
+  admin.get('/deposit-claims', wrap(async (req) => claims.listClaims(db, { status: str(req.query.status) || null })));
+  admin.post('/deposit-claims/:id', wrap(async (req) => claims.updateClaim(db, idOf(req), { status: req.body?.status, note: req.body?.note })));
   api.use('/admin', admin);
 
   // only accounts that chose to show their X handle can be found by it
@@ -325,6 +328,20 @@ export async function createApp(opts) {
     res.json(rows.map((r) => ({ ...r, price: num(r.price) })));
   });
 
+  // a lost deposit, reported on the site's /lost-deposit page; no sign-in needed (it is attached if there is one), but
+  // the site's header and origin are, and a few reports per hour from one address. The owner checks them in /admin.
+  api.post('/deposit-claims', express.json({ limit: '4kb' }), async (req, res) => {
+    if (req.get('x-mcp-site') !== '1' || (req.get('origin') && req.get('origin') !== siteOrigin)) return res.status(403).json({ error: 'forbidden' });
+    try {
+      const u = await siteUser(req).catch(() => null);
+      const c = await claims.createClaim(db, { ...(req.body || {}), ip: req.ip, userId: u?.id ?? null });
+      res.json({ received: true, id: c.id, duplicate: c.duplicate }); // nothing about how it is going: anyone may know a signature
+    } catch (e) {
+      if (e instanceof MoneyError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+  });
+
   // the explorer: public, read-only. Everything is shown under MCP addresses (see explorer.js).
   const ex = express.Router();
   const addrOk = (a) => a === 'treasury' || a === 'escrow' || m.isPublicId(a);
@@ -333,7 +350,9 @@ export async function createApp(opts) {
   ex.get('/txs', async (req, res) => {
     const addr = str(req.query.addr);
     if (addr && !addrOk(addr)) return res.status(400).json({ error: 'not an MCP address' });
-    res.json(await explorer.txs({ before: intOr(req.query.before), addr, limit: intOr(req.query.limit, 30) }));
+    const type = str(req.query.type);
+    if (type && !Object.hasOwn(TX_TYPES, type)) return res.status(400).json({ error: `type: one of ${Object.keys(TX_TYPES).join(', ')}` });
+    res.json(await explorer.txs({ before: intOr(req.query.before), addr, limit: intOr(req.query.limit, 30), type: type || null }));
   });
   ex.get('/tx/:id', async (req, res) => {
     const t = intOr(req.params.id) != null ? await explorer.tx(intOr(req.params.id)) : null;

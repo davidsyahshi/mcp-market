@@ -30,6 +30,7 @@ export const TABLES = {
   promo_codes: 'code',
   promo_redemptions: 'id',
   promo_tasks_shown: 'code, user_id',
+  deposit_claims: 'id',
   oauth_clients: 'client_id',
   oauth_tokens: 'token',
 };

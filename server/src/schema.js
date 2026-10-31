@@ -274,6 +274,8 @@ alter table ledger add column if not exists seq bigint;
 alter table ledger add column if not exists hash text;
 create unique index if not exists ledger_seq on ledger(seq);
 create index if not exists ledger_xact on ledger(xact);
+-- the explorer's type filter (mints, sales, transfers…), newest first
+create index if not exists ledger_kind on ledger(kind, id desc);
 create index if not exists ledger_unsealed on ledger(id) where seq is null;
 create or replace function ledger_guard() returns trigger language plpgsql as $g$
 begin
@@ -363,6 +365,22 @@ create table if not exists nft_send_previews (
   created_at timestamptz not null default now()
 );
 create index if not exists nft_send_previews_age on nft_send_previews(created_at);
+-- lost deposits reported on the site (/lost-deposit): checked by the owner in /admin; a report never moves money
+create table if not exists deposit_claims (
+  id serial primary key,
+  deposit_address text not null,        -- the Solana address MCP gave for deposits, as the person typed it
+  from_wallet text not null,            -- the wallet they sent from
+  tx text not null,                     -- the transaction signature
+  user_id int references users(id),     -- signed in on the site when they reported it, if they were
+  ip_hash text not null,                -- salted hash of the sender's IP address, for the rate limit only
+  status text not null default 'new',   -- new | done | rejected
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
+);
+create unique index if not exists deposit_claims_tx_addr on deposit_claims(tx, deposit_address);
+create index if not exists deposit_claims_tx on deposit_claims(tx);
+create index if not exists deposit_claims_ip on deposit_claims(ip_hash, created_at);
 
 -- OAuth for the MCP connector. Codes and tokens are stored as sha256 hashes, never in plain text.
 create table if not exists oauth_clients (
@@ -419,6 +437,7 @@ alter table promo_redemptions enable row level security;
 alter table promo_misses enable row level security;
 alter table promo_tasks_shown enable row level security;
 alter table nft_send_previews enable row level security;
+alter table deposit_claims enable row level security;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') and exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on all tables in schema public from anon, authenticated;

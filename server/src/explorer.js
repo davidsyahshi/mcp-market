@@ -58,6 +58,17 @@ export function explorerConfig(env = process.env) {
 
 const KINDS = { deposit: 'deposit', faucet: 'faucet', mint: 'mint', team_mint: 'team mint', free_mint: 'free mint', buy: 'buy', send: 'transfer', withdraw: 'withdrawal', withdraw_refund: 'refund', payout: 'payout', mint_refund: 'refund' };
 const ESCROW_SQL = `(${ESCROW_KINDS.map((k) => `'${k}'`).join(', ')})`;
+// the explorer's filter: which ledger rows mark a transaction of each type. A sale is one transaction with a "buy" row
+// (the buyer) and a "sale" row (the seller): on the whole market "buy" and "sell" are the same list; on an account's
+// page they are what it bought and what it sold.
+export const TX_TYPES = {
+  mint: ['mint', 'team_mint', 'free_mint'],
+  buy: ['buy'],
+  sell: ['sale'],
+  transfer: ['send', 'receive'],
+  deposit: ['deposit'],
+  withdrawal: ['withdraw'],
+};
 
 export function createExplorer(db, opts = {}) {
   const cfg = { ...explorerConfig(), ...(opts.config || {}) };
@@ -331,8 +342,9 @@ export function createExplorer(db, opts = {}) {
     }).sort((a, b) => b.id - a.id);
   }
 
-  async function txs({ before = null, addr = null, limit = 30 } = {}) {
+  async function txs({ before = null, addr = null, limit = 30, type = null } = {}) {
     const n = Math.min(Math.max(Number(limit) || 30, 1), 100);
+    // type: only transactions with a row of these kinds (TX_TYPES); on an account's page, rows of that account
     // addr: only transactions touching that MCP address ("treasury": the market's own rows)
     // The newest rows by id (index), then their whole transactions. A transaction's rows have neighbouring ids,
     // so a window of 4 rows per transaction is usually plenty. A big transaction (a team mint has 50 rows, a send of 50 NFTs 100) can fill
@@ -343,9 +355,12 @@ export function createExplorer(db, opts = {}) {
       if (!u) return [];
       userId = u.id;
     }
-    const filter = addr === 'treasury' ? `and user_id is null and kind not in ${ESCROW_SQL}` : addr === 'escrow' ? `and user_id is null and kind in ${ESCROW_SQL}`
-      : userId != null ? 'and user_id = $4' : '';
-    const params = (win) => (userId != null ? [before ?? null, n, win, userId] : [before ?? null, n, win]);
+    const kinds = type && Object.hasOwn(TX_TYPES, type) ? TX_TYPES[type] : null;
+    const base = (win) => (userId != null ? [before ?? null, n, win, userId] : [before ?? null, n, win]);
+    const kindAt = userId != null ? 5 : 4;
+    const filter = (addr === 'treasury' ? `and user_id is null and kind not in ${ESCROW_SQL}` : addr === 'escrow' ? `and user_id is null and kind in ${ESCROW_SQL}`
+      : userId != null ? 'and user_id = $4' : '') + (kinds ? ` and kind = any($${kindAt}::text[])` : '');
+    const params = (win) => (kinds ? [...base(win), kinds] : base(win));
     let groups = [];
     for (let win = n * 4; ; win *= 8) {
       groups = await db.query(`select xact, min(id) as first from ledger where xact in (
