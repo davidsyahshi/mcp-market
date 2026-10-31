@@ -346,12 +346,15 @@ test('admin: claims with wallets, copied as wallet,amount lines (one per wallet)
   assert.match(js, /navigator\.clipboard\.writeText\(lines\)/);
 });
 
-test('Tokens page: its own address, in the menu, "$CREDIT IS GOING LIVE SOON"', () => {
+test('Tokens page: its own address, in the menu, $CREDIT with its CA and the airdrop feed', () => {
   assert.ok(SITE_PAGES.test('/tokens'));
   const site = fs.readFileSync(path.join(root, 'site', 'index.html'), 'utf8');
   assert.match(site, /<a href="\/tokens" data-nav="tokens">Tokens<\/a>/);
-  assert.match(site, /<span class="tk">\$CREDIT<\/span> IS GOING<br>LIVE SOON/);
-  assert.match(site, /if \(pathPart === '\/tokens'\) return renderTokens\(\);/);
+  assert.match(site, /<h1 class="px" id="tkTitle">\$CREDIT<\/h1>/);
+  assert.match(site, /Contract address \(CA\)/);
+  assert.match(site, /Buy on pump\.fun/);
+  assert.match(site, /if \(pathPart === '\/tokens'\) return renderTokens\(query\);/);
+  assert.ok(fs.existsSync(path.join(root, 'site', 'credit.svg')));
   assert.match(fs.readFileSync(path.join(root, 'netlify.toml'), 'utf8'), /from = "\/tokens"/);
 });
 
