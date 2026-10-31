@@ -938,8 +938,10 @@ export function buildMcpServer(db, userId, opts) {
       }
       const state = await cState().catch((e) => { console.error('credit form state', e.message); return null; });
       return {
-        content: [text(`Claim #${c.id}: ${credit.credits(c.amount)} $CREDIT to ${c.wallet}, in the airdrop. Fee ${m.fmt(c.fee)}. ${credit.launchLine()}`)],
-        structuredContent: { state, claimed: { ...c, fee: c.fee / 1e6, mcp_balance: c.mcp_balance / 1e6, launch_text: credit.launchText(), launch_line: credit.launchLine() } },
+        content: [text(`Claim #${c.id}: ${credit.credits(c.amount)} $CREDIT to ${c.wallet}, in the airdrop. Fee ${m.fmt(c.fee)}. ${credit.launchLine()} ` +
+          `The airdrop goes out in batches; its place in the queue and its Solana transaction: ${publicUrl}/tokens?w=${c.wallet}`)],
+        structuredContent: { state, claimed: { ...c, fee: c.fee / 1e6, mcp_balance: c.mcp_balance / 1e6, launch_text: credit.launchText(), launch_line: credit.launchLine(),
+          track_url: `${publicUrl}/tokens?w=${c.wallet}` } },
       };
     });
   }

@@ -22,6 +22,7 @@ import { defaultStorage, defaultBackupStore, sniffImage } from './storage.js';
 import { runBackup, lastBackup, keyTime, KEY_RE } from './backup.js';
 import { bigImage } from './assets.js';
 import * as credit from './credit.js';
+import * as airdrop from './airdrop.js';
 import { burnCard, airdropCard } from './card.js';
 
 const sameSecret = (given, key) => {
@@ -177,6 +178,18 @@ export async function createApp(opts) {
       recent: recent.map(feedItem),
     });
   });
+  // The Tokens page: the $CREDIT token (CA, link) and its airdrop: batches sent with their Solana transactions, the batch
+  // being sent, the queue. Polled every few seconds by every open page, so one URL for everyone, cached by the CDN.
+  api.get('/credit/airdrop', async (req, res) => cdn(res, 3).json(await airdrop.feed(db)));
+  // one wallet: its batch, its transaction, or its place in the queue and roughly when
+  api.get('/credit/airdrop/wallet/:wallet', async (req, res) => {
+    try {
+      cdn(res, 3).json(await airdrop.walletStatus(db, String(req.params.wallet)));
+    } catch (e) {
+      if (e instanceof m.MarketError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+  });
   // older mints, page by page, for scrolling down the mint page
   api.get('/mint/feed', async (req, res) => {
     const items = await m.mintFeed(db, { collection: m.OWN_COLLECTION, cursor: str(req.query.cursor), limit: intOr(req.query.limit, 48) });
@@ -267,7 +280,8 @@ export async function createApp(opts) {
   api.use('/launch', launch);
   // the owner's review queue and money actions
   const admin = express.Router();
-  admin.use(guard, express.json({ limit: '16kb' }), (req, res, next) => (isAdmin(req.user) ? next() : res.status(403).json({ error: 'Only the owner of the market can do this.' })));
+  // 512 KB: a batch's report from a multisender (wallet, amount, signature per line) is ~200 bytes a wallet
+  admin.use(guard, express.json({ limit: '512kb' }), (req, res, next) => (isAdmin(req.user) ? next() : res.status(403).json({ error: 'Only the owner of the market can do this.' })));
   admin.get('/collections', wrap(async () => {
     const rows = await db.query(`select c.*, u.handle as creator_handle, u.public_id as creator_addr,
       (select count(*)::int from nfts where collection_id = c.id and minted_at is not null) as minted
@@ -322,6 +336,20 @@ export async function createApp(opts) {
   admin.get('/credit', wrap(async () => credit.adminCredit(db)));
   admin.post('/credit/mark', wrap(async (req) => credit.markClaims(db, req.body?.ids, String(req.body?.status || ''))));
   admin.post('/credit/void/:id', wrap(async (req) => credit.voidClaim(db, idOf(req))));
+  // the airdrop, batch by batch (airdrop.js): make the next batch, copy its lines, send them, paste the signatures
+  admin.get('/airdrop', wrap(async () => airdrop.adminBatches(db)));
+  admin.post('/airdrop/batch', wrap(async (req) => airdrop.makeBatch(db, req.body?.size)));
+  // next: the size of the batch to make right after this one is marked sent (the owner just copies it and sends it)
+  admin.post('/airdrop/batch/:id/sent', wrap(async (req) => {
+    const r = await airdrop.markBatchSent(db, idOf(req), {
+      sent: typeof req.body?.sent === 'string' ? req.body.sent : '', failed: typeof req.body?.failed === 'string' ? req.body.failed : '' });
+    const size = Number(req.body?.next);
+    const next = Number.isInteger(size) && size > 0 ? await airdrop.makeBatch(db, size).catch(() => null) : null;
+    return { ...r, next: next && { no: next.no, wallets: next.wallets } };
+  }));
+  admin.post('/airdrop/batch/:id/cancel', wrap(async (req) => airdrop.cancelBatch(db, idOf(req))));
+  // the token's CA and Buy link on the Tokens page: set once
+  admin.post('/airdrop/token', wrap(async (req) => airdrop.setToken(db, { ca: req.body?.ca, url: req.body?.url })));
   // free $CREDIT drops: a code people type in the chat (/mcpcredit FREE1000) for a fixed amount of $CREDIT each
   admin.get('/drops', wrap(async () => credit.drops(db)));
   admin.post('/drops', wrap(async (req) => credit.createDrop(db, { code: req.body?.code, amount: req.body?.amount, uses: req.body?.uses, ...links(req.body) })));

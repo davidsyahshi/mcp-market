@@ -350,21 +350,21 @@ export async function adminCredit(db) {
       (select count(*)::int from credit_claims where status = 'void') as void,
       (select coalesce(sum(fee), 0)::bigint from credit_claims) as fees`);
   // the newest 1,000 to look at; the airdrop list below has every pending one
-  const claims = await db.query(`select c.*, u.public_id, u.handle from credit_claims c join users u on u.id = c.user_id
-    order by (c.status = 'pending') desc, c.id desc limit 1000`);
+  const claims = await db.query(`select c.*, u.public_id, u.handle, b.no as batch_no from credit_claims c join users u on u.id = c.user_id
+    left join credit_batches b on b.id = c.batch_id order by (c.status = 'pending') desc, c.id desc limit 1000`);
   return {
     totals: Object.fromEntries(Object.entries(s).map(([k, v]) => [k, k === 'fees' ? Number(v) / 1e6 : Number(v)])),
     per_nft: CONFIG.perNft, launch_at: launchAt()?.toISOString() || null,
-    claims: claims.map((c) => ({ ...claimView(c), addr: c.public_id, handle: c.handle })),
+    claims: claims.map((c) => ({ ...claimView(c), addr: c.public_id, handle: c.handle, batch: c.batch_no == null ? null : Number(c.batch_no), tx: c.tx || null })),
     ...await airdrop(db),
   };
 }
 
-// every pending claim, one line per wallet with its total: "wallet,amount" for an airdrop tool, and the claims those
-// lines cover (the page marks exactly these sent, so a claim that comes in after the copy isn't marked by mistake)
+// every pending claim that is in no airdrop batch yet (airdrop.js), one line per wallet with its total: "wallet,amount"
+// for an airdrop tool, and the claims those lines cover
 export async function airdrop(db) {
   const rows = await db.query(`select wallet, sum(amount)::bigint as amount, array_agg(id order by id) as ids
-    from credit_claims where status = 'pending' group by wallet order by min(id)`);
+    from credit_claims where status = 'pending' and batch_id is null group by wallet order by min(id)`);
   return { airdrop: rows.map((r) => `${r.wallet},${Number(r.amount)}`).join('\n'), airdrop_ids: rows.flatMap((r) => r.ids.map(Number)) };
 }
 
@@ -373,7 +373,9 @@ export async function markClaims(db, ids, status) {
   if (!['sent', 'pending'].includes(status)) fail('Status is sent or pending.');
   const list = [...new Set((Array.isArray(ids) ? ids : []).map(Number))].filter((x) => Number.isInteger(x) && x > 0);
   if (!list.length || list.length > 100_000) fail('Give 1 to 100,000 claim numbers.');
-  const rows = await db.query(`update credit_claims set status = $2, sent_at = case when $2 = 'sent' then coalesce(sent_at, now()) else null end
+  // back to pending (Undo): back in the queue too, out of its batch
+  const rows = await db.query(`update credit_claims set status = $2, sent_at = case when $2 = 'sent' then coalesce(sent_at, now()) else null end,
+      batch_id = case when $2 = 'pending' then null else batch_id end, tx = case when $2 = 'pending' then null else tx end
     where id = any($1::int[]) and status <> $2 and status <> 'void' returning id`, [list, status]);
   return { updated: rows.length };
 }
@@ -385,6 +387,7 @@ export async function voidClaim(db, id) {
     const [c] = await t.query('select * from credit_claims where id = $1 for update', [Number(id) || 0]);
     if (!c) fail('There is no such claim.');
     if (c.status !== 'pending') fail(`Claim #${c.id} is ${c.status}: only a pending claim can be voided.`);
+    if (c.batch_id != null) fail(`Claim #${c.id} is in an airdrop batch that is being sent. Mark its wallet failed there (or cancel the batch), then void it.`);
     await t.query("update credit_claims set status = 'void' where id = $1", [c.id]);
     const [u] = await t.query('update users set credit_balance = credit_balance + $1 where id = $2 returning credit_balance', [c.amount, c.user_id]);
     return { id: Number(c.id), returned: Number(c.amount), credit_balance: Number(u.credit_balance) };

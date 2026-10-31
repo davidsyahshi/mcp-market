@@ -446,6 +446,23 @@ create table if not exists credit_drop_claims (
   done_at timestamptz,
   unique (code, user_id)
 );
+-- The $CREDIT airdrop, batch by batch (airdrop.js). The owner makes a batch of the oldest pending claims (one line per
+-- wallet), sends it from his own wallet with a multisender, pastes the transaction signatures and marks it sent. The
+-- Tokens page shows the batches, the queue and where a wallet is in it. One batch is open ('sending') at a time; an open
+-- batch that is cancelled is deleted (its claims go back to the queue and its number is used again).
+create table if not exists credit_batches (
+  id serial primary key,
+  no int not null unique,                  -- the number people see: batch #1, #2, ...
+  size int not null default 100,           -- wallets asked for when it was made (the queue's estimate goes by it)
+  status text not null default 'sending' check (status in ('sending', 'sent')),
+  txs text[] not null default '{}',        -- its Solana transaction signatures, as the owner pasted them
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+create unique index if not exists credit_batches_one_open on credit_batches(status) where status = 'sending';
+alter table credit_claims add column if not exists batch_id int references credit_batches(id);
+alter table credit_claims add column if not exists tx text; -- this wallet's own transaction, when the owner pasted one
+create index if not exists credit_claims_batch on credit_claims(batch_id);
 -- a claim's wallet and amount never change after the fact; only its status (the owner marks it sent)
 create or replace function credit_claims_guard() returns trigger language plpgsql set search_path = pg_catalog, public as $g$
 begin
@@ -537,6 +554,7 @@ alter table burns enable row level security;
 alter table credit_claims enable row level security;
 alter table credit_drops enable row level security;
 alter table credit_drop_claims enable row level security;
+alter table credit_batches enable row level security;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') and exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on all tables in schema public from anon, authenticated;

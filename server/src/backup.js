@@ -32,6 +32,7 @@ export const TABLES = {
   promo_tasks_shown: 'code, user_id',
   deposit_claims: 'id',
   burns: 'id',
+  credit_batches: 'id',
   credit_claims: 'id',
   credit_drops: 'code',
   credit_drop_claims: 'id',
@@ -160,7 +161,7 @@ export async function restoreBackup(db, buf, { batch = 500 } = {}) {
       }
     }
     // the id counters carry on after the restored rows
-    for (const name of ['users', 'collections', 'ledger', 'sales', 'deposits', 'withdrawals', 'withdrawal_attempts', 'chain_anchors', 'promo_redemptions', 'deposit_claims', 'burns', 'credit_claims', 'credit_drop_claims']) {
+    for (const name of ['users', 'collections', 'ledger', 'sales', 'deposits', 'withdrawals', 'withdrawal_attempts', 'chain_anchors', 'promo_redemptions', 'deposit_claims', 'burns', 'credit_batches', 'credit_claims', 'credit_drop_claims']) {
       await t.query(`select setval(pg_get_serial_sequence('${name}', 'id'), greatest((select max(id) from ${name}), 1), (select max(id) from ${name}) is not null)`);
     }
     await t.query("select setval('nft_ids', greatest((select max(id) from nfts where id >= 100001), 100001), (select max(id) from nfts where id >= 100001) is not null)");

@@ -242,12 +242,12 @@ const FACE = [
   '.#g..........#g.',
   '.#g..........#g.',
 ];
-const COIN_N = 30;
+export const COIN_N = 30;
 const MID = (COIN_N - 1) / 2;
 const R0 = 14.7; // the coin
 const R1 = 13.3; // inside the rim
 const dist = (x, y) => Math.hypot(x - MID, y - MID);
-function coinCell(x, y) {
+export function coinCell(x, y) {
   const d = dist(x, y);
   if (d > R0) return null;
   const light = x + y < 22;
