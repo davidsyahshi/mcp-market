@@ -364,6 +364,10 @@ test('free $CREDIT drop through the promo-code tool: tasks, the card to post, th
   await assert.rejects(credit.createDrop(db, { code: 'BIGDROP', amount: 0, uses: 5 }), /per account/);
   for (const typed of ['FREE 1000 $CREDIT MCP', '/mcpcredit FREE1000', 'free 1,000 $CREDIT', 'FREE1000']) assert.equal(await credit.findDrop(db, typed), 'FREE1000', typed);
   assert.equal(await credit.findDrop(db, 'EARLY'), null);
+  // a drop's tasks: a comment under the post comes with like + RT
+  assert.deepEqual(credit.dropTasks({ tweet_url: 'https://x.com/a/status/1' }).map((t) => t.kind), ['like_rt', 'comment']);
+  assert.deepEqual(credit.dropTasks({ follow_url: 'https://x.com/a' }).map((t) => t.kind), ['follow']);
+  assert.deepEqual(credit.dropTasks({}), []);
 
   const a = await user(undefined, 0);
   const c = await chat(a);
@@ -373,14 +377,17 @@ test('free $CREDIT drop through the promo-code tool: tasks, the card to post, th
   assert.match(c.txt(await c.raw('mcpcredit')), /FREE 1,000 \$CREDIT airdrop is live: send \/mcpcredit FREE1000/);
   // 1. the tasks
   let r = await say('FREE 1000 $CREDIT MCP');
-  assert.match(c.txt(r), /FREE 1,000 \$CREDIT airdrop 🎁 Before you get it:\n1\. Follow us on X: https:\/\/x\.com\/mcpmarkets\n2\. Like \+ RT this post/);
+  assert.match(c.txt(r), /FREE 1,000 \$CREDIT airdrop 🎁 Before you get it:\n1\. Follow us on X: https:\/\/x\.com\/mcpmarkets\n2\. Like \+ RT this post: (\S+)\n3\. Comment on this post: https:\/\/x\.com\/mcpmarkets\/status\/123456789\n\nDone all 3\? Send one screenshot that shows them all, or a few \(following, like \+ RT, your comment\)\./);
+  assert.match(c.txt(r), /The user may send one screenshot or several\. When they show all of it \(the account followed; the post liked and reposted; the user's own comment under the post\)/);
   assert.equal(r.structuredContent.nfts.view, 'tasks');
+  assert.deepEqual(r.structuredContent.nfts.tasks.map((t) => t.kind), ['follow', 'like_rt', 'comment']);
+  assert.match(r.structuredContent.nfts.note, /Done all 3\?/);
   assert.match(r.structuredContent.nfts.intro, /FREE 1,000 \$CREDIT/);
-  r = await say('FREE1000', 'liked, reposted, following');
-  assert.match(c.txt(r), /Do the tasks first/, 'a screenshot right away is too soon');
+  r = await say('FREE1000', 'liked, reposted, following, commented');
+  assert.match(c.txt(r), /Do all 3 tasks first, then send the screenshots again\./, 'a screenshot right away is too soon');
   await older();
   // 2. the card to post: a use is counted, no $CREDIT yet
-  r = await say('FREE1000', 'post liked and reposted, following @mcpmarkets');
+  r = await say('FREE1000', 'post liked and reposted, following @mcpmarkets, their comment under the post');
   assert.match(c.txt(r), /Your FREE 1,000 \$CREDIT AIRDROP is reserved 🎁\nTo confirm your allocation you must post your card on X: https:\/\/x\.com\/intent\/post\?text=/);
   assert.ok(r.content.some((x) => x.type === 'image' && x.mimeType === 'image/png'), 'the card comes as a picture too');
   const card = r.structuredContent.nfts;
