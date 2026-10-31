@@ -29,7 +29,7 @@ after(async () => { await db?.close(); });
 test('commands: unique, end in -mcp (or one of the few named ones), each one points at a real tool that names it', async () => {
   const names = COMMANDS.map((x) => x.name);
   assert.equal(new Set(names).size, names.length);
-  for (const n of names) assert.match(n, /^([a-z]+-mcp|mcpcredit|mcpmint|showmynfts|sendnft|transfernft)$/, n);
+  for (const n of names) assert.match(n, /^([a-z]+-mcp|mcpcredit|mcpmint|mcpchat|showmynfts|sendnft|transfernft)$/, n);
   for (const n of ['mcpcredit', 'deposit-mcp', 'withdraw-mcp', 'mint-mcp', 'buynft-mcp', 'sellnft-mcp', 'help-mcp']) assert.ok(names.includes(n), n);
   const tools = (await c.listTools()).tools;
   for (const x of COMMANDS) {
@@ -72,7 +72,7 @@ test('commands: offered as MCP prompts that put the command in the chat', async 
 
 test('commands: the /connect page shows the same list', () => {
   const site = fs.readFileSync(new URL('../../site/index.html', import.meta.url), 'utf8');
-  const listed = [...site.matchAll(/\['(\/(?:[a-z]+-mcp|mcpcredit|mcpmint|showmynfts|sendnft|transfernft))', '([^']*)', '([^']*)'\]/g)].map((x) => x.slice(1));
+  const listed = [...site.matchAll(/\['(\/(?:[a-z]+-mcp|mcpcredit|mcpmint|mcpchat|showmynfts|sendnft|transfernft))', '([^']*)', '([^']*)'\]/g)].map((x) => x.slice(1));
   assert.deepEqual(listed, COMMANDS.map((x) => [`/${x.name}`, usage(x).slice(x.name.length + 2), x.does]));
 });
 
@@ -89,4 +89,47 @@ test('commands: /mcpcredit starts MCP: balance, the mint and the command list in
   assert.match(start.description, /\/mcpcredit/);
   assert.equal(start.annotations.readOnlyHint, true);
   assert.match(c.getInstructions(), /\/mcpcredit, the start command/);
+});
+
+test('commands: /mcpchat gives the holders chat link only to accounts that own an MCP NFT', async () => {
+  const { buildMcpServer: build } = await import('../src/mcp.js');
+  const url = 'https://x.com/i/chat/group_join/g1/abc';
+  const open = async (handle, chatUrl = url) => {
+    const [u] = await db.query("insert into users (x_id, handle) values ($1, $2) returning id", [`dev:${handle}`, handle]);
+    const server = build(db, u.id, { publicUrl: 'https://mcp.example', thumbsDir: '/nonexistent', deposits: { enabled: false }, ui: null, holdersChatUrl: chatUrl });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await server.connect(a);
+    const client = new Client({ name: 'test', version: '1' });
+    await client.connect(b);
+    const say = async () => (await client.callTool({ name: 'holders_chat', arguments: {} })).content.map((x) => x.text).join('\n');
+    return { id: u.id, client, say };
+  };
+  const holder = await open('holder1');
+  const nobody = await open('nobody1');
+  const unset = await open('holder2', '');
+  // no NFT: no link, how to get one
+  let t = await nobody.say();
+  assert.ok(!t.includes(url));
+  assert.match(t, /only for MCP holders/);
+  assert.match(t, /\/market-mcp/);
+  // an NFT of another collection is not an MCP NFT
+  const [col] = await db.query("insert into collections (slug, name, supply, mint_price, mint_limit, status) values ('other', 'Other', 1, 1000000, 1, 'live') returning id");
+  await db.query("insert into nfts (id, name, collection_id, edition) values (900001, 'Other #1', $1, 1)", [col.id]);
+  await db.query('update nfts set owner_id = $1, minted_at = now() where id = 900001', [nobody.id]);
+  assert.ok(!(await nobody.say()).includes(url));
+  // one MCP NFT: the link
+  await db.query("update nfts set owner_id = $1, minted_at = now() where id = (select n.id from nfts n join collections c on c.id = n.collection_id where c.slug = 'mcp' and n.minted_at is null order by n.id limit 1)", [holder.id]);
+  t = await holder.say();
+  assert.ok(t.includes(`Join here: ${url}`), t);
+  assert.match(t, /You hold 1 MCP NFT:/);
+  // a holder, but no link set on the server
+  await db.query("update nfts set owner_id = $1, minted_at = now() where id = (select n.id from nfts n join collections c on c.id = n.collection_id where c.slug = 'mcp' and n.minted_at is null order by n.id limit 1)", [unset.id]);
+  assert.match(await unset.say(), /isn't set up yet/);
+  // the tool names the command, reads only; the link is not in the tool list or the instructions
+  const tool = (await holder.client.listTools()).tools.find((x) => x.name === 'holders_chat');
+  assert.match(tool.description, /Chat command: \/mcpchat\./);
+  assert.equal(tool.annotations.readOnlyHint, true);
+  assert.ok(!JSON.stringify(await holder.client.listTools()).includes(url));
+  assert.ok(!holder.client.getInstructions().includes(url));
+  assert.match(holder.client.getInstructions(), /\/mcpchat \(also mcpchat\)/);
 });
