@@ -382,6 +382,101 @@ create unique index if not exists deposit_claims_tx_addr on deposit_claims(tx, d
 create index if not exists deposit_claims_tx on deposit_claims(tx);
 create index if not exists deposit_claims_ip on deposit_claims(ip_hash, created_at);
 
+-- $CREDIT (credit.js): MCP NFTs burned for $CREDIT, and claims of $CREDIT to a Solana wallet for the airdrop.
+-- $CREDIT is not $MCP: it is a separate balance (users.credit_balance, whole units) that never enters the $MCP ledger.
+-- An account's credit_balance is always the $CREDIT of its burns and finished free drops minus what its claims took
+-- (void claims gave theirs back).
+-- A burned NFT has no owner and can't be minted again (minted_at stays); each one is a zero-amount "burn" ledger row.
+alter table nfts add column if not exists burned_at timestamptz;
+alter table nfts add column if not exists burned_by int references users(id);
+alter table users add column if not exists credit_balance bigint not null default 0;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'users_credit_balance_check') then
+    alter table users add constraint users_credit_balance_check check (credit_balance >= 0);
+  end if;
+end $$;
+create table if not exists burns (
+  id serial primary key,
+  user_id int not null references users(id),
+  nft_ids int[] not null,
+  count int not null check (count > 0),
+  credit bigint not null check (credit > 0), -- $CREDIT it gave
+  xact bigint not null default txid_current(), -- the explorer transaction with its "burn" ledger rows
+  created_at timestamptz not null default now()
+);
+create index if not exists burns_user on burns(user_id);
+create index if not exists burns_xact on burns(xact);
+create table if not exists credit_claims (
+  id serial primary key,
+  user_id int not null references users(id),
+  wallet text not null,                 -- the Solana wallet the user gave for the airdrop
+  amount bigint not null check (amount > 0), -- $CREDIT claimed (all the account had)
+  fee bigint not null default 0,        -- $MCP paid for the claim, micro-units
+  client_key text,                      -- made by the claim form: a retry never makes a second claim
+  status text not null default 'pending' check (status in ('pending', 'sent', 'void')), -- void: undone by the owner, $CREDIT back
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+create unique index if not exists credit_claims_key on credit_claims(user_id, client_key);
+create index if not exists credit_claims_status on credit_claims(status, id);
+-- Free $CREDIT drops (credit.js: redeemDrop): a code from /admin gives each account a fixed amount of $CREDIT, through the
+-- chat's promo-code tool (redeem_code), so no new tool is needed. Steps per account: 'tasks' (follow, like + RT shown),
+-- 'post' (the screenshot showed them: the airdrop card is made, a use is counted), 'done' (the screenshot of the user's
+-- own post with the card: the $CREDIT is added). Drop codes and promo codes share one name space.
+create table if not exists credit_drops (
+  code text primary key,
+  amount bigint not null check (amount > 0),  -- $CREDIT per account
+  max_uses int not null check (max_uses > 0),
+  used int not null default 0 check (used >= 0 and used <= max_uses),
+  status text not null default 'active' check (status in ('active', 'paused')),
+  follow_url text,
+  tweet_url text,
+  created_at timestamptz not null default now()
+);
+create table if not exists credit_drop_claims (
+  id serial primary key,
+  code text not null references credit_drops(code),
+  user_id int not null references users(id),
+  stage text not null default 'tasks' check (stage in ('tasks', 'post', 'done')),
+  amount bigint not null default 0,      -- set when the card is made ('post')
+  task_proof text,                       -- what the assistant saw on the tasks screenshot
+  post_proof text,                       -- what it saw on the screenshot of the user's post
+  shown_at timestamptz not null default now(), -- when this step was shown (the next one waits a moment)
+  created_at timestamptz not null default now(),
+  done_at timestamptz,
+  unique (code, user_id)
+);
+-- a claim's wallet and amount never change after the fact; only its status (the owner marks it sent)
+create or replace function credit_claims_guard() returns trigger language plpgsql set search_path = pg_catalog, public as $g$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'credit claim % can not be deleted', old.id;
+  end if;
+  if new.user_id <> old.user_id or new.wallet <> old.wallet or new.amount <> old.amount or new.fee <> old.fee
+     or new.client_key is distinct from old.client_key or new.created_at <> old.created_at then
+    raise exception 'credit claim %: only its status can be changed', old.id;
+  end if;
+  return new;
+end $g$;
+drop trigger if exists credit_claims_guard on credit_claims;
+create trigger credit_claims_guard before update or delete on credit_claims for each row execute function credit_claims_guard();
+-- a finished free drop never changes or goes away (its $CREDIT is on the account)
+create or replace function credit_drop_claims_guard() returns trigger language plpgsql set search_path = pg_catalog, public as $g$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'free drop claim % can not be deleted', old.id;
+  end if;
+  if old.stage = 'done' and new is distinct from old then
+    raise exception 'free drop claim % is done and can not be changed', old.id;
+  end if;
+  if new.user_id <> old.user_id or new.code <> old.code then
+    raise exception 'free drop claim %: account and code can not be changed', old.id;
+  end if;
+  return new;
+end $g$;
+drop trigger if exists credit_drop_claims_guard on credit_drop_claims;
+create trigger credit_drop_claims_guard before update or delete on credit_drop_claims for each row execute function credit_drop_claims_guard();
+
 -- OAuth for the MCP connector. Codes and tokens are stored as sha256 hashes, never in plain text.
 create table if not exists oauth_clients (
   client_id text primary key,
@@ -438,6 +533,10 @@ alter table promo_misses enable row level security;
 alter table promo_tasks_shown enable row level security;
 alter table nft_send_previews enable row level security;
 alter table deposit_claims enable row level security;
+alter table burns enable row level security;
+alter table credit_claims enable row level security;
+alter table credit_drops enable row level security;
+alter table credit_drop_claims enable row level security;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'anon') and exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on all tables in schema public from anon, authenticated;

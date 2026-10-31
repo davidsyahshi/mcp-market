@@ -1,6 +1,7 @@
 // Small PNG tools with no dependencies: read a PNG of 8 bits per channel or less (palette, grey, RGB, RGBA), scale it
 // up by a whole factor with nearest neighbour (sharp pixels, like the site draws them) and write it back. The build uses
-// it for the big NFT pictures (/big/<id>.png, 1008 px) that people download from the site.
+// it for the big NFT pictures (/big/<id>.png, 1008 px) that people download from the site; card.js draws the burn
+// cards with toRgba and encodeRgb.
 import zlib from 'node:zlib';
 
 const SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -55,7 +56,7 @@ export function readPng(buf) {
   }
   const bpp = Math.max(1, (CHANNELS[colorType] * depth) >> 3); // bytes per pixel for the filters
   const stride = Math.ceil((width * CHANNELS[colorType] * depth) / 8);
-  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const raw = zlib.inflateSync(Buffer.concat(idat), { maxOutputLength: 64 * 1024 * 1024 });
   if (raw.length < height * (stride + 1)) throw new Error('PNG data is too short');
   const rows = Buffer.alloc(height * stride);
   for (let y = 0; y < height; y++) {
@@ -126,14 +127,75 @@ export function scalePng(img, factor) {
 }
 
 // filtered rows (each starting with its filter byte) to a PNG file
-export function writePng({ width, height, depth, colorType, extra = [] }, filtered) {
+export function writePng({ width, height, depth, colorType, extra = [] }, filtered, level = 9) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
   ihdr[8] = depth;
   ihdr[9] = colorType;
   return Buffer.concat([SIG, chunk('IHDR', ihdr), ...extra.map(([t, d]) => chunk(t, d)),
-    chunk('IDAT', zlib.deflateSync(filtered, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
+    chunk('IDAT', zlib.deflateSync(filtered, { level })), chunk('IEND', Buffer.alloc(0))]);
 }
 
 export const upscalePng = (buf, factor) => scalePng(readPng(buf), factor);
+
+// a decoded picture as RGBA bytes, width * height * 4
+export function toRgba(img) {
+  const { width, height, depth, colorType } = img;
+  const ch = CHANNELS[colorType];
+  const out = new Uint8Array(width * height * 4);
+  const plte = img.extra.find(([t]) => t === 'PLTE')?.[1];
+  const trns = img.extra.find(([t]) => t === 'tRNS')?.[1];
+  const max = (1 << depth) - 1;
+  const at = (row, x, k) => (depth < 8 ? sampleAt(row, x, depth) : row[x * ch + k]);
+  for (let y = 0; y < height; y++) {
+    const row = img.rows.subarray(y * img.stride, (y + 1) * img.stride);
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4;
+      if (colorType === 3) {
+        const i = at(row, x, 0);
+        out[o] = plte?.[i * 3] ?? 0; out[o + 1] = plte?.[i * 3 + 1] ?? 0; out[o + 2] = plte?.[i * 3 + 2] ?? 0;
+        out[o + 3] = trns && i < trns.length ? trns[i] : 255;
+      } else if (colorType === 0 || colorType === 4) {
+        const v = Math.round((at(row, x, 0) * 255) / max);
+        out[o] = out[o + 1] = out[o + 2] = v;
+        out[o + 3] = colorType === 4 ? row[x * ch + 1] : 255;
+      } else {
+        out[o] = row[x * ch]; out[o + 1] = row[x * ch + 1]; out[o + 2] = row[x * ch + 2];
+        out[o + 3] = colorType === 6 ? row[x * ch + 3] : 255;
+      }
+    }
+  }
+  return out;
+}
+
+// RGB bytes (width * height * 3) to a PNG: a palette PNG when there are 256 colours or fewer (flat pixel art), else RGB
+export function encodeRgb(width, height, rgb) {
+  const colors = new Map();
+  for (let i = 0; i < rgb.length && colors.size <= 256; i += 3) {
+    const k = (rgb[i] << 16) | (rgb[i + 1] << 8) | rgb[i + 2];
+    if (!colors.has(k)) colors.set(k, colors.size);
+  }
+  if (colors.size <= 256) {
+    const plte = Buffer.alloc(colors.size * 3);
+    for (const [k, i] of colors) { plte[i * 3] = k >> 16; plte[i * 3 + 1] = (k >> 8) & 255; plte[i * 3 + 2] = k & 255; }
+    const out = Buffer.alloc(height * (width + 1));
+    for (let y = 0; y < height; y++) {
+      const at = y * (width + 1);
+      out[at] = 0;
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 3;
+        out[at + 1 + x] = colors.get((rgb[i] << 16) | (rgb[i + 1] << 8) | rgb[i + 2]);
+      }
+    }
+    return writePng({ width, height, depth: 8, colorType: 3, extra: [['PLTE', plte]] }, out, 6);
+  }
+  const stride = width * 3;
+  const out = Buffer.alloc(height * (stride + 1));
+  for (let y = 0; y < height; y++) {
+    const at = y * (stride + 1);
+    out[at] = 1; // Sub
+    for (let x = 0; x < stride; x++) out[at + 1 + x] = (rgb[y * stride + x] - (x >= 3 ? rgb[y * stride + x - 3] : 0)) & 255;
+  }
+  return writePng({ width, height, depth: 8, colorType: 2 }, out, 6);
+}

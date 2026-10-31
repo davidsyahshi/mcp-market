@@ -360,6 +360,8 @@ export async function createPromo(db, { code, uses, follow_url, tweet_url } = {}
   checkLinks(links);
   const col = await getCollection(db, OWN_COLLECTION);
   if (!col) fail(`There is no collection "${OWN_COLLECTION}".`);
+  // free $CREDIT drops (credit.js) share the name space
+  if ((await db.query('select 1 from credit_drops where code = $1', [c0])).length) fail(`${c0} is already a $CREDIT drop.`);
   try {
     await db.query('insert into promo_codes (code, collection_id, max_uses, follow_url, tweet_url) values ($1, $2, $3, $4, $5)',
       [c0, col.id, uses, links.follow_url || null, links.tweet_url || null]);
@@ -591,7 +593,7 @@ export async function sendsLeft(db, fromId) {
 // ---------- read side, shared by the MCP tools and the public preview API ----------
 
 // owner_addr: the owner's MCP address; owner_name: their X handle, only when they chose to show it
-const NFT_COLS = `n.id, n.name, n.edition, n.rarity, n.attributes, n.pixel, n.price, n.listed_at, n.minted_at,
+const NFT_COLS = `n.id, n.name, n.edition, n.rarity, n.attributes, n.pixel, n.price, n.listed_at, n.minted_at, n.burned_at,
   c.slug as collection, c.name as collection_name, c.status as collection_status,
   u.public_id as owner_addr, case when u.show_handle then u.handle end as owner_name`;
 const NFT_FROM = 'from nfts n join collections c on c.id = n.collection_id left join users u on u.id = n.owner_id';
@@ -637,7 +639,7 @@ export async function getNft(db, id, { anyStatus = false } = {}) {
 // the NFT's own transactions from the ledger (mint, sales and transfers), newest first; tx = the explorer's transaction number
 export async function activity(db, id) {
   const rows = await db.query(`select l.id, l.xact, l.kind, l.delta, l.created_at, ${PUBLIC_NAME('u', 'user')}
-    from ledger l join users u on u.id = l.user_id where l.ref = $1 and l.kind in ('mint', 'team_mint', 'free_mint', 'buy', 'sale', 'send', 'receive') order by l.id`, [String(id)]);
+    from ledger l join users u on u.id = l.user_id where l.ref = $1 and l.kind in ('mint', 'team_mint', 'free_mint', 'buy', 'sale', 'send', 'receive', 'burn') order by l.id`, [String(id)]);
   const byX = new Map();
   for (const r of rows) {
     const key = String(r.xact);
@@ -650,6 +652,7 @@ export async function activity(db, id) {
     if (r.kind === 'sale') Object.assign(a, { from_addr: r.user_addr, from_name: r.user_name });
     if (r.kind === 'send') Object.assign(a, { type: 'transfer', from_addr: r.user_addr, from_name: r.user_name, price: 0 });
     if (r.kind === 'receive') Object.assign(a, { to_addr: r.user_addr, to_name: r.user_name });
+    if (r.kind === 'burn') Object.assign(a, { type: 'burn', from_addr: r.user_addr, from_name: r.user_name, price: 0 });
   }
   return [...byX.values()].filter((a) => a.type).reverse();
 }
@@ -721,6 +724,7 @@ export async function stats(db, { collection, anyStatus = false } = {}) {
   const [s] = await db.query(`select
     (select count(*)::int from nfts where ${only}) as supply,
     (select count(*)::int from nfts where ${only} and minted_at is not null) as minted,
+    (select count(*)::int from nfts where ${only} and burned_at is not null) as burned,
     (select count(*)::int from nfts where ${only} and price is not null) as listed,
     (select min(price) from nfts where ${only} and price is not null) as floor,
     (select coalesce(sum(s.price), 0) from sales s join nfts n on n.id = s.nft_id where n.${only}) as volume,

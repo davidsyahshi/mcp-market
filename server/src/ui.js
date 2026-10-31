@@ -55,3 +55,5 @@ export const withdrawUi = (opts) => appPage('withdraw', opts);
 export const nftsUi = (opts) => appPage('nfts', opts);
 // the NFT transfer form: tick NFTs, type an MCP address, confirm
 export const transferUi = (opts) => appPage('transfer', opts);
+// the $CREDIT form: burn MCP NFTs for $CREDIT, or claim $CREDIT to a Solana wallet (one page, two views)
+export const creditUi = (opts) => appPage('credit', opts);

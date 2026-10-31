@@ -21,6 +21,8 @@ import * as lp from './launchpad.js';
 import { defaultStorage, defaultBackupStore, sniffImage } from './storage.js';
 import { runBackup, lastBackup, keyTime, KEY_RE } from './backup.js';
 import { bigImage } from './assets.js';
+import * as credit from './credit.js';
+import { burnCard, airdropCard } from './card.js';
 
 const sameSecret = (given, key) => {
   if (!key || typeof given !== 'string') return false;
@@ -30,7 +32,7 @@ const sameSecret = (given, key) => {
 };
 
 // the website's own pages: index.html draws them (site/index.html, route()); keep in step with netlify.toml
-export const SITE_PAGES = /^\/(market|mint|lost-deposit|collections|connect|explorer|launch|admin|(c|nft|tx|a|u)\/[A-Za-z0-9_-]{1,64})\/?$/;
+export const SITE_PAGES = /^\/(market|mint|lost-deposit|collections|connect|explorer|tokens|launch|admin|(c|nft|tx|a|u)\/[A-Za-z0-9_-]{1,64})\/?$/;
 
 export async function createApp(opts) {
   const { db } = opts;
@@ -193,7 +195,7 @@ export async function createApp(opts) {
       values: Object.entries(vals).map(([value, count]) => ({ value, count, percent: Math.round((count / full.supply) * 10000) / 100 }))
         .sort((a, b) => b.count - a.count),
     }));
-    res.json({ ...colView(c), holders: s.holders, sales: s.sales, traits });
+    res.json({ ...colView(c), holders: s.holders, sales: s.sales, burned: s.burned, traits });
   });
   api.get('/collections/:slug/nfts', async (req, res) => {
     if (!await visible(req, String(req.params.slug).toLowerCase())) return res.status(404).json({ error: 'not found' });
@@ -316,6 +318,14 @@ export async function createApp(opts) {
       res.status(500).json({ error: String(e.message || e) });
     }
   });
+  // $CREDIT: burns and claims for the airdrop; the page copies the pending claims as "wallet,amount" lines
+  admin.get('/credit', wrap(async () => credit.adminCredit(db)));
+  admin.post('/credit/mark', wrap(async (req) => credit.markClaims(db, req.body?.ids, String(req.body?.status || ''))));
+  admin.post('/credit/void/:id', wrap(async (req) => credit.voidClaim(db, idOf(req))));
+  // free $CREDIT drops: a code people type in the chat (/mcpcredit FREE1000) for a fixed amount of $CREDIT each
+  admin.get('/drops', wrap(async () => credit.drops(db)));
+  admin.post('/drops', wrap(async (req) => credit.createDrop(db, { code: req.body?.code, amount: req.body?.amount, uses: req.body?.uses, ...links(req.body) })));
+  admin.post('/drops/:code', wrap(async (req) => credit.updateDrop(db, req.params.code, { status: req.body?.status, uses: req.body?.uses, ...links(req.body) })));
   admin.get('/deposit-claims', wrap(async (req) => claims.listClaims(db, { status: str(req.query.status) || null })));
   admin.post('/deposit-claims/:id', wrap(async (req) => claims.updateClaim(db, idOf(req), { status: req.body?.status, note: req.body?.note })));
   api.use('/admin', admin);
@@ -428,6 +438,92 @@ export async function createApp(opts) {
     // the site's pages (/c/mcp, /nft/42, ...) are all index.html; on Netlify netlify.toml does the same
     app.get(SITE_PAGES, (req, res) => res.sendFile(path.join(root, 'site', 'index.html')));
   }
+  // A burn's card for X: /burn/<n>.png (the picture, drawn once and kept by the CDN; a burn never changes) and
+  // /burn/<n> (a small page with the picture whose link previews show the card)
+  // Drawing one takes ~0.1 s, so: one address per card (a query string or a leading zero goes to the plain one), the
+  // last few kept in memory, and the CDN keeps the rest (for good once nothing was missing from the picture)
+  const burnCache = { 'Cache-Control': 'public, max-age=3600', 'Netlify-CDN-Cache-Control': 'public, durable, max-age=31536000, immutable' };
+  const shortCache = { 'Cache-Control': 'public, max-age=300', 'Netlify-CDN-Cache-Control': 'public, durable, max-age=600' };
+  const drawn = new Map();
+  const remember = (key, v) => { drawn.set(key, v); if (drawn.size > 40) drawn.delete(drawn.keys().next().value); return v; };
+  // req.url: the public path (the first middleware strips the function's own prefix), with any query string
+  const canonical = (req, res, path) => {
+    if (req.url === path) return false;
+    res.redirect(301, path);
+    return true;
+  };
+  app.get(/^\/burn\/(\d{1,9})\.png$/, async (req, res) => {
+    const id = Number(req.params[0]);
+    if (!id || canonical(req, res, `/burn/${id}.png`)) return id ? undefined : res.status(404).json({ error: 'not found' });
+    let card = drawn.get(`b${id}`);
+    if (!card) {
+      const b = await credit.getBurn(db, id);
+      if (!b) return res.status(404).json({ error: 'not found' });
+      const opt = { thumbsDir, missing: 0 };
+      const png = burnCard(b, opt);
+      card = opt.missing ? { png, complete: false } : remember(`b${id}`, { png, complete: true });
+    }
+    res.set({ 'Content-Type': 'image/png', ...(card.complete ? burnCache : shortCache) }).send(card.png);
+  });
+  // a small page with the card whose link previews show it on X
+  const sharePage = (res, { page, title, desc, back, cta }) => {
+    const h = (v) => String(v).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+    const img = `${page}.png`;
+    res.set({
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+      'Cache-Control': 'public, max-age=300', 'Netlify-CDN-Cache-Control': 'public, durable, max-age=300', // shows a handle: short
+    }).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${h(title)} · MCP</title><meta name="description" content="${h(desc)}">
+<meta property="og:type" content="website"><meta property="og:site_name" content="MCP"><meta property="og:url" content="${h(page)}">
+<meta property="og:title" content="${h(title)}"><meta property="og:description" content="${h(desc)}">
+<meta property="og:image" content="${h(img)}"><meta property="og:image:width" content="1600"><meta property="og:image:height" content="900">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${h(title)}"><meta name="twitter:description" content="${h(desc)}"><meta name="twitter:image" content="${h(img)}">
+<link rel="icon" href="/favicon.png">
+<style>body{margin:0;min-height:100vh;background:#0D0D0F;color:#F5F1E8;font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px 16px;box-sizing:border-box}
+img{display:block;width:100%;max-width:960px;height:auto;border:2px solid #2A2A30}p{margin:0;text-align:center;color:#8C8A84}.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+a{color:#F5F1E8;text-decoration:none;border:2px solid #2A2A30;padding:10px 16px}a.red{background:#FF2A1F;border-color:#FF2A1F}</style></head>
+<body><img src="${h(new URL(img).pathname)}" alt="${h(title)}" width="1600" height="900"><p>${h(desc)}</p>
+<div class="row"><a class="red" href="/connect">${h(cta)}</a>${back ? `<a href="${h(back)}">In the explorer</a>` : ''}<a href="/">mcp.credit</a></div></body></html>`);
+  };
+  app.get(/^\/burn\/(\d{1,9})\/?$/, async (req, res) => {
+    const id = Number(req.params[0]);
+    if (!id || canonical(req, res, `/burn/${id}`)) return id ? undefined : res.status(404).json({ error: 'not found' });
+    const b = await credit.getBurn(db, id);
+    if (!b) return res.status(404).json({ error: 'not found' });
+    const who = b.name ? `@${b.name}` : b.address;
+    sharePage(res, {
+      page: `${publicUrl}/burn/${b.id}`,
+      title: `BURNT ${b.count.toLocaleString('en-US')} NFT${b.count === 1 ? '' : 's'} · ${credit.credits(b.credit)} $CREDIT`,
+      desc: `${who} burned ${b.count === 1 ? 'an MCP NFT' : `${b.count.toLocaleString('en-US')} MCP NFTs`} for ${credit.credits(b.credit)} $CREDIT, right inside their AI.`,
+      back: `/a/${b.address}`, cta: 'Burn yours: /burnmcp in your AI',
+    });
+  });
+  // a free $CREDIT airdrop's card: /airdrop/<n>.png and its page
+  app.get(/^\/airdrop\/(\d{1,9})\.png$/, async (req, res) => {
+    const id = Number(req.params[0]);
+    if (!id || canonical(req, res, `/airdrop/${id}.png`)) return id ? undefined : res.status(404).json({ error: 'not found' });
+    let card = drawn.get(`a${id}`);
+    if (!card) {
+      const d = await credit.getDropCard(db, id);
+      if (!d) return res.status(404).json({ error: 'not found' });
+      card = remember(`a${id}`, { png: airdropCard(d), complete: true });
+    }
+    res.set({ 'Content-Type': 'image/png', ...burnCache }).send(card.png);
+  });
+  app.get(/^\/airdrop\/(\d{1,9})\/?$/, async (req, res) => {
+    const id = Number(req.params[0]);
+    if (!id || canonical(req, res, `/airdrop/${id}`)) return id ? undefined : res.status(404).json({ error: 'not found' });
+    const d = await credit.getDropCard(db, id);
+    if (!d) return res.status(404).json({ error: 'not found' });
+    sharePage(res, {
+      page: `${publicUrl}/airdrop/${d.id}`,
+      title: `FREE ${credit.credits(d.amount)} $CREDIT · AIRDROP INSIDE AI`,
+      desc: `${d.name ? `@${d.name}` : d.address} got a free ${credit.credits(d.amount)} $CREDIT airdrop, right inside their AI. Get yours: /mcpcredit ${d.code}`,
+      back: null, cta: `Get yours: /mcpcredit ${d.code}`,
+    });
+  });
+
   // pictures of launchpad collections (the market's own come from the CDN, or from the folders above locally)
   app.get(/^\/(img|thumb)\/(\d{1,9})\.png$/, async (req, res) => {
     const [kind, id] = [req.params[0], Number(req.params[1])];

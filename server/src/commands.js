@@ -47,6 +47,10 @@ export const COMMANDS = [
       'its confirm code only after the user answers yes. The command itself is not the yes' },
   { name: 'transfernft', tool: 'transfer_form', does: 'The transfer form: tick the NFTs you want to send, type the MCP address, confirm',
     how: 'call transfer_form and let the user pick in the form; nothing is sent until they confirm there' },
+  { name: 'burnmcp', tool: 'burn_form', does: 'Burn MCP NFTs for $CREDIT, 10,000 each: tick them in a form and confirm there',
+    how: 'call burn_form and let the user pick in the form; nothing is burned until they confirm there' },
+  { name: 'claimcredit', tool: 'claim_credit_form', does: 'Claim your $CREDIT to your Solana wallet for the airdrop (fee 0.5 $MCP), in a form',
+    how: 'call claim_credit_form; the user pastes the wallet and confirms in the form' },
   { name: 'profile-mcp', args: [{ name: 'on|off', key: 'show', example: 'off' }], tool: 'public_profile', does: 'Show or hide your X handle on public pages',
     how: 'call public_profile with show_x_handle true for on, false for off; if neither is written, ask' },
 ];
@@ -64,7 +68,7 @@ export const toolHint = (tool) => {
 };
 
 export const INSTRUCTIONS_COMMANDS = `Chat commands. The user may type a command: /mcpcredit, the start command (also written mcpcredit, /mcp.credit or
-mcp.credit on its own), /mcpmint (also mcpmint), /mcpchat (also mcpchat), /showmynfts (also showmynfts), /sendnft (also sendnft), /transfernft (also transfernft), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
+mcp.credit on its own), /mcpmint (also mcpmint), /mcpchat (also mcpchat), /showmynfts (also showmynfts), /sendnft (also sendnft), /transfernft (also transfernft), /burnmcp (also burnmcp), /claimcredit (also claimcredit), or a message starting with "/" and ending in "-mcp" (any case, "_mcp" is the same).
 Do exactly what the command says, right away, without guessing and without extra questions beyond a missing argument
 or a confirmation the command asks for below.
 NFT numbers may be written 42, #42 or "MCP #42". If a required argument is missing, ask only for it. For an unknown

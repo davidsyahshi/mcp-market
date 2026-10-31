@@ -31,6 +31,10 @@ export const TABLES = {
   promo_redemptions: 'id',
   promo_tasks_shown: 'code, user_id',
   deposit_claims: 'id',
+  burns: 'id',
+  credit_claims: 'id',
+  credit_drops: 'code',
+  credit_drop_claims: 'id',
   oauth_clients: 'client_id',
   oauth_tokens: 'token',
 };
@@ -156,7 +160,7 @@ export async function restoreBackup(db, buf, { batch = 500 } = {}) {
       }
     }
     // the id counters carry on after the restored rows
-    for (const name of ['users', 'collections', 'ledger', 'sales', 'deposits', 'withdrawals', 'withdrawal_attempts', 'chain_anchors', 'promo_redemptions']) {
+    for (const name of ['users', 'collections', 'ledger', 'sales', 'deposits', 'withdrawals', 'withdrawal_attempts', 'chain_anchors', 'promo_redemptions', 'deposit_claims', 'burns', 'credit_claims', 'credit_drop_claims']) {
       await t.query(`select setval(pg_get_serial_sequence('${name}', 'id'), greatest((select max(id) from ${name}), 1), (select max(id) from ${name}) is not null)`);
     }
     await t.query("select setval('nft_ids', greatest((select max(id) from nfts where id >= 100001), 100001), (select max(id) from nfts where id >= 100001) is not null)");
@@ -179,5 +183,10 @@ export async function checkMoney(db) {
     if (entryHash(prev, ledgerEntry(r)) !== r.hash) { chainOk = false; brokenAt = Number(r.seq); break; }
     prev = r.hash;
   }
-  return { balancesMatch: off.length === 0, balancesOff: off.length, chainOk, sealed: rows.length, brokenAt };
+  // $CREDIT (credit.js): burns + finished free drops - claims that are not void
+  const creditOff = await db.query(`select u.id from users u where u.credit_balance <>
+    coalesce((select sum(credit) from burns where user_id = u.id), 0)
+    + coalesce((select sum(amount) from credit_drop_claims where user_id = u.id and stage = 'done'), 0)
+    - coalesce((select sum(amount) from credit_claims where user_id = u.id and status <> 'void'), 0)`);
+  return { balancesMatch: off.length === 0, balancesOff: off.length, chainOk, sealed: rows.length, brokenAt, creditMatch: creditOff.length === 0 };
 }

@@ -80,6 +80,10 @@ function onCurve(bytes) {
   }
 }
 
+// a wallet: a public key on the ed25519 curve. Associated token accounts and other program addresses are off the
+// curve, so a token account pasted in place of the wallet is caught without asking the network
+export const isWallet = (s) => isAddress(s) && onCurve(base58.decode(s));
+
 export function findProgramAddress(seeds, programId) {
   const program = base58.decode(programId);
   for (let bump = 255; bump >= 0; bump--) {
