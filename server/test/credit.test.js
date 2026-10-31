@@ -45,7 +45,10 @@ async function user(handle = `cr${++n}`, dollars = 10) {
   if (dollars) await m.credit(db, u.id, dollars * 1e6, 'deposit', `USDC ${sig()} ${sig().slice(0, 44)}`);
   return (await db.query('select * from users where id = $1', [u.id]))[0];
 }
-const nftsOf = async (u, k) => (await m.teamMint(db, u.id, k)).minted.map((x) => x.id);
+// k unminted MCP NFTs of one rarity (Common by default, so a burn gives 10,000 each) given to the account
+const nftsOf = async (u, k, rarity = 'Common') => (await db.query(`update nfts set owner_id = $1, minted_at = now() where id in (
+    select n.id from nfts n join collections c on c.id = n.collection_id where c.slug = 'mcp' and n.minted_at is null and n.rarity = $2
+    order by random() limit $3) returning id`, [u.id, rarity, k])).map((x) => Number(x.id));
 const creditOf = async (u) => Number((await db.query('select credit_balance from users where id = $1', [u.id]))[0].credit_balance);
 // the invariant: an account's $CREDIT is what its burns gave minus what its claims took
 async function creditMatches() {
@@ -487,6 +490,52 @@ test('review fixes: void returns the $CREDIT, the copied claims are what gets ma
   // a finished free drop can't be edited
   const [done] = await db.query("select id from credit_drop_claims where stage = 'done' limit 1");
   if (done) await assert.rejects(db.query('update credit_drop_claims set amount = 1 where id = $1', [done.id]), /is done/);
+});
+
+test('rarer NFTs burn for more: Common 1x, Rare 2x, Epic 5x, Legendary 8x, Ultra-Rare 10x', async () => {
+  assert.deepEqual(credit.RARITY_X, { Common: 1, Rare: 2, Epic: 5, Legendary: 8, 'Ultra-Rare': 10 });
+  assert.equal(credit.creditFor('Ultra-Rare'), 100_000);
+  assert.equal(credit.creditFor(null), 10_000);
+  assert.equal(credit.rarityLine(), '10,000 each · Rare 2x · Epic 5x · Legendary 8x · Ultra-Rare 10x');
+  const a = await user(undefined, 0);
+  const ids = [];
+  for (const r of ['Common', 'Rare', 'Epic', 'Legendary', 'Ultra-Rare']) ids.push(...await nftsOf(a, 1, r));
+  // the form shows each NFT's $CREDIT
+  const c = await chat(a);
+  const st = (await c.raw('burn_form')).structuredContent.state;
+  assert.deepEqual(st.nfts.map((n) => [n.rarity, n.credit]).sort((x, y) => x[1] - y[1]),
+    [['Common', 10_000], ['Rare', 20_000], ['Epic', 50_000], ['Legendary', 80_000], ['Ultra-Rare', 100_000]]);
+  assert.deepEqual(st.credit.rarity_x, credit.RARITY_X);
+  const b = await credit.burn(db, a.id, ids);
+  assert.equal(b.credit, 260_000);
+  assert.deepEqual(b.nfts.map((n) => n.credit).sort((x, y) => x - y), [10_000, 20_000, 50_000, 80_000, 100_000]);
+  assert.equal(await creditOf(a), 260_000);
+  const [row] = await db.query('select credit from burns where id = $1', [b.id]);
+  assert.equal(Number(row.credit), 260_000);
+  assert.ok(await creditMatches());
+});
+
+test('burns made before the rarity rates are topped up to them once, never lowered', async () => {
+  const { migrate } = await import('../src/schema.js');
+  const a = await user(undefined, 0);
+  const [rare] = await nftsOf(a, 1, 'Rare');
+  const [leg] = await nftsOf(a, 1, 'Legendary');
+  const [com] = await nftsOf(a, 1, 'Common');
+  // as the old code did it: 10,000 each
+  const old = await credit.burn(db, a.id, [rare, leg, com]);
+  await db.query('update burns set credit = 30000 where id = $1', [old.id]);
+  await db.query('update users set credit_balance = credit_balance - $1 where id = $2', [old.credit - 30_000, a.id]);
+  assert.equal(await creditOf(a), 30_000);
+  // the migration runs again as on the first start of the new code
+  await db.query("delete from app_meta where key in ('schema', 'data:credit-rarity')");
+  await migrate(db);
+  assert.equal(await creditOf(a), 20_000 + 80_000 + 10_000);
+  assert.equal(Number((await db.query('select credit from burns where id = $1', [old.id]))[0].credit), 110_000);
+  assert.ok(await creditMatches());
+  // once: running it again changes nothing
+  await db.query("delete from app_meta where key in ('schema', 'data:credit-rarity')");
+  await migrate(db);
+  assert.equal(await creditOf(a), 110_000);
 });
 
 // a signed-in browser on the site (test sign-in), cookies kept by hand
